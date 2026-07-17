@@ -148,14 +148,25 @@ export default function GenerateDocument() {
             <p className="text-xs text-[#5f6368]">Gerar documento com IA</p>
           </div>
           {hasResults && (
-            <button
-              onClick={handleExport}
-              disabled={exporting}
-              className="flex items-center gap-2 px-4 py-2 bg-[#1a73e8] text-white rounded-lg text-sm font-medium hover:bg-[#1557b0] transition-colors disabled:opacity-50"
-            >
-              {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-              {exporting ? 'Exportando...' : 'Exportar DOCX'}
-            </button>
+            <div className="flex items-center gap-3">
+              <label className="flex items-center gap-1.5 text-xs text-[#3c4043] cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={comTimbrado}
+                  onChange={(e) => setComTimbrado(e.target.checked)}
+                  className="w-4 h-4 accent-[#1a73e8]"
+                />
+                Incluir timbrado
+              </label>
+              <button
+                onClick={handleExport}
+                disabled={exporting}
+                className="flex items-center gap-2 px-4 py-2 bg-[#1a73e8] text-white rounded-lg text-sm font-medium hover:bg-[#1557b0] transition-colors disabled:opacity-50"
+              >
+                {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                {exporting ? 'Exportando...' : 'Exportar DOCX'}
+              </button>
+            </div>
           )}
         </div>
 
