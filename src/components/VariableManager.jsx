@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
-import { Plus, Variable as VariableIcon, Save, Loader2, Info } from 'lucide-react';
+import { Plus, Variable as VariableIcon, Save, Loader2, Info, Sparkles } from 'lucide-react';
 
 export default function VariableManager({
   variables,
   onAddVariable,
   onUpdateDescription,
   onSave,
-  saving
+  saving,
+  onOpenAI
 }) {
   const [newVarName, setNewVarName] = useState('');
   const [error, setError] = useState('');
@@ -37,6 +38,13 @@ export default function VariableManager({
 
       {/* Add new variable */}
       <div className="px-5 py-3 border-b border-[#dadce0]">
+        <button
+          onClick={onOpenAI}
+          className="flex items-center justify-center gap-2 w-full mb-3 px-4 py-2 border border-[#1a73e8] text-[#1a73e8] rounded-lg text-sm font-medium hover:bg-[#e8f0fe] transition-colors"
+        >
+          <Sparkles className="w-4 h-4" />
+          Criar variáveis com IA
+        </button>
         <div className="flex gap-2">
           <input
             type="text"
@@ -55,7 +63,7 @@ export default function VariableManager({
         </div>
         {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
         <p className="text-xs text-[#9aa0a6] mt-1">
-          Use o formato {'{{NOME_VARIAVEL}}'} no texto
+          Use {'{{NOME_VARIAVEL}}'} no texto ou grife um trecho e clique em {'{{x}}'} na barra do editor
         </p>
       </div>
 

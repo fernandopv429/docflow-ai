@@ -1,8 +1,9 @@
 import React, { forwardRef, useImperativeHandle, useRef, useEffect } from 'react';
 
-const RichTextEditor = forwardRef(({ value, onChange, placeholder }, ref) => {
+const RichTextEditor = forwardRef(({ value, onChange, placeholder, onVariableFromSelection }, ref) => {
   const editorRef = useRef(null);
   const isInternalChange = useRef(false);
+  const pendingRange = useRef(null);
 
   // Sync external value changes to the DOM (e.g. on load)
   useEffect(() => {
@@ -36,6 +37,17 @@ const RichTextEditor = forwardRef(({ value, onChange, placeholder }, ref) => {
       range.collapse(true);
       sel.removeAllRanges();
       sel.addRange(range);
+      isInternalChange.current = true;
+      onChange(el.innerHTML);
+    },
+    applyPendingVariable: (varName) => {
+      const el = editorRef.current;
+      const range = pendingRange.current;
+      if (!el || !range) return;
+      range.deleteContents();
+      const text = document.createTextNode(`{{${varName}}}`);
+      range.insertNode(text);
+      pendingRange.current = null;
       isInternalChange.current = true;
       onChange(el.innerHTML);
     }
@@ -136,6 +148,25 @@ const RichTextEditor = forwardRef(({ value, onChange, placeholder }, ref) => {
         <ToolbarButton cmd="justifyRight" title="Alinhar à direita">
           ⯈
         </ToolbarButton>
+        <div className="w-px h-5 bg-[#dadce0] mx-1" />
+        <button
+          type="button"
+          title="Transformar seleção em variável"
+          onMouseDown={(e) => {
+            e.preventDefault();
+            const sel = window.getSelection();
+            const text = sel.toString().trim();
+            if (!text || sel.rangeCount === 0 || !editorRef.current?.contains(sel.anchorNode)) {
+              alert('Grife (selecione) um trecho do texto para transformá-lo em variável');
+              return;
+            }
+            pendingRange.current = sel.getRangeAt(0).cloneRange();
+            onVariableFromSelection?.(text);
+          }}
+          className="px-2 h-7 flex items-center justify-center text-[#1a73e8] hover:bg-[#e8f0fe] rounded text-xs font-mono font-medium transition-colors"
+        >
+          {'{{x}}'}
+        </button>
         <div className="w-px h-5 bg-[#dadce0] mx-1" />
         <button
           type="button"
