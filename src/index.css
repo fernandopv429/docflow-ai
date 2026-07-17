@@ -91,35 +91,29 @@
   }
 }
 
-/* ===== Quill Editor - Google Docs Style ===== */
-.ql-toolbar.ql-snow {
-  border: none !important;
-  border-bottom: 1px solid #dadce0 !important;
-  background: #f8f9fa;
-  padding: 8px 16px !important;
-  position: sticky;
-  top: 0;
-  z-index: 10;
-}
-
-.ql-container.ql-snow {
-  border: none !important;
+/* ===== Rich Text Editor - Google Docs Style ===== */
+.doc-editor-content {
   font-family: Arial, sans-serif;
   font-size: 11pt;
   line-height: 1.5;
   color: #202124;
-}
-
-.ql-editor {
-  padding: 96px 96px !important;
+  padding: 96px;
   min-height: 800px;
 }
 
-.ql-editor.ql-blank::before {
+.doc-editor-content:empty::before {
+  content: attr(data-placeholder);
   color: #9aa0a6;
-  font-style: normal;
-  left: 96px;
+  pointer-events: none;
 }
+
+.doc-editor-content h1 { font-size: 1.5em; font-weight: 700; margin: 0.5em 0; }
+.doc-editor-content h2 { font-size: 1.25em; font-weight: 700; margin: 0.5em 0; }
+.doc-editor-content h3 { font-size: 1.1em; font-weight: 700; margin: 0.5em 0; }
+.doc-editor-content p { margin: 0.5em 0; }
+.doc-editor-content ul, .doc-editor-content ol { margin: 0.5em 0; padding-left: 2em; }
+.doc-editor-content li { margin: 0.25em 0; }
+.doc-editor-content a { color: #1a73e8; text-decoration: underline; }
 
 /* ===== Variable Highlighting in Preview ===== */
 .var-pending {
