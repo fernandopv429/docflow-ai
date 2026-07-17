@@ -90,3 +90,69 @@
     @apply bg-background text-foreground font-body;
   }
 }
+
+/* ===== Quill Editor - Google Docs Style ===== */
+.ql-toolbar.ql-snow {
+  border: none !important;
+  border-bottom: 1px solid #dadce0 !important;
+  background: #f8f9fa;
+  padding: 8px 16px !important;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.ql-container.ql-snow {
+  border: none !important;
+  font-family: Arial, sans-serif;
+  font-size: 11pt;
+  line-height: 1.5;
+  color: #202124;
+}
+
+.ql-editor {
+  padding: 96px 96px !important;
+  min-height: 800px;
+}
+
+.ql-editor.ql-blank::before {
+  color: #9aa0a6;
+  font-style: normal;
+  left: 96px;
+}
+
+/* ===== Variable Highlighting in Preview ===== */
+.var-pending {
+  display: inline-block;
+  background: #e8f0fe;
+  color: #1a73e8;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-family: ui-monospace, monospace;
+  font-size: 0.85em;
+  font-weight: 500;
+}
+
+.var-filled {
+  color: #202124;
+  font-weight: 500;
+}
+
+/* ===== Document Preview ===== */
+.doc-preview {
+  font-family: Arial, sans-serif;
+  font-size: 11pt;
+  line-height: 1.5;
+  color: #202124;
+}
+
+.doc-preview h1 { font-size: 1.5em; font-weight: 700; margin: 0.5em 0; text-align: center; }
+.doc-preview h2 { font-size: 1.25em; font-weight: 700; margin: 0.5em 0; }
+.doc-preview h3 { font-size: 1.1em; font-weight: 700; margin: 0.5em 0; }
+.doc-preview p { margin: 0.5em 0; }
+.doc-preview ul, .doc-preview ol { margin: 0.5em 0; padding-left: 2em; }
+.doc-preview li { margin: 0.25em 0; }
+.doc-preview strong, .doc-preview b { font-weight: 700; }
+.doc-preview em, .doc-preview i { font-style: italic; }
+.doc-preview u { text-decoration: underline; }
+.doc-preview a { color: #1a73e8; text-decoration: underline; }
