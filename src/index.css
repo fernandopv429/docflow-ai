@@ -105,21 +105,44 @@
   background: transparent !important;
   padding: 0 !important;
   margin: -96px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  background-color: #f8f9fa !important;
 }
 
 .doc-editor-content .docx-wrapper > section.docx {
-  box-shadow: none !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2) !important;
   width: 100% !important;
+  background: white;
+  margin: 0 auto;
 }
 
 .doc-preview .docx-wrapper {
   background: transparent !important;
   padding: 0 !important;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  background-color: #f8f9fa !important;
 }
 
 .doc-preview .docx-wrapper > section.docx {
-  box-shadow: none !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2) !important;
   width: 100% !important;
+  background: white;
+  margin: 0 auto;
+}
+
+/* Page division lines for regular (non-imported) editor content — A4 height */
+.doc-editor-content {
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent 1055px,
+    #f8f9fa 1055px,
+    #f8f9fa 1079px
+  );
 }
 
 .doc-editor-content:empty::before {
