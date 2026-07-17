@@ -142,9 +142,9 @@ function processBlock(block, out) {
 
 // ---------- Timbrado: cabecalho e rodape ----------
 
-async function buildHeader(comLogo) {
+function buildHeader(comLogo) {
   const children = [];
-  const logoBytes = comLogo ? await carregarLogoBytes() : null;
+  const logoBytes = comLogo ? carregarLogoBytes() : null;
 
   if (logoBytes) {
     children.push(new Paragraph({
@@ -219,7 +219,7 @@ export async function exportToDocx(html, variables, title, opts = {}) {
     processBlock(block, children);
   }
 
-  const header = await buildHeader(comTimbrado);
+  const header = buildHeader(comTimbrado);
   const footer = buildFooter();
 
   const docx = new Document({
