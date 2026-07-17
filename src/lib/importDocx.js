@@ -11,82 +11,75 @@ const REGRAS = `REGRAS CRITICAS:
 export async function importDocxAsTemplate(file, { onProgress } = {}) {
   const { file_url } = await base44.integrations.Core.UploadFile({ file });
 
-  if (onProgress) onProgress('Analisando documento...');
+  // Step 1: Extract raw text content, segmented by pages
+  if (onProgress) onProgress('Extraindo conteudo do documento...');
+  const extractResult = await base44.integrations.Core.InvokeLLM({
+    prompt: `Extraia TODO o texto do documento anexo, segmentado por paginas.
 
-  const outline = await base44.integrations.Core.InvokeLLM({
-    prompt: `Analise o documento anexo e retorne:
-- title: o primeiro titulo/cabecalho do documento (ou "Documento Importado")
-- total_paginas: numero aproximado de paginas do documento`,
+Para cada pagina do documento, retorne o texto completo exatamente como aparece, incluindo:
+- Texto de paragrafos (inteiros, sem resumir)
+- Texto de tabelas (use | para separar colunas, uma linha por linha da tabela)
+- Titulos e cabecalhos
+- Marque alinhamento quando relevante: [CENTRO], [DIREITA], [JUSTIFICADO]
+- Inclua assinaturas, rodapes e tudo que estiver no documento
+
+NAO omita NADA. Se o documento for longo, divida em quantas paginas forem necessarias — cada pagina como um item separado do array. E preferivel ter muitas paginas pequenas do que poucas paginas que truncam.
+
+Retorne:
+- title: primeiro titulo ou cabecalho do documento (ou "Documento Importado")
+- pages: array de strings, cada string contendo o texto completo de uma pagina`,
     file_urls: [file_url],
     response_json_schema: {
       type: 'object',
       properties: {
         title: { type: 'string' },
-        total_paginas: { type: 'number' },
+        pages: {
+          type: 'array',
+          items: { type: 'string' },
+        },
       },
     },
     model: 'claude_sonnet_4_6',
   });
 
-  const outlineData = outline.response || outline;
-  const totalPaginas = Math.max(1, Math.round(outlineData.total_paginas || 1));
+  const extractData = extractResult.response || extractResult;
+  const title = extractData.title || 'Documento Importado';
+  const pages = extractData.pages || [];
 
-  if (totalPaginas <= 4) {
-    if (onProgress) onProgress('Convertendo documento...');
-    const result = await base44.integrations.Core.InvokeLLM({
-      prompt: `Converta o documento anexo INTEIRO para HTML, do primeiro ao ultimo paragrafo, incluindo assinaturas e rodapes.
-
-${REGRAS}
-
-Retorne:
-- content_html: conteudo COMPLETO em HTML, fiel ao original, sem nenhuma alteracao ou omissao de texto`,
-      file_urls: [file_url],
-      response_json_schema: {
-        type: 'object',
-        properties: { content_html: { type: 'string' } },
-      },
-      model: 'claude_sonnet_4_6',
-    });
-    const data = result.response || result;
-    return {
-      title: outlineData.title || 'Documento Importado',
-      content: data.content_html || '',
-      variables: [],
-    };
+  if (pages.length === 0) {
+    return { title, content: '', variables: [] };
   }
 
-  const PAGINAS_POR_PARTE = 4;
-  const totalPartes = Math.ceil(totalPaginas / PAGINAS_POR_PARTE);
-  const partesHtml = [];
+  // Step 2: Convert each page to HTML individually (prevents truncation on long docs)
+  const htmlParts = [];
+  for (let i = 0; i < pages.length; i++) {
+    if (onProgress) onProgress(`Convertendo pagina ${i + 1} de ${pages.length}...`);
+    const convertResult = await base44.integrations.Core.InvokeLLM({
+      prompt: `Converta o texto abaixo para HTML, preservando a formatacao e estrutura original.
 
-  for (let i = 0; i < totalPartes; i++) {
-    const inicio = i * PAGINAS_POR_PARTE + 1;
-    const fim = Math.min((i + 1) * PAGINAS_POR_PARTE, totalPaginas);
-    if (onProgress) onProgress(`Convertendo paginas ${inicio}-${fim} de ${totalPaginas}...`);
-
-    const result = await base44.integrations.Core.InvokeLLM({
-      prompt: `O documento anexo tem ${totalPaginas} paginas. Converta para HTML APENAS o conteudo das paginas ${inicio} a ${fim}.
-${i === 0 ? 'Comece do inicio absoluto do documento.' : `Comece EXATAMENTE onde a pagina ${inicio} inicia, sem repetir conteudo anterior.`}
-${fim === totalPaginas ? 'Va ate o final absoluto do documento, incluindo assinaturas.' : `Pare no final da pagina ${fim}.`}
+TEXTO DA PAGINA ${i + 1}:
+${pages[i]}
 
 ${REGRAS}
 
 Retorne:
-- content_html: o HTML COMPLETO desse trecho, fiel ao original, sem omissoes`,
-      file_urls: [file_url],
+- html: o HTML COMPLETO desta pagina, fiel ao texto acima, sem omissoes`,
       response_json_schema: {
         type: 'object',
-        properties: { content_html: { type: 'string' } },
+        properties: {
+          html: { type: 'string' },
+        },
       },
       model: 'claude_sonnet_4_6',
     });
-    const data = result.response || result;
-    partesHtml.push(data.content_html || '');
+
+    const convertData = convertResult.response || convertResult;
+    htmlParts.push(convertData.html || '');
   }
 
   return {
-    title: outlineData.title || 'Documento Importado',
-    content: partesHtml.join('\n'),
+    title,
+    content: htmlParts.join('\n'),
     variables: [],
   };
 }
