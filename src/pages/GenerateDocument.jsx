@@ -24,6 +24,7 @@ export default function GenerateDocument() {
   const [values, setValues] = useState({});
   const [error, setError] = useState(null);
   const [exporting, setExporting] = useState(false);
+  const [comTimbrado, setComTimbrado] = useState(true);
 
   useEffect(() => {
     base44.entities.Template
@@ -104,7 +105,7 @@ export default function GenerateDocument() {
   const handleExport = async () => {
     setExporting(true);
     try {
-      await exportToDocx(template.content, values, template.title);
+      await exportToDocx(template.content, values, template.title, { comTimbrado });
       await base44.entities.GeneratedDocument.create({
         template_id: template.id,
         template_title: template.title,
