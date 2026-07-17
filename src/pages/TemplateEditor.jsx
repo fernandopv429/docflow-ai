@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, Loader2, Sparkles } from 'lucide-react';
+import { ArrowLeft, Loader2, Sparkles, Upload } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import RichTextEditor from '@/components/RichTextEditor';
 import VariableManager from '@/components/VariableManager';
 import { extractVariables } from '@/lib/variables';
+import { importDocxAsTemplate } from '@/lib/importDocx';
 
 export default function TemplateEditor() {
   const { id } = useParams();
@@ -14,6 +15,7 @@ export default function TemplateEditor() {
   const [variables, setVariables] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [importing, setImporting] = useState(false);
   const editorRef = useRef(null);
 
   useEffect(() => {
@@ -72,6 +74,22 @@ export default function TemplateEditor() {
     });
   };
 
+  const handleImportDocx = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setImporting(true);
+    try {
+      const result = await importDocxAsTemplate(file);
+      setTitle(result.title);
+      setContent(result.content);
+      setVariables(result.variables);
+    } catch (err) {
+      alert('Erro ao importar documento. Tente novamente.');
+    }
+    setImporting(false);
+    e.target.value = '';
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -96,6 +114,11 @@ export default function TemplateEditor() {
             placeholder="Título do documento"
             className="flex-1 text-lg font-medium text-[#202124] bg-transparent border-none focus:outline-none"
           />
+          <input type="file" accept=".docx" onChange={handleImportDocx} className="hidden" id="import-docx" />
+          <label htmlFor="import-docx" className="flex items-center gap-2 px-4 py-2 text-[#3c4043] border border-[#dadce0] rounded-lg text-sm font-medium hover:bg-[#f8f9fa] transition-colors cursor-pointer">
+            {importing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+            {importing ? 'Importando...' : 'Importar DOCX'}
+          </label>
           {id && (
             <Link
               to={`/templates/${id}/generate`}

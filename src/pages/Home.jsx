@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { FileText, Plus, MoreVertical, Trash2, Copy, Sparkles, Loader2 } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { FileText, Plus, MoreVertical, Trash2, Copy, Sparkles, Loader2, Upload } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
+import { importDocxAsTemplate } from '@/lib/importDocx';
 
 export default function Home() {
   const [templates, setTemplates] = useState([]);
   const [loading, setLoading] = useState(true);
   const [openMenu, setOpenMenu] = useState(null);
+  const [importing, setImporting] = useState(false);
+  const navigate = useNavigate();
 
   const load = () => {
     base44.entities.Template
@@ -17,6 +20,25 @@ export default function Home() {
   };
 
   useEffect(load, []);
+
+  const handleImportDocx = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setImporting(true);
+    try {
+      const result = await importDocxAsTemplate(file);
+      const created = await base44.entities.Template.create({
+        title: result.title,
+        content: result.content,
+        variables: result.variables,
+      });
+      navigate(`/templates/${created.id}`);
+    } catch (err) {
+      alert('Erro ao importar documento. Tente novamente.');
+    }
+    setImporting(false);
+    e.target.value = '';
+  };
 
   const handleDelete = async (id) => {
     if (!confirm('Excluir este template?')) return;
@@ -50,13 +72,20 @@ export default function Home() {
           <h1 className="text-2xl font-semibold text-[#202124]">Meus Templates</h1>
           <p className="text-sm text-[#5f6368] mt-1">Crie documentos com variáveis preenchidas por IA</p>
         </div>
-        <Link
-          to="/templates/new"
-          className="flex items-center gap-2 px-4 py-2.5 bg-[#1a73e8] text-white rounded-lg text-sm font-medium hover:bg-[#1557b0] transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          Novo Template
-        </Link>
+        <div className="flex items-center gap-2">
+          <input type="file" accept=".docx" onChange={handleImportDocx} className="hidden" id="import-docx-home" />
+          <label htmlFor="import-docx-home" className="flex items-center gap-2 px-4 py-2.5 text-[#3c4043] border border-[#dadce0] rounded-lg text-sm font-medium hover:bg-[#f8f9fa] transition-colors cursor-pointer">
+            {importing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+            {importing ? 'Importando...' : 'Importar DOCX'}
+          </label>
+          <Link
+            to="/templates/new"
+            className="flex items-center gap-2 px-4 py-2.5 bg-[#1a73e8] text-white rounded-lg text-sm font-medium hover:bg-[#1557b0] transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            Novo Template
+          </Link>
+        </div>
       </div>
 
       {templates.length === 0 ? (
