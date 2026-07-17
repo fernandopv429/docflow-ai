@@ -107,11 +107,15 @@ export default function TemplateEditor() {
 
   const handleSelectionVariable = (text) => setSelDialog({ open: true, text });
 
-  const confirmSelectionVariable = (name) => {
+  const confirmSelectionVariable = (name, description) => {
     editorRef.current?.applyPendingVariable(name);
-    setVariables((prev) =>
-      prev.find((v) => v.name === name) ? prev : [...prev, { name, description: '' }]
-    );
+    setVariables((prev) => {
+      const existing = prev.find((v) => v.name === name);
+      if (existing) {
+        return prev.map((v) => (v.name === name ? { ...v, description: description || v.description } : v));
+      }
+      return [...prev, { name, description: description || '' }];
+    });
     setSelDialog({ open: false, text: '' });
   };
 

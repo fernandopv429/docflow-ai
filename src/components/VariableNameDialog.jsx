@@ -3,9 +3,13 @@ import { Highlighter, X } from 'lucide-react';
 
 export default function VariableNameDialog({ open, selectedText, onConfirm, onClose }) {
   const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
 
   useEffect(() => {
-    if (open) setName('');
+    if (open) {
+      setName('');
+      setDescription('');
+    }
   }, [open]);
 
   if (!open) return null;
@@ -13,7 +17,7 @@ export default function VariableNameDialog({ open, selectedText, onConfirm, onCl
   const handleConfirm = () => {
     const clean = name.trim().toUpperCase().replace(/\s+/g, '_');
     if (!clean) return;
-    onConfirm(clean);
+    onConfirm(clean, description.trim());
   };
 
   return (
@@ -42,6 +46,16 @@ export default function VariableNameDialog({ open, selectedText, onConfirm, onCl
             placeholder="NOME_DA_VARIAVEL"
             className="w-full px-3 py-2 text-sm border border-[#dadce0] rounded-md focus:outline-none focus:border-[#1a73e8] focus:ring-1 focus:ring-[#1a73e8]"
           />
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="Descreva o que esta variável representa (ajuda a IA no preenchimento)..."
+            rows={2}
+            className="w-full mt-2 px-3 py-2 text-sm border border-[#dadce0] rounded-md resize-none focus:outline-none focus:border-[#1a73e8] focus:ring-1 focus:ring-[#1a73e8]"
+          />
+          <p className="text-xs text-[#9aa0a6] mt-2">
+            Apenas o trecho selecionado será substituído — o layout e a formatação do documento permanecem iguais.
+          </p>
         </div>
         <div className="flex justify-end gap-2 px-5 py-4 border-t border-[#dadce0]">
           <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-[#3c4043] border border-[#dadce0] rounded-lg hover:bg-[#f8f9fa]">
