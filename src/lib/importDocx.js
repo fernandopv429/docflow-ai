@@ -1,4 +1,4 @@
-import mammoth from 'mammoth';
+import * as mammoth from 'mammoth/mammoth.browser';
 
 export async function importDocxAsTemplate(file, { onProgress } = {}) {
   if (onProgress) onProgress('Lendo documento...');
