@@ -1,52 +1,64 @@
-let mammothPromise = null;
+let docxPreviewPromise = null;
 
-function loadMammoth() {
-  if (window.mammoth) return Promise.resolve(window.mammoth);
-  if (!mammothPromise) {
-    mammothPromise = new Promise((resolve, reject) => {
-      const script = document.createElement('script');
-      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.8.0/mammoth.browser.min.js';
-      script.onload = () => resolve(window.mammoth);
-      script.onerror = () => {
-        mammothPromise = null;
-        reject(new Error('Falha ao carregar o conversor de DOCX'));
-      };
-      document.head.appendChild(script);
+function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = src;
+    script.onload = resolve;
+    script.onerror = () => reject(new Error('Falha ao carregar o conversor de DOCX'));
+    document.head.appendChild(script);
+  });
+}
+
+function loadDocxPreview() {
+  if (window.docx) return Promise.resolve(window.docx);
+  if (!docxPreviewPromise) {
+    docxPreviewPromise = (async () => {
+      if (!window.JSZip) {
+        await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js');
+      }
+      await loadScript('https://cdn.jsdelivr.net/npm/docx-preview@0.3.2/dist/docx-preview.min.js');
+      return window.docx;
+    })().catch((err) => {
+      docxPreviewPromise = null;
+      throw err;
     });
   }
-  return mammothPromise;
+  return docxPreviewPromise;
 }
 
 export async function importDocxAsTemplate(file) {
-  const mammoth = await loadMammoth();
+  const docx = await loadDocxPreview();
 
   const arrayBuffer = await file.arrayBuffer();
 
-  const result = await mammoth.convertToHtml(
-    { arrayBuffer },
-    {
-      styleMap: [
-        "p[style-name='Title'] => h1:fresh",
-        "p[style-name='Heading 1'] => h1:fresh",
-        "p[style-name='Heading 2'] => h2:fresh",
-        "p[style-name='Heading 3'] => h3:fresh",
-      ],
-    }
-  );
+  // Render into a hidden container to capture the full HTML (headers, footers, images)
+  const container = document.createElement('div');
+  const styleContainer = document.createElement('div');
+  container.style.position = 'fixed';
+  container.style.left = '-99999px';
+  container.style.top = '0';
+  document.body.appendChild(container);
 
-  const html = result.value || '';
+  try {
+    await docx.renderAsync(arrayBuffer, container, styleContainer, {
+      inWrapper: true,
+      renderHeaders: true,
+      renderFooters: true,
+      renderFootnotes: true,
+      experimental: true,
+      ignoreLastRenderedPageBreak: false,
+    });
 
-  // Extract title from first heading or use filename
-  let title = file.name.replace(/\.docx$/i, '');
-  const titleMatch = html.match(/<h[1-3][^>]*>(.*?)<\/h[1-3]>/i);
-  if (titleMatch) {
-    const headingText = titleMatch[1].replace(/<[^>]*>/g, '').trim();
-    if (headingText) title = headingText;
+    // Combine the generated styles with the rendered document HTML
+    const html = styleContainer.innerHTML + container.innerHTML;
+
+    return {
+      title: file.name.replace(/\.docx$/i, ''),
+      content: html,
+      variables: [],
+    };
+  } finally {
+    document.body.removeChild(container);
   }
-
-  return {
-    title,
-    content: html,
-    variables: [],
-  };
 }

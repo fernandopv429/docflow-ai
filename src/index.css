@@ -101,6 +101,27 @@
   min-height: 800px;
 }
 
+.doc-editor-content .docx-wrapper {
+  background: transparent !important;
+  padding: 0 !important;
+  margin: -96px;
+}
+
+.doc-editor-content .docx-wrapper > section.docx {
+  box-shadow: none !important;
+  width: 100% !important;
+}
+
+.doc-preview .docx-wrapper {
+  background: transparent !important;
+  padding: 0 !important;
+}
+
+.doc-preview .docx-wrapper > section.docx {
+  box-shadow: none !important;
+  width: 100% !important;
+}
+
 .doc-editor-content:empty::before {
   content: attr(data-placeholder);
   color: #9aa0a6;
