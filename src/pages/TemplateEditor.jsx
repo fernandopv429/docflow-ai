@@ -84,7 +84,8 @@ export default function TemplateEditor() {
       setContent(result.content);
       setVariables(result.variables);
     } catch (err) {
-      alert('Erro ao importar documento. Tente novamente.');
+      console.error(err);
+      alert(`Erro ao importar documento: ${err.message}`);
     }
     setImporting(false);
     e.target.value = '';

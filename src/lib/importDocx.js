@@ -1,11 +1,26 @@
-import * as mammoth from 'mammoth/mammoth.browser';
+let mammothPromise = null;
 
-export async function importDocxAsTemplate(file, { onProgress } = {}) {
-  if (onProgress) onProgress('Lendo documento...');
+function loadMammoth() {
+  if (window.mammoth) return Promise.resolve(window.mammoth);
+  if (!mammothPromise) {
+    mammothPromise = new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.8.0/mammoth.browser.min.js';
+      script.onload = () => resolve(window.mammoth);
+      script.onerror = () => {
+        mammothPromise = null;
+        reject(new Error('Falha ao carregar o conversor de DOCX'));
+      };
+      document.head.appendChild(script);
+    });
+  }
+  return mammothPromise;
+}
+
+export async function importDocxAsTemplate(file) {
+  const mammoth = await loadMammoth();
 
   const arrayBuffer = await file.arrayBuffer();
-
-  if (onProgress) onProgress('Convertendo DOCX para HTML...');
 
   const result = await mammoth.convertToHtml(
     { arrayBuffer },
@@ -22,12 +37,11 @@ export async function importDocxAsTemplate(file, { onProgress } = {}) {
   const html = result.value || '';
 
   // Extract title from first heading or use filename
-  let title = 'Documento Importado';
+  let title = file.name.replace(/\.docx$/i, '');
   const titleMatch = html.match(/<h[1-3][^>]*>(.*?)<\/h[1-3]>/i);
   if (titleMatch) {
-    title = titleMatch[1].replace(/<[^>]*>/g, '').trim() || file.name.replace(/\.docx$/i, '');
-  } else {
-    title = file.name.replace(/\.docx$/i, '');
+    const headingText = titleMatch[1].replace(/<[^>]*>/g, '').trim();
+    if (headingText) title = headingText;
   }
 
   return {

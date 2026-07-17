@@ -34,7 +34,8 @@ export default function Home() {
       });
       navigate(`/templates/${created.id}`);
     } catch (err) {
-      alert('Erro ao importar documento. Tente novamente.');
+      console.error(err);
+      alert(`Erro ao importar documento: ${err.message}`);
     }
     setImporting(false);
     e.target.value = '';
