@@ -7,7 +7,7 @@ import VariableManager from '@/components/VariableManager';
 import AIVariableDialog from '@/components/AIVariableDialog';
 import VariableNameDialog from '@/components/VariableNameDialog';
 import { extractVariables } from '@/lib/variables';
-import { importDocxAsTemplate } from '@/lib/importDocx';
+import { importDocxAsTemplate, sanitizeContentImages } from '@/lib/importDocx';
 
 export default function TemplateEditor() {
   const { id } = useParams();
@@ -51,7 +51,9 @@ export default function TemplateEditor() {
     }
     setSaving(true);
     try {
-      const data = { title, content, variables: mergedVars };
+      const cleanContent = await sanitizeContentImages(content);
+      if (cleanContent !== content) setContent(cleanContent);
+      const data = { title, content: cleanContent, variables: mergedVars };
       if (id) {
         await base44.entities.Template.update(id, data);
       } else {
@@ -59,7 +61,8 @@ export default function TemplateEditor() {
         navigate(`/templates/${created.id}`, { replace: true });
       }
     } catch (err) {
-      alert('Erro ao salvar template');
+      console.error(err);
+      alert(`Erro ao salvar template: ${err.message || 'tente novamente'}`);
     }
     setSaving(false);
   };

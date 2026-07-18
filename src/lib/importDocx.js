@@ -1,4 +1,28 @@
+import { base44 } from '@/api/base44Client';
+
 let docxPreviewPromise = null;
+
+// Replaces heavy base64 inline images in an HTML string with uploaded file URLs
+export async function sanitizeContentImages(html) {
+  if (!html || !html.includes('data:')) return html;
+  const div = document.createElement('div');
+  div.innerHTML = html;
+  await uploadInlineImages(div);
+  return div.innerHTML;
+}
+
+// Replaces heavy base64 inline images with uploaded file URLs so the content can be saved
+async function uploadInlineImages(rootElement) {
+  const imgs = Array.from(rootElement.querySelectorAll('img[src^="data:"]'));
+  for (const img of imgs) {
+    const res = await fetch(img.src);
+    const blob = await res.blob();
+    const ext = (blob.type.split('/')[1] || 'png').split('+')[0];
+    const file = new File([blob], `imagem.${ext}`, { type: blob.type });
+    const { file_url } = await base44.integrations.Core.UploadFile({ file });
+    img.src = file_url;
+  }
+}
 
 function loadScript(src) {
   return new Promise((resolve, reject) => {
@@ -49,6 +73,9 @@ export async function importDocxAsTemplate(file) {
       experimental: true,
       ignoreLastRenderedPageBreak: false,
     });
+
+    // Upload embedded images (base64) and replace with lightweight URLs
+    await uploadInlineImages(container);
 
     // Combine the generated styles with the rendered document HTML
     const html = styleContainer.innerHTML + container.innerHTML;
