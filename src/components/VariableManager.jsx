@@ -1,5 +1,5 @@
-import React from 'react';
-import { Variable as VariableIcon, Save, Loader2, Info } from 'lucide-react';
+import React, { useState } from 'react';
+import { Variable as VariableIcon, Save, Loader2, Info, ChevronRight, ChevronLeft } from 'lucide-react';
 
 export default function VariableManager({
   variables,
@@ -7,12 +7,43 @@ export default function VariableManager({
   onSave,
   saving
 }) {
+  const [collapsed, setCollapsed] = useState(false);
+
+  if (collapsed) {
+    return (
+      <aside className="w-12 flex-shrink-0 bg-white border-l border-[#dadce0] flex flex-col items-center py-3 gap-3">
+        <button
+          onClick={() => setCollapsed(false)}
+          title="Expandir painel de variáveis"
+          className="p-2 text-[#5f6368] hover:bg-[#f1f3f4] rounded-full"
+        >
+          <ChevronLeft className="w-4 h-4" />
+        </button>
+        <div className="relative" title={`${variables.length} variáveis`}>
+          <VariableIcon className="w-5 h-5 text-[#1a73e8]" />
+          {variables.length > 0 && (
+            <span className="absolute -top-1.5 -right-2 min-w-[16px] h-4 px-1 flex items-center justify-center bg-[#1a73e8] text-white text-[10px] font-medium rounded-full">
+              {variables.length}
+            </span>
+          )}
+        </div>
+      </aside>
+    );
+  }
+
   return (
     <aside className="w-80 flex-shrink-0 bg-white border-l border-[#dadce0] flex flex-col">
       <div className="px-5 py-4 border-b border-[#dadce0]">
         <div className="flex items-center gap-2">
           <VariableIcon className="w-4 h-4 text-[#1a73e8]" />
-          <h2 className="font-semibold text-[#202124] text-sm">Variáveis</h2>
+          <h2 className="font-semibold text-[#202124] text-sm flex-1">Variáveis</h2>
+          <button
+            onClick={() => setCollapsed(true)}
+            title="Recolher painel"
+            className="p-1 text-[#5f6368] hover:bg-[#f1f3f4] rounded-full"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
         </div>
         <p className="text-xs text-[#5f6368] mt-1">
           Serão preenchidas pela IA ao analisar documentos
