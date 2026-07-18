@@ -176,6 +176,8 @@ export default function TemplateEditor() {
         saving={saving}
         skill={skill}
         onUpdateSkill={setSkill}
+        content={content}
+        title={title}
       />
 
       <VariableNameDialog

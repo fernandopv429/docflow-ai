@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Variable as VariableIcon, Save, Loader2, Info, ChevronRight, ChevronLeft } from 'lucide-react';
 import SkillSection from '@/components/SkillSection';
+import EditorDocUpload from '@/components/EditorDocUpload';
 
 export default function VariableManager({
   variables,
@@ -8,7 +9,9 @@ export default function VariableManager({
   onSave,
   saving,
   skill,
-  onUpdateSkill
+  onUpdateSkill,
+  content,
+  title
 }) {
   const [collapsed, setCollapsed] = useState(false);
 
@@ -54,6 +57,8 @@ export default function VariableManager({
       </div>
 
       <SkillSection skill={skill} onChange={onUpdateSkill} />
+
+      <EditorDocUpload variables={variables} skill={skill} content={content} title={title} />
 
       {/* Variable list */}
       <div className="flex-1 overflow-y-auto">
