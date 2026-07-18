@@ -13,6 +13,7 @@ import {
 import { base44 } from '@/api/base44Client';
 import { extractVariables, highlightVariablesInHtml } from '@/lib/variables';
 import { exportToDocx } from '@/lib/exportDocx';
+import CorrectionChat from '@/components/CorrectionChat';
 
 export default function GenerateDocument() {
   const { id } = useParams();
@@ -273,6 +274,17 @@ export default function GenerateDocument() {
           )}
         </div>
       </aside>
+
+      {hasResults && (
+        <CorrectionChat
+          template={template}
+          variables={variables}
+          values={values}
+          onValuesChange={setValues}
+          fileUrls={uploadedUrls}
+          onSkillSaved={(newSkill) => setTemplate((prev) => ({ ...prev, skill: newSkill }))}
+        />
+      )}
     </div>
   );
 }
