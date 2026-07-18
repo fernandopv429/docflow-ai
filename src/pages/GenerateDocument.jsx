@@ -84,10 +84,14 @@ export default function GenerateDocument() {
       };
 
       const varList = variables
-        .map((v) => `- ${v.name}: ${v.description || 'sem descrição'}`)
+        .map((v) => {
+          let line = `- ${v.name}: ${v.description || 'sem descrição'}`;
+          if (v.example) line += ` (exemplo de formato esperado: "${v.example}")`;
+          return line;
+        })
         .join('\n');
 
-      const prompt = `Você é um assistente especializado em análise de documentos. Analise os documentos enviados (PDFs ou imagens de documentos como CNH, RG, contratos, etc.) e extraia os valores para as seguintes variáveis:\n\n${varList}\n\nPara cada variável, encontre o valor correspondente no documento. Se um valor não for encontrado, retorne uma string vazia. Responda apenas com o objeto JSON.`;
+      const prompt = `Você é um assistente especializado em análise de documentos. Analise os documentos enviados (PDFs ou imagens de documentos como CNH, RG, contratos, etc.) e extraia os valores para as seguintes variáveis:\n\n${varList}\n\nPara cada variável, encontre o valor correspondente no documento. Quando houver um exemplo de formato esperado, retorne o valor no mesmo formato do exemplo. Se um valor não for encontrado, retorne uma string vazia. Responda apenas com o objeto JSON.`;
 
       const result = await base44.integrations.Core.InvokeLLM({
         prompt,
