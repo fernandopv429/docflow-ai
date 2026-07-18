@@ -14,6 +14,7 @@ import { base44 } from '@/api/base44Client';
 import { extractVariables, highlightVariablesInHtml } from '@/lib/variables';
 import { exportToDocx } from '@/lib/exportDocx';
 import CorrectionChat from '@/components/CorrectionChat';
+import { loadTemplateContent } from '@/lib/templateContent';
 
 export default function GenerateDocument() {
   const { id } = useParams();
@@ -30,7 +31,10 @@ export default function GenerateDocument() {
   useEffect(() => {
     base44.entities.Template
       .get(id)
-      .then(setTemplate)
+      .then(async (t) => {
+        const content = await loadTemplateContent(t);
+        setTemplate({ ...t, content });
+      })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [id]);

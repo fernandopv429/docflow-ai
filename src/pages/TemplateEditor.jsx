@@ -7,6 +7,7 @@ import VariableManager from '@/components/VariableManager';
 import VariableNameDialog from '@/components/VariableNameDialog';
 import { extractVariables } from '@/lib/variables';
 import { importDocxAsTemplate, sanitizeContentImages } from '@/lib/importDocx';
+import { packTemplateContent, loadTemplateContent } from '@/lib/templateContent';
 
 export default function TemplateEditor() {
   const { id } = useParams();
@@ -25,9 +26,9 @@ export default function TemplateEditor() {
     if (id) {
       base44.entities.Template
         .get(id)
-        .then((t) => {
+        .then(async (t) => {
           setTitle(t.title || '');
-          setContent(t.content || '');
+          setContent(await loadTemplateContent(t));
           setVariables(t.variables || []);
           setSkill(t.skill || '');
         })
@@ -53,7 +54,8 @@ export default function TemplateEditor() {
     try {
       const cleanContent = await sanitizeContentImages(content);
       if (cleanContent !== content) setContent(cleanContent);
-      const data = { title, content: cleanContent, variables: mergedVars, skill };
+      const packed = await packTemplateContent(cleanContent);
+      const data = { title, ...packed, variables: mergedVars, skill };
       if (id) {
         await base44.entities.Template.update(id, data);
       } else {

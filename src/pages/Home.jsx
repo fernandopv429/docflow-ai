@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { FileText, Plus, MoreVertical, Trash2, Copy, Sparkles, Loader2, Upload } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { importDocxAsTemplate } from '@/lib/importDocx';
+import { packTemplateContent } from '@/lib/templateContent';
 
 export default function Home() {
   const [templates, setTemplates] = useState([]);
@@ -27,9 +28,10 @@ export default function Home() {
     setImporting(true);
     try {
       const result = await importDocxAsTemplate(file);
+      const packed = await packTemplateContent(result.content);
       const created = await base44.entities.Template.create({
         title: result.title,
-        content: result.content,
+        ...packed,
         variables: result.variables,
       });
       navigate(`/templates/${created.id}`);
@@ -52,7 +54,9 @@ export default function Home() {
     await base44.entities.Template.create({
       title: `${t.title} (cópia)`,
       content: t.content,
+      content_url: t.content_url,
       variables: t.variables,
+      skill: t.skill,
     });
     setOpenMenu(null);
     load();

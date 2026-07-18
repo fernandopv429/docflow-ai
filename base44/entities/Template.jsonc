@@ -10,6 +10,10 @@
       "type": "string",
       "title": "Conte\u00fado"
     },
+    "content_url": {
+      "type": "string",
+      "title": "URL do Conte\u00fado"
+    },
     "skill": {
       "type": "string",
       "title": "Skill da IA"
