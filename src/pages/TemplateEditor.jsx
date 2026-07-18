@@ -4,7 +4,6 @@ import { ArrowLeft, Loader2, Sparkles, Upload } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import RichTextEditor from '@/components/RichTextEditor';
 import VariableManager from '@/components/VariableManager';
-import AIVariableDialog from '@/components/AIVariableDialog';
 import VariableNameDialog from '@/components/VariableNameDialog';
 import { extractVariables } from '@/lib/variables';
 import { importDocxAsTemplate, sanitizeContentImages } from '@/lib/importDocx';
@@ -18,7 +17,6 @@ export default function TemplateEditor() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [importing, setImporting] = useState(false);
-  const [aiDialogOpen, setAiDialogOpen] = useState(false);
   const [selDialog, setSelDialog] = useState({ open: false, text: '' });
   const editorRef = useRef(null);
 
@@ -67,10 +65,6 @@ export default function TemplateEditor() {
     setSaving(false);
   };
 
-  const handleAddVariable = (varName) => {
-    editorRef.current?.insertVariable(varName);
-  };
-
   const handleUpdateDescription = (varName, description) => {
     setVariables((prev) => {
       const existing = prev.find((v) => v.name === varName);
@@ -79,33 +73,6 @@ export default function TemplateEditor() {
       }
       return [...prev, { name: varName, description }];
     });
-  };
-
-  const handleAIVariables = (aiVars) => {
-    let newContent = content;
-    let appliedCount = 0;
-    aiVars.forEach((v) => {
-      if (v.original_text && v.name && newContent.includes(v.original_text)) {
-        newContent = newContent.split(v.original_text).join(`{{${v.name}}}`);
-        appliedCount++;
-      }
-    });
-    setContent(newContent);
-    setVariables((prev) => {
-      const merged = [...prev];
-      aiVars.forEach((v) => {
-        const existing = merged.find((m) => m.name === v.name);
-        if (existing) {
-          existing.description = v.description || existing.description;
-        } else {
-          merged.push({ name: v.name, description: v.description || '' });
-        }
-      });
-      return merged;
-    });
-    if (appliedCount === 0) {
-      alert('A IA não encontrou trechos exatos para substituir. Tente descrever melhor o contexto.');
-    }
   };
 
   const handleSelectionVariable = (text) => setSelDialog({ open: true, text });
@@ -202,18 +169,9 @@ export default function TemplateEditor() {
       {/* Variable panel */}
       <VariableManager
         variables={mergedVars}
-        onAddVariable={handleAddVariable}
         onUpdateDescription={handleUpdateDescription}
         onSave={handleSave}
         saving={saving}
-        onOpenAI={() => setAiDialogOpen(true)}
-      />
-
-      <AIVariableDialog
-        open={aiDialogOpen}
-        onClose={() => setAiDialogOpen(false)}
-        contentHtml={content}
-        onApply={handleAIVariables}
       />
 
       <VariableNameDialog
