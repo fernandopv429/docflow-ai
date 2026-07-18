@@ -1,6 +1,6 @@
 import React, { forwardRef, useImperativeHandle, useRef, useEffect } from 'react';
 
-const RichTextEditor = forwardRef(({ value, onChange, placeholder, onVariableFromSelection }, ref) => {
+const RichTextEditor = forwardRef(({ value, onChange, placeholder, onVariableFromSelection, onVariableAtCursor }, ref) => {
   const editorRef = useRef(null);
   const isInternalChange = useRef(false);
   const pendingRange = useRef(null);
@@ -166,6 +166,30 @@ const RichTextEditor = forwardRef(({ value, onChange, placeholder, onVariableFro
           className="px-2 h-7 flex items-center justify-center text-[#1a73e8] hover:bg-[#e8f0fe] rounded text-xs font-mono font-medium transition-colors"
         >
           {'{{x}}'}
+        </button>
+        <button
+          type="button"
+          title="Inserir variável no ponto do cursor"
+          onMouseDown={(e) => {
+            e.preventDefault();
+            const el = editorRef.current;
+            if (!el) return;
+            const sel = window.getSelection();
+            let range;
+            if (sel.rangeCount > 0 && el.contains(sel.anchorNode)) {
+              range = sel.getRangeAt(0).cloneRange();
+              range.collapse(true);
+            } else {
+              range = document.createRange();
+              range.selectNodeContents(el);
+              range.collapse(false);
+            }
+            pendingRange.current = range;
+            onVariableAtCursor?.();
+          }}
+          className="px-2 h-7 flex items-center justify-center text-[#1a73e8] hover:bg-[#e8f0fe] rounded text-xs font-mono font-medium transition-colors"
+        >
+          {'+{{}}'}
         </button>
         <div className="w-px h-5 bg-[#dadce0] mx-1" />
         <button

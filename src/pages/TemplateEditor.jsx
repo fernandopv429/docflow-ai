@@ -192,6 +192,7 @@ export default function TemplateEditor() {
               value={content}
               onChange={setContent}
               onVariableFromSelection={handleSelectionVariable}
+              onVariableAtCursor={() => setSelDialog({ open: true, text: '' })}
               placeholder="Comece a escrever seu documento... Use {{NOME_VARIAVEL}} para inserir variáveis."
             />
           </div>
