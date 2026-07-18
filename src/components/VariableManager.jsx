@@ -1,11 +1,14 @@
 import React, { useState } from 'react';
 import { Variable as VariableIcon, Save, Loader2, Info, ChevronRight, ChevronLeft } from 'lucide-react';
+import SkillSection from '@/components/SkillSection';
 
 export default function VariableManager({
   variables,
   onUpdateDescription,
   onSave,
-  saving
+  saving,
+  skill,
+  onUpdateSkill
 }) {
   const [collapsed, setCollapsed] = useState(false);
 
@@ -49,6 +52,8 @@ export default function VariableManager({
           Serão preenchidas pela IA ao analisar documentos
         </p>
       </div>
+
+      <SkillSection skill={skill} onChange={onUpdateSkill} />
 
       {/* Variable list */}
       <div className="flex-1 overflow-y-auto">

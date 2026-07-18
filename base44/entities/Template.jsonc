@@ -10,6 +10,10 @@
       "type": "string",
       "title": "Conte\u00fado"
     },
+    "skill": {
+      "type": "string",
+      "title": "Skill da IA"
+    },
     "variables": {
       "type": "array",
       "title": "Vari\u00e1veis",

@@ -14,6 +14,7 @@ export default function TemplateEditor() {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [variables, setVariables] = useState([]);
+  const [skill, setSkill] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [importing, setImporting] = useState(false);
@@ -28,6 +29,7 @@ export default function TemplateEditor() {
           setTitle(t.title || '');
           setContent(t.content || '');
           setVariables(t.variables || []);
+          setSkill(t.skill || '');
         })
         .catch(() => {})
         .finally(() => setLoading(false));
@@ -51,7 +53,7 @@ export default function TemplateEditor() {
     try {
       const cleanContent = await sanitizeContentImages(content);
       if (cleanContent !== content) setContent(cleanContent);
-      const data = { title, content: cleanContent, variables: mergedVars };
+      const data = { title, content: cleanContent, variables: mergedVars, skill };
       if (id) {
         await base44.entities.Template.update(id, data);
       } else {
@@ -172,6 +174,8 @@ export default function TemplateEditor() {
         onUpdateDescription={handleUpdateDescription}
         onSave={handleSave}
         saving={saving}
+        skill={skill}
+        onUpdateSkill={setSkill}
       />
 
       <VariableNameDialog

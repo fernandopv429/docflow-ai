@@ -91,7 +91,11 @@ export default function GenerateDocument() {
         })
         .join('\n');
 
-      const prompt = `Você é um assistente especializado em análise de documentos. Analise os documentos enviados (PDFs ou imagens de documentos como CNH, RG, contratos, etc.) e extraia os valores para as seguintes variáveis:\n\n${varList}\n\nPara cada variável, encontre o valor correspondente no documento. Quando houver um exemplo de formato esperado, retorne o valor no mesmo formato do exemplo. Se um valor não for encontrado, retorne uma string vazia. Responda apenas com o objeto JSON.`;
+      const skillBlock = template.skill?.trim()
+        ? `\n\nINSTRUÇÕES ESPECÍFICAS DESTE TEMPLATE (siga rigorosamente):\n${template.skill.trim()}`
+        : '';
+
+      const prompt = `Você é um assistente especializado em análise de documentos. Analise os documentos enviados (PDFs ou imagens de documentos como CNH, RG, contratos, etc.) e extraia os valores para as seguintes variáveis:\n\n${varList}${skillBlock}\n\nPara cada variável, encontre o valor correspondente no documento. Quando houver um exemplo de formato esperado, retorne o valor no mesmo formato do exemplo. Se um valor não for encontrado, retorne uma string vazia. Responda apenas com o objeto JSON.`;
 
       const result = await base44.integrations.Core.InvokeLLM({
         prompt,
