@@ -15,6 +15,8 @@ import { extractVariables, highlightVariablesInHtml } from '@/lib/variables';
 import { exportToDocx } from '@/lib/exportDocx';
 import CorrectionChat from '@/components/CorrectionChat';
 import { loadTemplateContent } from '@/lib/templateContent';
+import { saveAnalysis, loadAnalysis } from '@/lib/analysisCache';
+import { prepareFileForUpload } from '@/lib/compressImage';
 
 export default function GenerateDocument() {
   const { id } = useParams();
@@ -34,6 +36,11 @@ export default function GenerateDocument() {
       .then(async (t) => {
         const content = await loadTemplateContent(t);
         setTemplate({ ...t, content });
+        const cached = loadAnalysis(id);
+        if (cached && Object.keys(cached.values || {}).length > 0) {
+          setValues(cached.values);
+          setUploadedUrls(cached.urls || []);
+        }
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -67,11 +74,13 @@ export default function GenerateDocument() {
       let urls = uploadedUrls;
 
       if (urls.length === 0 && files.length > 0) {
-        urls = [];
-        for (const file of files) {
-          const { file_url } = await base44.integrations.Core.UploadFile({ file });
-          urls.push(file_url);
-        }
+        urls = await Promise.all(
+          files.map(async (file) => {
+            const prepared = await prepareFileForUpload(file);
+            const { file_url } = await base44.integrations.Core.UploadFile({ file: prepared });
+            return file_url;
+          })
+        );
         setUploadedUrls(urls);
       }
 
@@ -109,6 +118,7 @@ export default function GenerateDocument() {
       });
 
       setValues(result || {});
+      saveAnalysis(id, result || {}, urls);
     } catch (err) {
       setError('Erro ao analisar documentos. Tente novamente.');
     }

@@ -8,6 +8,7 @@ export default function CorrectionChat({ template, variables, values, onValuesCh
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [savingSkill, setSavingSkill] = useState(null);
+  const [useDocs, setUseDocs] = useState(false);
   const bottomRef = useRef(null);
 
   useEffect(() => {
@@ -46,7 +47,7 @@ Sua tarefa:
 
       const result = await base44.integrations.Core.InvokeLLM({
         prompt,
-        file_urls: fileUrls?.length ? fileUrls : undefined,
+        file_urls: useDocs && fileUrls?.length ? fileUrls : undefined,
         response_json_schema: {
           type: 'object',
           properties: {
@@ -166,6 +167,17 @@ Sua tarefa:
             <div ref={bottomRef} />
           </div>
 
+          {fileUrls?.length > 0 && (
+            <label className="flex items-center gap-2 px-4 py-2 bg-white border-t border-[#f1f3f4] text-xs text-[#5f6368] cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={useDocs}
+                onChange={(e) => setUseDocs(e.target.checked)}
+                className="w-3.5 h-3.5 accent-[#1a73e8]"
+              />
+              Consultar documentos originais (consome mais créditos)
+            </label>
+          )}
           <div className="flex items-center gap-2 px-3 py-3 bg-white border-t border-[#dadce0]">
             <input
               type="text"

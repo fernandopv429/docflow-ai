@@ -11,7 +11,8 @@ export default function VariableManager({
   skill,
   onUpdateSkill,
   content,
-  title
+  title,
+  templateId
 }) {
   const [collapsed, setCollapsed] = useState(false);
 
@@ -58,7 +59,7 @@ export default function VariableManager({
 
       <SkillSection skill={skill} onChange={onUpdateSkill} />
 
-      <EditorDocUpload variables={variables} skill={skill} content={content} title={title} />
+      <EditorDocUpload variables={variables} skill={skill} content={content} title={title} templateId={templateId} />
 
       {/* Variable list */}
       <div className="flex-1 overflow-y-auto">

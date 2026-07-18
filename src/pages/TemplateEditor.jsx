@@ -180,6 +180,7 @@ export default function TemplateEditor() {
         onUpdateSkill={setSkill}
         content={content}
         title={title}
+        templateId={id}
       />
 
       <VariableNameDialog

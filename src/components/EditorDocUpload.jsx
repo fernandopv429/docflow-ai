@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Upload, FileText, X, Sparkles, Loader2, Download } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { exportToDocx } from '@/lib/exportDocx';
+import { saveAnalysis, loadAnalysis } from '@/lib/analysisCache';
+import { prepareFileForUpload } from '@/lib/compressImage';
 
-export default function EditorDocUpload({ variables, skill, content, title }) {
+export default function EditorDocUpload({ variables, skill, content, title, templateId }) {
   const [expanded, setExpanded] = useState(true);
   const [files, setFiles] = useState([]);
   const [uploadedUrls, setUploadedUrls] = useState([]);
@@ -11,6 +13,14 @@ export default function EditorDocUpload({ variables, skill, content, title }) {
   const [values, setValues] = useState({});
   const [error, setError] = useState(null);
   const [exporting, setExporting] = useState(false);
+
+  useEffect(() => {
+    const cached = loadAnalysis(templateId);
+    if (cached && Object.keys(cached.values || {}).length > 0) {
+      setValues(cached.values);
+      setUploadedUrls(cached.urls || []);
+    }
+  }, [templateId]);
 
   const handleFileChange = (e) => {
     const selected = Array.from(e.target.files);
@@ -33,11 +43,13 @@ export default function EditorDocUpload({ variables, skill, content, title }) {
     try {
       let urls = uploadedUrls;
       if (urls.length === 0 && files.length > 0) {
-        urls = [];
-        for (const file of files) {
-          const { file_url } = await base44.integrations.Core.UploadFile({ file });
-          urls.push(file_url);
-        }
+        urls = await Promise.all(
+          files.map(async (file) => {
+            const prepared = await prepareFileForUpload(file);
+            const { file_url } = await base44.integrations.Core.UploadFile({ file: prepared });
+            return file_url;
+          })
+        );
         setUploadedUrls(urls);
       }
       if (urls.length === 0) {
@@ -69,6 +81,7 @@ export default function EditorDocUpload({ variables, skill, content, title }) {
         response_json_schema: schema,
       });
       setValues(result || {});
+      saveAnalysis(templateId, result || {}, urls);
     } catch (err) {
       setError('Erro ao analisar documentos. Tente novamente.');
     }
