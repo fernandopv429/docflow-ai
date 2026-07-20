@@ -9,6 +9,7 @@ import { buildAnalysisRequest } from '@/lib/analysisPrompt';
 export default function EditorDocUpload({ variables, skill, webSearch, searchSites, content, title, templateId }) {
   const [expanded, setExpanded] = useState(true);
   const [files, setFiles] = useState([]);
+  const [pastedText, setPastedText] = useState('');
   const [uploadedUrls, setUploadedUrls] = useState([]);
   const [analyzing, setAnalyzing] = useState(false);
   const [values, setValues] = useState({});
@@ -53,14 +54,14 @@ export default function EditorDocUpload({ variables, skill, webSearch, searchSit
         );
         setUploadedUrls(urls);
       }
-      if (urls.length === 0) {
-        setError('Faça upload de pelo menos um documento');
+      if (urls.length === 0 && !pastedText.trim()) {
+        setError('Envie um documento ou cole um texto para análise');
         setAnalyzing(false);
         return;
       }
 
       const result = await base44.integrations.Core.InvokeLLM(
-        buildAnalysisRequest({ variables, skill, webSearch, searchSites, fileUrls: urls })
+        buildAnalysisRequest({ variables, skill, webSearch, searchSites, fileUrls: urls, pastedText })
       );
       setValues(result || {});
       saveAnalysis(templateId, result || {}, urls);
@@ -106,6 +107,14 @@ export default function EditorDocUpload({ variables, skill, webSearch, searchSit
             <input type="file" multiple accept=".pdf,image/*" onChange={handleFileChange} className="hidden" />
           </label>
 
+          <textarea
+            value={pastedText}
+            onChange={(e) => setPastedText(e.target.value)}
+            placeholder="Ou cole aqui um texto para análise..."
+            rows={3}
+            className="w-full mt-2 px-3 py-2 text-xs border border-[#dadce0] rounded-md resize-none focus:outline-none focus:border-[#1a73e8] focus:ring-1 focus:ring-[#1a73e8]"
+          />
+
           {files.length > 0 && (
             <div className="mt-2 space-y-1.5">
               {files.map((f, i) => (
@@ -122,7 +131,7 @@ export default function EditorDocUpload({ variables, skill, webSearch, searchSit
 
           <button
             onClick={handleAnalyze}
-            disabled={analyzing || files.length === 0}
+            disabled={analyzing || (files.length === 0 && !pastedText.trim())}
             className="flex items-center justify-center gap-2 w-full mt-2.5 px-4 py-2 bg-[#1a73e8] text-white rounded-lg text-xs font-medium hover:bg-[#1557b0] transition-colors disabled:opacity-50"
           >
             {analyzing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}

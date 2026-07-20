@@ -1,6 +1,6 @@
 // Builds the InvokeLLM request for document analysis, shared by the
 // editor panel and the generation screen.
-export function buildAnalysisRequest({ variables, skill, webSearch, searchSites, fileUrls }) {
+export function buildAnalysisRequest({ variables, skill, webSearch, searchSites, fileUrls, pastedText }) {
   const schema = {
     type: 'object',
     properties: Object.fromEntries(variables.map((v) => [v.name, { type: 'string' }])),
@@ -24,13 +24,18 @@ export function buildAnalysisRequest({ variables, skill, webSearch, searchSites,
       }`
     : '';
 
-  const prompt = `Você é um assistente especializado em análise de documentos. Analise os documentos enviados (PDFs ou imagens de documentos como CNH, RG, contratos, etc.) e extraia os valores para as seguintes variáveis:\n\n${varList}${skillBlock}${webBlock}\n\nPara cada variável, encontre o valor correspondente no documento. Quando houver um exemplo de formato esperado, retorne o valor no mesmo formato do exemplo. Se um valor não for encontrado, retorne uma string vazia. Responda apenas com o objeto JSON.`;
+  const textBlock = pastedText?.trim()
+    ? `\n\nTEXTO FORNECIDO PELO USUÁRIO PARA ANÁLISE:\n"""\n${pastedText.trim()}\n"""`
+    : '';
+
+  const prompt = `Você é um assistente especializado em análise de documentos. Analise os documentos enviados (PDFs ou imagens de documentos como CNH, RG, contratos, etc.) e/ou o texto fornecido, e extraia os valores para as seguintes variáveis:\n\n${varList}${skillBlock}${webBlock}${textBlock}\n\nPara cada variável, encontre o valor correspondente nos documentos ou no texto fornecido. Quando houver um exemplo de formato esperado, retorne o valor no mesmo formato do exemplo. Se um valor não for encontrado, retorne uma string vazia. Responda apenas com o objeto JSON.`;
 
   const request = {
     prompt,
-    file_urls: fileUrls,
     response_json_schema: schema,
   };
+
+  if (fileUrls?.length) request.file_urls = fileUrls;
 
   if (webSearch) {
     request.add_context_from_internet = true;

@@ -24,6 +24,7 @@ export default function GenerateDocument() {
   const [template, setTemplate] = useState(null);
   const [loading, setLoading] = useState(true);
   const [files, setFiles] = useState([]);
+  const [pastedText, setPastedText] = useState('');
   const [uploadedUrls, setUploadedUrls] = useState([]);
   const [analyzing, setAnalyzing] = useState(false);
   const [values, setValues] = useState({});
@@ -85,8 +86,8 @@ export default function GenerateDocument() {
         setUploadedUrls(urls);
       }
 
-      if (urls.length === 0) {
-        setError('Faça upload de pelo menos um documento');
+      if (urls.length === 0 && !pastedText.trim()) {
+        setError('Envie um documento ou cole um texto para análise');
         setAnalyzing(false);
         return;
       }
@@ -98,6 +99,7 @@ export default function GenerateDocument() {
           webSearch: template.web_search,
           searchSites: template.search_sites,
           fileUrls: urls,
+          pastedText,
         })
       );
 
@@ -209,6 +211,14 @@ export default function GenerateDocument() {
             />
           </label>
 
+          <textarea
+            value={pastedText}
+            onChange={(e) => setPastedText(e.target.value)}
+            placeholder="Ou cole aqui um texto para análise..."
+            rows={4}
+            className="w-full mt-3 px-3 py-2 text-sm border border-[#dadce0] rounded-md resize-none focus:outline-none focus:border-[#1a73e8] focus:ring-1 focus:ring-[#1a73e8]"
+          />
+
           {files.length > 0 && (
             <div className="mt-3 space-y-2">
               {files.map((f, i) => (
@@ -228,7 +238,7 @@ export default function GenerateDocument() {
 
           <button
             onClick={handleAnalyze}
-            disabled={analyzing || files.length === 0}
+            disabled={analyzing || (files.length === 0 && !pastedText.trim())}
             className="flex items-center justify-center gap-2 w-full mt-3 px-4 py-2.5 bg-[#1a73e8] text-white rounded-lg text-sm font-medium hover:bg-[#1557b0] transition-colors disabled:opacity-50"
           >
             {analyzing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
