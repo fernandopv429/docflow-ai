@@ -72,6 +72,18 @@ Sua tarefa:
           skillSaved: false,
         },
       ]);
+
+      // Salva o histórico da conversa (sem exibição por enquanto)
+      base44.entities.ChatMessage.bulkCreate([
+        { template_id: template.id, role: 'user', text },
+        {
+          template_id: template.id,
+          role: 'assistant',
+          text: result?.reply || 'Correção aplicada.',
+          corrected_values: result?.corrected_values || {},
+          skill_suggestion: result?.skill_suggestion || '',
+        },
+      ]).catch(() => {});
     } catch (err) {
       setMessages((prev) => [...prev, { role: 'assistant', text: 'Erro ao processar a correção. Tente novamente.' }]);
     }
