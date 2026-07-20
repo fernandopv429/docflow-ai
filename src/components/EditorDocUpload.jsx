@@ -4,8 +4,9 @@ import { base44 } from '@/api/base44Client';
 import { exportToDocx } from '@/lib/exportDocx';
 import { saveAnalysis, loadAnalysis } from '@/lib/analysisCache';
 import { prepareFileForUpload } from '@/lib/compressImage';
+import { buildAnalysisRequest } from '@/lib/analysisPrompt';
 
-export default function EditorDocUpload({ variables, skill, content, title, templateId }) {
+export default function EditorDocUpload({ variables, skill, webSearch, searchSites, content, title, templateId }) {
   const [expanded, setExpanded] = useState(true);
   const [files, setFiles] = useState([]);
   const [uploadedUrls, setUploadedUrls] = useState([]);
@@ -58,28 +59,9 @@ export default function EditorDocUpload({ variables, skill, content, title, temp
         return;
       }
 
-      const schema = {
-        type: 'object',
-        properties: Object.fromEntries(variables.map((v) => [v.name, { type: 'string' }])),
-      };
-      const varList = variables
-        .map((v) => {
-          let line = `- ${v.name}: ${v.description || 'sem descrição'}`;
-          if (v.example) line += ` (exemplo de formato esperado: "${v.example}")`;
-          return line;
-        })
-        .join('\n');
-      const skillBlock = skill?.trim()
-        ? `\n\nINSTRUÇÕES ESPECÍFICAS DESTE TEMPLATE (siga rigorosamente):\n${skill.trim()}`
-        : '';
-
-      const prompt = `Você é um assistente especializado em análise de documentos. Analise os documentos enviados (PDFs ou imagens de documentos como CNH, RG, contratos, etc.) e extraia os valores para as seguintes variáveis:\n\n${varList}${skillBlock}\n\nPara cada variável, encontre o valor correspondente no documento. Quando houver um exemplo de formato esperado, retorne o valor no mesmo formato do exemplo. Se um valor não for encontrado, retorne uma string vazia. Responda apenas com o objeto JSON.`;
-
-      const result = await base44.integrations.Core.InvokeLLM({
-        prompt,
-        file_urls: urls,
-        response_json_schema: schema,
-      });
+      const result = await base44.integrations.Core.InvokeLLM(
+        buildAnalysisRequest({ variables, skill, webSearch, searchSites, fileUrls: urls })
+      );
       setValues(result || {});
       saveAnalysis(templateId, result || {}, urls);
     } catch (err) {

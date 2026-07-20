@@ -18,6 +18,15 @@
       "type": "string",
       "title": "Skill da IA"
     },
+    "web_search": {
+      "type": "boolean",
+      "default": false,
+      "title": "Buscar na Internet"
+    },
+    "search_sites": {
+      "type": "string",
+      "title": "Sites Priorit\u00e1rios"
+    },
     "variables": {
       "type": "array",
       "title": "Vari\u00e1veis",

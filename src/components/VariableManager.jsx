@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Variable as VariableIcon, Save, Loader2, Info, ChevronRight, ChevronLeft } from 'lucide-react';
 import SkillSection from '@/components/SkillSection';
+import WebSearchSection from '@/components/WebSearchSection';
 import EditorDocUpload from '@/components/EditorDocUpload';
 
 export default function VariableManager({
@@ -10,6 +11,10 @@ export default function VariableManager({
   saving,
   skill,
   onUpdateSkill,
+  webSearch,
+  onToggleWebSearch,
+  searchSites,
+  onUpdateSearchSites,
   content,
   title,
   templateId
@@ -59,7 +64,22 @@ export default function VariableManager({
 
       <SkillSection skill={skill} onChange={onUpdateSkill} />
 
-      <EditorDocUpload variables={variables} skill={skill} content={content} title={title} templateId={templateId} />
+      <WebSearchSection
+        webSearch={webSearch}
+        onToggle={onToggleWebSearch}
+        searchSites={searchSites}
+        onUpdateSites={onUpdateSearchSites}
+      />
+
+      <EditorDocUpload
+        variables={variables}
+        skill={skill}
+        webSearch={webSearch}
+        searchSites={searchSites}
+        content={content}
+        title={title}
+        templateId={templateId}
+      />
 
       {/* Variable list */}
       <div className="flex-1 overflow-y-auto">

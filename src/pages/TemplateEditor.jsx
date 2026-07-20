@@ -16,6 +16,8 @@ export default function TemplateEditor() {
   const [content, setContent] = useState('');
   const [variables, setVariables] = useState([]);
   const [skill, setSkill] = useState('');
+  const [webSearch, setWebSearch] = useState(false);
+  const [searchSites, setSearchSites] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [importing, setImporting] = useState(false);
@@ -31,6 +33,8 @@ export default function TemplateEditor() {
           setContent(await loadTemplateContent(t));
           setVariables(t.variables || []);
           setSkill(t.skill || '');
+          setWebSearch(t.web_search || false);
+          setSearchSites(t.search_sites || '');
         })
         .catch(() => {})
         .finally(() => setLoading(false));
@@ -55,7 +59,7 @@ export default function TemplateEditor() {
       const cleanContent = await sanitizeContentImages(content);
       if (cleanContent !== content) setContent(cleanContent);
       const packed = await packTemplateContent(cleanContent);
-      const data = { title, ...packed, variables: mergedVars, skill };
+      const data = { title, ...packed, variables: mergedVars, skill, web_search: webSearch, search_sites: searchSites };
       if (id) {
         await base44.entities.Template.update(id, data);
       } else {
@@ -178,6 +182,10 @@ export default function TemplateEditor() {
         saving={saving}
         skill={skill}
         onUpdateSkill={setSkill}
+        webSearch={webSearch}
+        onToggleWebSearch={setWebSearch}
+        searchSites={searchSites}
+        onUpdateSearchSites={setSearchSites}
         content={content}
         title={title}
         templateId={id}
