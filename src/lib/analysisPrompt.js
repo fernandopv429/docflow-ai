@@ -19,8 +19,10 @@ export function buildAnalysisRequest({ variables, skill, webSearch, searchSites,
     : '';
 
   const webBlock = webSearch
-    ? `\n\nBUSCA NA INTERNET: você pode buscar na internet informações complementares que não estejam nos documentos (ex: dados públicos, endereços, razão social por CNPJ).${
-        searchSites?.trim() ? ` Priorize as informações destes sites: ${searchSites.trim()}` : ''
+    ? `\n\nBUSCA NA INTERNET: você DEVE buscar na internet informações complementares e atualizadas que não estejam nos documentos (ex: dados públicos, endereços, razão social por CNPJ, valores e índices vigentes).${
+        searchSites?.trim()
+          ? `\nCONSULTE OBRIGATORIAMENTE estas URLs/sites definidos pelo usuário e extraia deles as informações mais recentes disponíveis:\n${searchSites.trim()}\nAo preencher variáveis que dependam de dados atualizados, use os valores encontrados nesses sites em vez de valores desatualizados dos documentos.`
+          : ''
       }`
     : '';
 
