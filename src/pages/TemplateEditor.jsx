@@ -8,6 +8,7 @@ import VariableNameDialog from '@/components/VariableNameDialog';
 import { extractVariables } from '@/lib/variables';
 import { importDocxAsTemplate, sanitizeContentImages } from '@/lib/importDocx';
 import { packTemplateContent, loadTemplateContent } from '@/lib/templateContent';
+import { useAutoSave } from '@/hooks/useAutoSave';
 
 export default function TemplateEditor() {
   const { id } = useParams();
@@ -74,6 +75,12 @@ export default function TemplateEditor() {
     }
     setSaving(false);
   };
+
+  useAutoSave({
+    enabled: !!id && !loading && !!title.trim(),
+    data: { title, description, content, variables: mergedVars, skill, webSearch, searchSites },
+    onSave: handleSave,
+  });
 
   const handleUpdateDescription = (varName, description) => {
     setVariables((prev) => {
