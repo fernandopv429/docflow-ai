@@ -5,6 +5,7 @@ import { exportToDocx } from '@/lib/exportDocx';
 import { saveAnalysis, loadAnalysis } from '@/lib/analysisCache';
 import { prepareFileForUpload } from '@/lib/compressImage';
 import { buildAnalysisRequest } from '@/lib/analysisPrompt';
+import AnalysisSources from '@/components/AnalysisSources';
 
 export default function EditorDocUpload({ variables, skill, webSearch, searchSites, content, title, templateId }) {
   const [expanded, setExpanded] = useState(true);
@@ -13,6 +14,7 @@ export default function EditorDocUpload({ variables, skill, webSearch, searchSit
   const [uploadedUrls, setUploadedUrls] = useState([]);
   const [analyzing, setAnalyzing] = useState(false);
   const [values, setValues] = useState({});
+  const [sources, setSources] = useState('');
   const [error, setError] = useState(null);
   const [exporting, setExporting] = useState(false);
 
@@ -63,8 +65,10 @@ export default function EditorDocUpload({ variables, skill, webSearch, searchSit
       const result = await base44.integrations.Core.InvokeLLM(
         buildAnalysisRequest({ variables, skill, webSearch, searchSites, fileUrls: urls, pastedText })
       );
-      setValues(result || {});
-      saveAnalysis(templateId, result || {}, urls);
+      const { _fontes, ...vals } = result || {};
+      setValues(vals);
+      setSources(_fontes || '');
+      saveAnalysis(templateId, vals, urls);
     } catch (err) {
       setError('Erro ao analisar documentos. Tente novamente.');
     }
@@ -139,6 +143,8 @@ export default function EditorDocUpload({ variables, skill, webSearch, searchSit
           </button>
 
           {error && <p className="text-xs text-red-500 mt-2">{error}</p>}
+
+          <AnalysisSources sources={sources} />
 
           {hasResults && (
             <div className="mt-3">

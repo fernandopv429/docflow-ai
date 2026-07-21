@@ -3,7 +3,14 @@
 export function buildAnalysisRequest({ variables, skill, webSearch, searchSites, fileUrls, pastedText }) {
   const schema = {
     type: 'object',
-    properties: Object.fromEntries(variables.map((v) => [v.name, { type: 'string' }])),
+    properties: {
+      ...Object.fromEntries(variables.map((v) => [v.name, { type: 'string' }])),
+      _fontes: {
+        type: 'string',
+        description:
+          'Relatório das fontes usadas: documentos enviados, texto colado e cada site/URL consultado na internet, indicando o que foi extraído de cada fonte.',
+      },
+    },
   };
 
   const varList = variables
@@ -30,7 +37,9 @@ export function buildAnalysisRequest({ variables, skill, webSearch, searchSites,
     ? `\n\nTEXTO FORNECIDO PELO USUÁRIO PARA ANÁLISE:\n"""\n${pastedText.trim()}\n"""`
     : '';
 
-  const prompt = `Você é um assistente especializado em análise de documentos. Analise os documentos enviados (PDFs ou imagens de documentos como CNH, RG, contratos, etc.) e/ou o texto fornecido, e extraia os valores para as seguintes variáveis:\n\n${varList}${skillBlock}${webBlock}${textBlock}\n\nPara cada variável, encontre o valor correspondente nos documentos ou no texto fornecido. Quando houver um exemplo de formato esperado, retorne o valor no mesmo formato do exemplo. Se um valor não for encontrado, retorne uma string vazia. Responda apenas com o objeto JSON.`;
+  const prompt = `Você é um assistente especializado em análise de documentos. Analise os documentos enviados (PDFs ou imagens de documentos como CNH, RG, contratos, etc.) e/ou o texto fornecido, e extraia os valores para as seguintes variáveis:\n\n${varList}${skillBlock}${webBlock}${textBlock}\n\nPara cada variável, encontre o valor correspondente nos documentos ou no texto fornecido. Quando houver um exemplo de formato esperado, retorne o valor no mesmo formato do exemplo. Se um valor não for encontrado, retorne uma string vazia.
+
+No campo "_fontes", escreva um relatório curto (em português) listando cada fonte que você usou: documentos enviados, texto colado e, se buscou na internet, cada site/URL consultado com o que foi extraído dele. Se não buscou na internet, diga isso explicitamente. Responda apenas com o objeto JSON.`;
 
   const request = {
     prompt,

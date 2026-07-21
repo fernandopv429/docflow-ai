@@ -18,6 +18,7 @@ import { loadTemplateContent } from '@/lib/templateContent';
 import { saveAnalysis, loadAnalysis } from '@/lib/analysisCache';
 import { prepareFileForUpload } from '@/lib/compressImage';
 import { buildAnalysisRequest } from '@/lib/analysisPrompt';
+import AnalysisSources from '@/components/AnalysisSources';
 
 export default function GenerateDocument() {
   const { id } = useParams();
@@ -28,6 +29,7 @@ export default function GenerateDocument() {
   const [uploadedUrls, setUploadedUrls] = useState([]);
   const [analyzing, setAnalyzing] = useState(false);
   const [values, setValues] = useState({});
+  const [sources, setSources] = useState('');
   const [error, setError] = useState(null);
   const [exporting, setExporting] = useState(false);
   const [comTimbrado, setComTimbrado] = useState(true);
@@ -103,8 +105,10 @@ export default function GenerateDocument() {
         })
       );
 
-      setValues(result || {});
-      saveAnalysis(id, result || {}, urls);
+      const { _fontes, ...vals } = result || {};
+      setValues(vals);
+      setSources(_fontes || '');
+      saveAnalysis(id, vals, urls);
     } catch (err) {
       setError('Erro ao analisar documentos. Tente novamente.');
     }
@@ -246,6 +250,8 @@ export default function GenerateDocument() {
           </button>
 
           {error && <p className="text-xs text-red-500 mt-2">{error}</p>}
+
+          <AnalysisSources sources={sources} />
         </div>
 
         {/* Variables values */}
