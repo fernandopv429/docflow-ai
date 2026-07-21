@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
-import { FileText, Plus, HelpCircle, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { FileText, Plus, HelpCircle, PanelLeftClose, PanelLeftOpen, Briefcase } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 
 export default function Layout() {
@@ -42,6 +42,18 @@ export default function Layout() {
           >
             <Plus className="w-4 h-4 flex-shrink-0" />
             {!collapsed && 'Cadastrar Templates'}
+          </Link>
+          <Link
+            to="/trabalhista"
+            title="Casos Trabalhistas"
+            className={`flex items-center justify-center gap-2 w-full py-2.5 mt-2 rounded-lg text-sm font-medium transition-colors ${
+              location.pathname.startsWith('/trabalhista')
+                ? 'bg-[#e8f0fe] text-[#1a73e8]'
+                : 'text-[#3c4043] hover:bg-[#f1f3f4]'
+            } ${collapsed ? 'px-0' : 'px-4'}`}
+          >
+            <Briefcase className="w-4 h-4 flex-shrink-0" />
+            {!collapsed && 'Casos Trabalhistas'}
           </Link>
         </div>
 

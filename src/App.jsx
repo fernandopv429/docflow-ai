@@ -11,6 +11,9 @@ import Layout from '@/components/Layout';
 import Home from '@/pages/Home';
 import TemplateEditor from '@/pages/TemplateEditor';
 import GenerateDocument from '@/pages/GenerateDocument';
+import TrabalhistaList from '@/pages/TrabalhistaList';
+import TrabalhistaForm from '@/pages/TrabalhistaForm';
+import CasoTrabalhistaPage from '@/pages/CasoTrabalhistaPage';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -44,6 +47,9 @@ const AuthenticatedApp = () => {
         <Route path="/templates/new" element={<TemplateEditor />} />
         <Route path="/templates/:id" element={<TemplateEditor />} />
         <Route path="/templates/:id/generate" element={<GenerateDocument />} />
+        <Route path="/trabalhista" element={<TrabalhistaList />} />
+        <Route path="/trabalhista/novo" element={<TrabalhistaForm />} />
+        <Route path="/trabalhista/:id" element={<CasoTrabalhistaPage />} />
       </Route>
       <Route path="*" element={<PageNotFound />} />
     </Routes>
