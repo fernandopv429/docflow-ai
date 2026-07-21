@@ -14,7 +14,7 @@ const Section = ({ title, children }) => (
 
 export default function TrabalhistaForm() {
   const navigate = useNavigate();
-  const [f, setF] = useState({ tipo_dispensa: '' });
+  const [f, setF] = useState(/** @type {Record<string, any>} */ ({ tipo_dispensa: '' }));
   const [docs, setDocs] = useState([]);
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);

@@ -1,6 +1,6 @@
 import React from 'react';
 
-export default function CampoInput({ label, required, hint, className = '', ...props }) {
+export default function CampoInput({ label, required = false, hint = '', className = '', ...props }) {
   return (
     <div className={className}>
       <label className="block text-xs font-medium text-[#3c4043] mb-1">
