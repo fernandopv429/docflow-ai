@@ -13,6 +13,7 @@ export default function TemplateEditor() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
   const [content, setContent] = useState('');
   const [variables, setVariables] = useState([]);
   const [skill, setSkill] = useState('');
@@ -30,6 +31,7 @@ export default function TemplateEditor() {
         .get(id)
         .then(async (t) => {
           setTitle(t.title || '');
+          setDescription(t.description || '');
           setContent(await loadTemplateContent(t));
           setVariables(t.variables || []);
           setSkill(t.skill || '');
@@ -59,7 +61,7 @@ export default function TemplateEditor() {
       const cleanContent = await sanitizeContentImages(content);
       if (cleanContent !== content) setContent(cleanContent);
       const packed = await packTemplateContent(cleanContent);
-      const data = { title, ...packed, variables: mergedVars, skill, web_search: webSearch, search_sites: searchSites };
+      const data = { title, description, ...packed, variables: mergedVars, skill, web_search: webSearch, search_sites: searchSites };
       if (id) {
         await base44.entities.Template.update(id, data);
       } else {
@@ -177,6 +179,8 @@ export default function TemplateEditor() {
       {/* Variable panel */}
       <VariableManager
         variables={mergedVars}
+        templateDescription={description}
+        onUpdateTemplateDescription={setDescription}
         onUpdateDescription={handleUpdateDescription}
         onSave={handleSave}
         saving={saving}

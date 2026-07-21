@@ -1,12 +1,15 @@
 import React, { useState } from 'react';
 import { Variable as VariableIcon, Save, Loader2, Info, ChevronRight, ChevronLeft } from 'lucide-react';
 import SkillSection from '@/components/SkillSection';
+import DescriptionSection from '@/components/DescriptionSection';
 import WebSearchSection from '@/components/WebSearchSection';
 import EditorDocUpload from '@/components/EditorDocUpload';
 
 export default function VariableManager({
   variables,
   onUpdateDescription,
+  templateDescription,
+  onUpdateTemplateDescription,
   onSave,
   saving,
   skill,
@@ -61,6 +64,8 @@ export default function VariableManager({
           Serão preenchidas pela IA ao analisar documentos
         </p>
       </div>
+
+      <DescriptionSection description={templateDescription} onChange={onUpdateTemplateDescription} />
 
       <SkillSection skill={skill} onChange={onUpdateSkill} />
 
