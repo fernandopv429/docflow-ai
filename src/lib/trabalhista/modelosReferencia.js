@@ -170,6 +170,11 @@ const CHAT_SCHEMA = {
           items: { type: 'string' },
           description: 'CNPJs das reclamadas mencionados na conversa OU encontrados nos documentos anexados',
         },
+        ceps: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'CEPs mencionados na conversa OU encontrados nos documentos (endereço do reclamante, local de prestação, reclamadas)',
+        },
       },
     },
     pronto_para_gerar: {
@@ -292,6 +297,88 @@ function blocoReceita(dados) {
 }
 
 // ============================================================
+// Consulta de CEP (ViaCEP, com fallback BrasilAPI) — determinística.
+// Completa o endereço do reclamante e do local de prestação (competência).
+// ============================================================
+const CEP_LABEL_RE = /CEP:?\s*(\d{5}-?\d{3})/gi;
+const CEP_DASH_RE = /\b\d{5}-\d{3}\b/g;
+
+export function extrairCeps(texto) {
+  const encontrados = new Set();
+  const t = texto || '';
+  for (const m of t.matchAll(CEP_LABEL_RE)) {
+    const d = m[1].replace(/\D/g, '');
+    if (d.length === 8) encontrados.add(d);
+  }
+  for (const m of t.matchAll(CEP_DASH_RE)) {
+    const d = m[0].replace(/\D/g, '');
+    if (d.length === 8) encontrados.add(d);
+  }
+  return [...encontrados];
+}
+
+export async function consultarCep(cep) {
+  const digits = (cep || '').replace(/\D/g, '');
+  if (digits.length !== 8) return { cep, erro: 'CEP inválido (precisa de 8 dígitos)' };
+  const fmt = `${digits.slice(0, 5)}-${digits.slice(5)}`;
+  // 1) ViaCEP (traz município + código IBGE)
+  try {
+    const resp = await fetch(`https://viacep.com.br/ws/${digits}/json/`);
+    if (resp.ok) {
+      const d = await resp.json();
+      if (!d.erro) {
+        return {
+          cep: fmt,
+          logradouro: d.logradouro || '',
+          bairro: d.bairro || '',
+          municipio: d.localidade || '',
+          uf: d.uf || '',
+          ibge: d.ibge || '',
+        };
+      }
+    }
+  } catch (e) {
+    // segue para o fallback
+  }
+  // 2) Fallback BrasilAPI
+  try {
+    const resp = await fetch(`https://brasilapi.com.br/api/cep/v1/${digits}`);
+    if (resp.ok) {
+      const d = await resp.json();
+      return {
+        cep: fmt,
+        logradouro: d.street || '',
+        bairro: d.neighborhood || '',
+        municipio: d.city || '',
+        uf: d.state || '',
+        ibge: '',
+      };
+    }
+  } catch (e) {
+    // ignora
+  }
+  return { cep: fmt, erro: 'não encontrado' };
+}
+
+export async function enriquecerCeps(ceps) {
+  const unicos = [
+    ...new Set((ceps || []).map((c) => (c || '').replace(/\D/g, '')).filter((d) => d.length === 8)),
+  ];
+  if (!unicos.length) return [];
+  return Promise.all(unicos.map(consultarCep));
+}
+
+function blocoCeps(dados) {
+  if (!dados?.length) return '';
+  const linhas = dados.map((d) =>
+    d.erro
+      ? `- CEP ${d.cep}: ${d.erro} — confirme o endereço.`
+      : `- CEP ${d.cep}: ${[d.logradouro, d.bairro, [d.municipio, d.uf].filter(Boolean).join('/')].filter(Boolean).join(', ')}.`
+  );
+  return `\n\nENDEREÇOS VERIFICADOS POR CEP (ViaCEP — use para completar logradouro/bairro/município/UF na qualificação; o município orienta a Vara do Trabalho e o UF o TRT da competência):\n${linhas.join('\n')}`;
+}
+
+// ============================================================
 // Passo 2: gerar a minuta usando o modelo como referência
 // ============================================================
 export const PROMPT_SISTEMA_PETICAO = `Você é um assistente jurídico especializado em Direito do Trabalho brasileiro, vinculado ao escritório FAV Advogados. A partir da entrevista do cliente, elabore o TEXTO COMPLETO da petição inicial trabalhista seguindo rigorosamente as regras abaixo.
@@ -354,7 +441,7 @@ REVISÃO FINAL (garantir antes de responder):
 REGRAS DE DADOS:
 - Use SOMENTE dados da entrevista/documentos do caso atual. Onde faltar um dado, insira marcador entre colchetes (ex.: [SALÁRIO], [DATA DE ADMISSÃO]). NÃO invente fatos nem valores. NÃO narre etapas, verificações ou alterações.`;
 
-export function buildGeracaoPrompt({ texto, attrs, modelo, dadosReceita }) {
+export function buildGeracaoPrompt({ texto, attrs, modelo, dadosReceita, dadosCep }) {
   return `${PROMPT_SISTEMA_PETICAO}
 
 Use o MODELO DE REFERÊNCIA abaixo (uma peça correta já aprovada pelo escritório) como guia de ESTRUTURA, ORDEM DOS TÓPICOS, TESES e FUNDAMENTAÇÃO JURÍDICA (súmulas e artigos). NÃO copie dados pessoais, nomes de partes, CPF, endereços ou valores do modelo — ele é de OUTRO processo e serve apenas como forma e argumentação.
@@ -372,26 +459,31 @@ ${modelo.conteudo || modelo.resumo || ''}
 ${texto || '(ver documentos anexados)'}
 
 Atributos detectados: função=${attrs?.funcao || '-'}, modalidade=${attrs?.tipo_dispensa || '-'}, rito=${attrs?.rito || '-'}, tomadora=${attrs?.tem_tomadora ? 'sim' : 'não'}.
-=== FIM DA ENTREVISTA ===${blocoReceita(dadosReceita)}
+=== FIM DA ENTREVISTA ===${blocoReceita(dadosReceita)}${blocoCeps(dadosCep)}
 
 FORMATO DE SAÍDA: retorne APENAS o HTML do corpo da petição (sem <html>, <head> ou <body>), pronto para formatação. Use <h2> para o título de cada tópico (ex.: <h2>DAS HORAS EXTRAS</h2>) e <p style="text-align: justify"> para os parágrafos. Comece direto pelo endereçamento ao Juízo (sem nome/letreiro do escritório antes). Inclua a qualificação das partes, os fatos, o direito (um tópico por tese cabível, seguindo a ordem), os cálculos/valor da causa e o fecho com a assinatura do Dr. Fernando Andrade Vieira — OAB/SP nº 320.825. Ao final, acrescente exatamente:
 <p><em>⚠️ Minuta gerada por IA a partir de modelo de referência — revisão obrigatória pelo advogado responsável.</em></p>`;
 }
 
 export async function gerarPeca({ texto, fileUrls, attrs, modelo }) {
-  // Consulta determinística dos CNPJs (do texto + os que a IA extraiu dos docs)
+  // Consultas determinísticas: CNPJ (Receita) e CEP (ViaCEP), do texto + o que a IA extraiu dos docs
   const cnpjs = [...extrairCnpjs(texto), ...((attrs && attrs.cnpjs) || [])];
-  const dadosReceita = await enriquecerCnpjs(cnpjs);
+  const ceps = [...extrairCeps(texto), ...((attrs && attrs.ceps) || [])];
+  const [dadosReceita, dadosCep] = await Promise.all([enriquecerCnpjs(cnpjs), enriquecerCeps(ceps)]);
 
   const req = {
-    prompt: buildGeracaoPrompt({ texto, attrs, modelo, dadosReceita }),
+    prompt: buildGeracaoPrompt({ texto, attrs, modelo, dadosReceita, dadosCep }),
     model: 'claude_sonnet_4_6',
   };
   const urls = [...(fileUrls || [])];
   if (modelo.arquivo_url) urls.push(modelo.arquivo_url);
   if (urls.length) req.file_urls = urls;
   const resultado = await base44.integrations.Core.InvokeLLM(req);
-  return { html: typeof resultado === 'string' ? resultado : String(resultado || ''), dadosReceita };
+  return {
+    html: typeof resultado === 'string' ? resultado : String(resultado || ''),
+    dadosReceita,
+    dadosCep,
+  };
 }
 
 // ============================================================
