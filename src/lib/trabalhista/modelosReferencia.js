@@ -511,7 +511,7 @@ function blocoCalculos(calculos) {
 }
 
 // Geração adaptando o MODELO PADRÃO (HTML formatado), preservando o estilo.
-export function buildGeracaoPadraoPrompt({ texto, attrs, modeloHtml, calculos, dadosReceita, dadosCep, dadosDatajud }) {
+export function buildGeracaoPadraoPrompt({ texto, attrs, modeloHtml, calculos, diferencial, modeloSemelhanteTitulo, dadosReceita, dadosCep, dadosDatajud }) {
   return `${PROMPT_SISTEMA_PETICAO}
 
 REGRA PRINCIPAL — ADAPTE O MODELO PADRÃO MANTENDO O ESTILO: abaixo está o MODELO PADRÃO do escritório em HTML (com a formatação, o layout e o texto-padrão corretos, podendo conter marcadores como {{VARIAVEL}}). Sua tarefa é ADAPTAR este HTML ao caso atual:
@@ -522,7 +522,7 @@ REGRA PRINCIPAL — ADAPTE O MODELO PADRÃO MANTENDO O ESTILO: abaixo está o MO
 === MODELO PADRÃO (HTML — preserve a formatação) ===
 ${modeloHtml}
 === FIM DO MODELO PADRÃO ===
-
+${diferencial ? `\n=== CASO SEMELHANTE NA BASE${modeloSemelhanteTitulo ? ` (${modeloSemelhanteTitulo})` : ''} — DIFERENCIAL ===\nO sistema selecionou, na base de referências, o caso mais semelhante a esta entrevista. Use os pontos PARTICULARES abaixo como orientação para as teses/capítulos específicos deste tipo de caso (o restante segue o Modelo Padrão). Inclua apenas o que tiver suporte no relato:\n${diferencial}\n=== FIM DO DIFERENCIAL ===\n` : ''}
 === ENTREVISTA / CASO ATUAL ===
 ${texto || '(ver documentos anexados)'}
 
@@ -573,12 +573,29 @@ export async function gerarPecaPadrao({ texto, fileUrls, attrs, modeloPadrao, on
   // Cálculo 100% determinístico (a IA não faz aritmética).
   const calculos = calcularVerbasCaso(caso || {});
 
+  // Seleciona o modelo de referência mais semelhante (matching determinístico) → usa seu diferencial.
+  let modeloSemelhante = null;
+  let diferencial = '';
+  try {
+    const modelos = await listarModelosAtivos();
+    const ranking = rankearModelos(modelos, attrs || {});
+    if (ranking[0] && ranking[0].score > 0) {
+      modeloSemelhante = ranking[0].modelo;
+      diferencial = modeloSemelhante.diferencial || modeloSemelhante.conteudo || modeloSemelhante.resumo || '';
+      if (modeloSemelhante.titulo) notify(`Referência mais semelhante: ${modeloSemelhante.titulo}`);
+    }
+  } catch (e) {
+    /* segue sem referência */
+  }
+
   const req = {
     prompt: buildGeracaoPadraoPrompt({
       texto,
       attrs,
       modeloHtml: modeloPadrao?.html || '',
       calculos,
+      diferencial,
+      modeloSemelhanteTitulo: modeloSemelhante?.titulo || '',
       dadosReceita,
       dadosCep,
       dadosDatajud,
@@ -595,6 +612,7 @@ export async function gerarPecaPadrao({ texto, fileUrls, attrs, modeloPadrao, on
     dadosDatajud,
     calculos,
     caso,
+    modeloSemelhante: modeloSemelhante ? { titulo: modeloSemelhante.titulo } : null,
   };
 }
 
