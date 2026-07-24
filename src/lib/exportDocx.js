@@ -205,6 +205,26 @@ function buildFooter() {
   });
 }
 
+// ---------- Blocos condicionais {{#if TOKEN}}...{{/if}} ----------
+// Usados para variar trechos do Modelo Padrão conforme flags booleanas
+// (ex.: T_DISPENSA/T_INDIRETA/T_COACAO/T_REVERSAO/T_ACORDO em tokens.js).
+// Suporta {{#if TOKEN}}...{{else}}...{{/if}} e aninhamento simples.
+function applyConditionals(html, flags = {}) {
+  if (!html) return html;
+  const IF_RE = /\{\{#if\s+([A-Z0-9_]+)\}\}/;
+  let out = html;
+  let guard = 0;
+  while (IF_RE.test(out) && guard < 500) {
+    guard += 1;
+    out = out.replace(/\{\{#if\s+([A-Z0-9_]+)\}\}([\s\S]*?)(?:\{\{else\}\}([\s\S]*?))?\{\{\/if\}\}/, (m, key, whenTrue, whenFalse) => {
+      // Só resolve blocos sem {{#if}} aninhado ainda não fechado dentro do trecho
+      if (/\{\{#if\s+[A-Z0-9_]+\}\}/.test(whenTrue)) return m; // aguarda a próxima passada (aninhado)
+      return flags[key] ? whenTrue : (whenFalse || '');
+    });
+  }
+  return out;
+}
+
 // ---------- Export principal ----------
 
 export async function exportToDocx(html, variables, title, opts = {}) {
@@ -216,7 +236,16 @@ export async function exportToDocx(html, variables, title, opts = {}) {
   processed = processed.replace(/<\/?(?:html|head|body|!doctype)[^>]*>/gi, '').trim();
 
   if (variables) {
+    // 1) Resolve blocos condicionais primeiro, usando as entradas booleanas como flags
+    const flags = {};
+    for (const [key, value] of Object.entries(variables)) {
+      if (typeof value === 'boolean') flags[key] = value;
+    }
+    processed = applyConditionals(processed, flags);
+
+    // 2) Substituição simples {{TOKEN}} apenas para valores de texto
     Object.entries(variables).forEach(([key, value]) => {
+      if (typeof value === 'boolean') return; // já consumido pelos condicionais acima
       processed = processed.split(`{{${key}}}`).join(value || '');
     });
   }
