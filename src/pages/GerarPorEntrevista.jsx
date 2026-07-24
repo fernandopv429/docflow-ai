@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  ArrowLeft, Loader2, Paperclip, Send, X, FileText, Bot, Wand2, FileDown, Library, RefreshCw, Wrench,
+  ArrowLeft, Loader2, Paperclip, Send, X, FileText, Bot, FileDown, Library, RefreshCw, Wrench,
 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { exportToDocx } from '@/lib/exportDocx';
@@ -155,14 +155,11 @@ export default function GerarPorEntrevista() {
             {attrs.funcao || '—'} · {TIPO_DISPENSA_LABELS[attrs.tipo_dispensa]?.split('(')[0]?.trim() || attrs.tipo_dispensa || '—'}
           </span>
         )}
-        <button
-          onClick={gerarMinuta}
-          disabled={!modeloPadrao || sending || generating}
-          className="ml-auto flex items-center gap-1.5 px-3 py-1.5 bg-[#1a73e8] text-white rounded-lg text-xs font-medium hover:bg-[#1557b0] transition-colors disabled:opacity-50"
-        >
-          {generating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Wand2 className="w-3.5 h-3.5" />}
-          {docHtml ? 'Atualizar minuta' : 'Gerar minuta'}
-        </button>
+        {generating && (
+          <span className="ml-auto flex items-center gap-1.5 text-xs text-[#1a73e8]">
+            <Loader2 className="w-3.5 h-3.5 animate-spin" /> Gerando minuta...
+          </span>
+        )}
       </div>
 
       {/* Corpo: chat (esq) + documento (dir) */}
