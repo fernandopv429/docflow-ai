@@ -4,6 +4,7 @@ import { ArrowLeft, Loader2, Paperclip, X } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { deriveTokens, TIPO_DISPENSA_LABELS } from '@/lib/trabalhista/tokens';
 import CampoInput from '@/components/trabalhista/CampoInput';
+import ParserEntrevista from '@/components/trabalhista/ParserEntrevista';
 
 const Section = ({ title, children }) => (
   <fieldset className="bg-white border border-[#dadce0] rounded-xl p-5">
@@ -71,6 +72,8 @@ export default function TrabalhistaForm() {
           </Link>
           <h1 className="text-xl font-semibold text-[#202124]">Novo Caso Trabalhista</h1>
         </div>
+
+        <ParserEntrevista onExtract={(dados) => setF((prev) => ({ ...prev, ...dados }))} />
 
         <Section title="Identificação">
           <CampoInput label="Título do caso" placeholder="Gerado automaticamente se vazio" value={f.titulo || ''} onChange={set('titulo')} className="md:col-span-2" />
