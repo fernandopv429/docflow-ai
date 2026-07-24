@@ -379,6 +379,79 @@ function blocoCeps(dados) {
 }
 
 // ============================================================
+// Configuração das integrações (liga/desliga cada tool). Singleton.
+// ============================================================
+export const CONFIG_INTEGRACOES_PADRAO = {
+  cnpj_ativo: true,
+  cep_ativo: true,
+  datajud_ativo: false,
+  datajud_tribunal: 'trt2',
+  datajud_size: 5,
+};
+
+export async function carregarConfigIntegracoes() {
+  try {
+    const lista = await base44.entities.IntegracaoConfig.list('-updated_date', 1);
+    return { ...CONFIG_INTEGRACOES_PADRAO, ...(lista?.[0] || {}) };
+  } catch (e) {
+    return { ...CONFIG_INTEGRACOES_PADRAO };
+  }
+}
+
+// ============================================================
+// Consulta ao DataJud (CNJ) — jurisprudência/processos por tema.
+// Vai por FUNÇÃO DE BACKEND (base44.functions.invoke('datajud')),
+// porque o DataJud não libera CORS para o navegador.
+// A busca é montada por palavras-chave/contexto da entrevista.
+// ============================================================
+export function montarTermosDatajud(attrs) {
+  const termos = [...((attrs && attrs.teses) || [])];
+  if (!termos.length && attrs?.funcao) termos.push(attrs.funcao);
+  return [...new Set(termos.map((t) => (t || '').trim()).filter(Boolean))].slice(0, 4);
+}
+
+export async function consultarDatajud({ termo, tribunal = 'trt2', size = 5 }) {
+  try {
+    const resp = await base44.functions.invoke('datajud', { termo, tribunal, size });
+    const data = resp?.data ?? resp;
+    const hits = data?.hits || data?.processos || [];
+    return { termo, hits: Array.isArray(hits) ? hits : [] };
+  } catch (e) {
+    return { termo, erro: 'indisponível' };
+  }
+}
+
+export async function enriquecerDatajud(attrs, config) {
+  if (!config?.datajud_ativo) return [];
+  const termos = montarTermosDatajud(attrs);
+  if (!termos.length) return [];
+  return Promise.all(
+    termos.map((termo) =>
+      consultarDatajud({
+        termo,
+        tribunal: config.datajud_tribunal || 'trt2',
+        size: config.datajud_size || 5,
+      })
+    )
+  );
+}
+
+function blocoDatajud(resultados) {
+  const comHits = (resultados || []).filter((r) => r && !r.erro && r.hits?.length);
+  if (!comHits.length) return '';
+  const linhas = comHits.map((r) => {
+    const exemplos = r.hits.slice(0, 3).map((h) => {
+      const numero = h.numero || h.numeroProcesso || '?';
+      const classe = h.classe || (h.classe && h.classe.nome) || '-';
+      const assuntos = (h.assuntos || []).map((a) => (typeof a === 'string' ? a : a.nome)).slice(0, 2);
+      return `${numero} — ${classe}${assuntos.length ? ` (${assuntos.join(', ')})` : ''}`;
+    });
+    return `- Tema "${r.termo}": ${exemplos.join('; ')}`;
+  });
+  return `\n\nCONTEXTO JURISPRUDENCIAL (DataJud/CNJ — mostra que o tema é recorrente no tribunal; use só como reforço argumentativo, NÃO cite números de processo específicos sem conferência humana):\n${linhas.join('\n')}`;
+}
+
+// ============================================================
 // Passo 2: gerar a minuta usando o modelo como referência
 // ============================================================
 export const PROMPT_SISTEMA_PETICAO = `Você é um assistente jurídico especializado em Direito do Trabalho brasileiro, vinculado ao escritório FAV Advogados. A partir da entrevista do cliente, elabore o TEXTO COMPLETO da petição inicial trabalhista seguindo rigorosamente as regras abaixo.
@@ -441,7 +514,7 @@ REVISÃO FINAL (garantir antes de responder):
 REGRAS DE DADOS:
 - Use SOMENTE dados da entrevista/documentos do caso atual. Onde faltar um dado, insira marcador entre colchetes (ex.: [SALÁRIO], [DATA DE ADMISSÃO]). NÃO invente fatos nem valores. NÃO narre etapas, verificações ou alterações.`;
 
-export function buildGeracaoPrompt({ texto, attrs, modelo, dadosReceita, dadosCep }) {
+export function buildGeracaoPrompt({ texto, attrs, modelo, dadosReceita, dadosCep, dadosDatajud }) {
   return `${PROMPT_SISTEMA_PETICAO}
 
 Use o MODELO DE REFERÊNCIA abaixo (uma peça correta já aprovada pelo escritório) como guia de ESTRUTURA, ORDEM DOS TÓPICOS, TESES e FUNDAMENTAÇÃO JURÍDICA (súmulas e artigos). NÃO copie dados pessoais, nomes de partes, CPF, endereços ou valores do modelo — ele é de OUTRO processo e serve apenas como forma e argumentação.
@@ -459,20 +532,26 @@ ${modelo.conteudo || modelo.resumo || ''}
 ${texto || '(ver documentos anexados)'}
 
 Atributos detectados: função=${attrs?.funcao || '-'}, modalidade=${attrs?.tipo_dispensa || '-'}, rito=${attrs?.rito || '-'}, tomadora=${attrs?.tem_tomadora ? 'sim' : 'não'}.
-=== FIM DA ENTREVISTA ===${blocoReceita(dadosReceita)}${blocoCeps(dadosCep)}
+=== FIM DA ENTREVISTA ===${blocoReceita(dadosReceita)}${blocoCeps(dadosCep)}${blocoDatajud(dadosDatajud)}
 
 FORMATO DE SAÍDA: retorne APENAS o HTML do corpo da petição (sem <html>, <head> ou <body>), pronto para formatação. Use <h2> para o título de cada tópico (ex.: <h2>DAS HORAS EXTRAS</h2>) e <p style="text-align: justify"> para os parágrafos. Comece direto pelo endereçamento ao Juízo (sem nome/letreiro do escritório antes). Inclua a qualificação das partes, os fatos, o direito (um tópico por tese cabível, seguindo a ordem), os cálculos/valor da causa e o fecho com a assinatura do Dr. Fernando Andrade Vieira — OAB/SP nº 320.825. Ao final, acrescente exatamente:
 <p><em>⚠️ Minuta gerada por IA a partir de modelo de referência — revisão obrigatória pelo advogado responsável.</em></p>`;
 }
 
 export async function gerarPeca({ texto, fileUrls, attrs, modelo }) {
-  // Consultas determinísticas: CNPJ (Receita) e CEP (ViaCEP), do texto + o que a IA extraiu dos docs
-  const cnpjs = [...extrairCnpjs(texto), ...((attrs && attrs.cnpjs) || [])];
-  const ceps = [...extrairCeps(texto), ...((attrs && attrs.ceps) || [])];
-  const [dadosReceita, dadosCep] = await Promise.all([enriquecerCnpjs(cnpjs), enriquecerCeps(ceps)]);
+  const config = await carregarConfigIntegracoes();
+
+  // Consultas externas, cada uma condicionada ao seu toggle na configuração.
+  const cnpjs = config.cnpj_ativo ? [...extrairCnpjs(texto), ...((attrs && attrs.cnpjs) || [])] : [];
+  const ceps = config.cep_ativo ? [...extrairCeps(texto), ...((attrs && attrs.ceps) || [])] : [];
+  const [dadosReceita, dadosCep, dadosDatajud] = await Promise.all([
+    enriquecerCnpjs(cnpjs),
+    enriquecerCeps(ceps),
+    enriquecerDatajud(attrs, config),
+  ]);
 
   const req = {
-    prompt: buildGeracaoPrompt({ texto, attrs, modelo, dadosReceita, dadosCep }),
+    prompt: buildGeracaoPrompt({ texto, attrs, modelo, dadosReceita, dadosCep, dadosDatajud }),
     model: 'claude_sonnet_4_6',
   };
   const urls = [...(fileUrls || [])];
@@ -483,6 +562,7 @@ export async function gerarPeca({ texto, fileUrls, attrs, modelo }) {
     html: typeof resultado === 'string' ? resultado : String(resultado || ''),
     dadosReceita,
     dadosCep,
+    dadosDatajud,
   };
 }
 
