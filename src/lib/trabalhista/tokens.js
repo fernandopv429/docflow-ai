@@ -60,10 +60,13 @@ export function deriveTokens(caso) {
     DANO_SUPERVISOR: caso.dano_supervisor || '',
     ACUMULO_FUNCAO: caso.acumulo_funcao || '',
     TIPO_DISPENSA: TIPO_DISPENSA_LABELS[tipo] || '',
-    t_dispensa: tipo === 'sem_justa_causa',
-    t_indireta: tipo === 'rescisao_indireta',
-    t_coacao: tipo === 'nulidade_pedido_demissao',
-    t_reversao: tipo === 'reversao_justa_causa',
+    // Flags condicionais consumidas por {{#if T_X}}...{{/if}} no Modelo Padrão
+    // (ver applyConditionals em exportDocx.js). Mutuamente exclusivas.
+    T_DISPENSA: tipo === 'sem_justa_causa',
+    T_INDIRETA: tipo === 'rescisao_indireta',
+    T_COACAO: tipo === 'nulidade_pedido_demissao',
+    T_REVERSAO: tipo === 'reversao_justa_causa',
+    T_ACORDO: tipo === 'acordo',
     tem_ft: !!(caso.tem_ft || caso.val_ft),
     tem_dano_moral: !!(caso.dano_fatos || caso.dano_supervisor || caso.dano_sem_estrutura),
   };
