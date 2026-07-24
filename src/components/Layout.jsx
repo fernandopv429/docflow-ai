@@ -1,16 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
-import { FileText, Plus, HelpCircle, PanelLeftClose, PanelLeftOpen, Sparkles, Library } from 'lucide-react';
-import { base44 } from '@/api/base44Client';
+import { FileText, HelpCircle, PanelLeftClose, PanelLeftOpen, Sparkles, Library } from 'lucide-react';
 
 export default function Layout() {
-  const [templates, setTemplates] = useState([]);
   const [collapsed, setCollapsed] = useState(false);
   const location = useLocation();
 
-  useEffect(() => {
-    base44.entities.Template.list('-updated_date', 50).then(setTemplates).catch(() => {});
-  }, [location.pathname]);
+  const itemCls = (active) =>
+    `flex items-center justify-center gap-2 w-full py-2.5 mt-2 rounded-lg text-sm font-medium transition-colors ${
+      active ? 'bg-[#e8f0fe] text-[#1a73e8]' : 'text-[#3c4043] hover:bg-[#f1f3f4]'
+    } ${collapsed ? 'px-0' : 'px-4'}`;
 
   return (
     <div className="flex h-screen bg-[#f8f9fa]">
@@ -20,9 +19,9 @@ export default function Layout() {
       >
         <div className={`py-5 border-b border-[#dadce0] flex items-center ${collapsed ? 'justify-center px-2' : 'justify-between px-5'}`}>
           {!collapsed && (
-            <Link to="/" className="flex items-center gap-2 min-w-0">
+            <Link to="/trabalhista/gerar-entrevista" className="flex items-center gap-2 min-w-0">
               <FileText className="w-5 h-5 text-[#1a73e8] flex-shrink-0" />
-              <span className="font-semibold text-[#202124] text-[15px] truncate">Editor de Documentos</span>
+              <span className="font-semibold text-[#202124] text-[15px] truncate">Petições FAV</span>
             </Link>
           )}
           <button
@@ -34,68 +33,23 @@ export default function Layout() {
           </button>
         </div>
 
-        <div className={`py-4 ${collapsed ? 'px-2' : 'px-4'}`}>
-          <Link
-            to="/templates/new"
-            title="Cadastrar Templates"
-            className={`flex items-center justify-center gap-2 w-full py-2.5 border border-[#1a73e8] text-[#1a73e8] rounded-lg text-sm font-medium hover:bg-[#e8f0fe] transition-colors ${collapsed ? 'px-0' : 'px-4'}`}
-          >
-            <Plus className="w-4 h-4 flex-shrink-0" />
-            {!collapsed && 'Cadastrar Templates'}
-          </Link>
+        <div className={`py-4 flex-1 ${collapsed ? 'px-2' : 'px-4'}`}>
           <Link
             to="/trabalhista/gerar-entrevista"
             title="Gerar por Entrevista"
-            className={`flex items-center justify-center gap-2 w-full py-2.5 mt-2 rounded-lg text-sm font-medium transition-colors ${
-              location.pathname === '/trabalhista/gerar-entrevista'
-                ? 'bg-[#e8f0fe] text-[#1a73e8]'
-                : 'text-[#3c4043] hover:bg-[#f1f3f4]'
-            } ${collapsed ? 'px-0' : 'px-4'}`}
+            className={itemCls(location.pathname === '/trabalhista/gerar-entrevista')}
           >
             <Sparkles className="w-4 h-4 flex-shrink-0" />
             {!collapsed && 'Gerar por Entrevista'}
           </Link>
           <Link
             to="/modelos"
-            title="Modelos de Referência"
-            className={`flex items-center justify-center gap-2 w-full py-2.5 mt-2 rounded-lg text-sm font-medium transition-colors ${
-              location.pathname === '/modelos'
-                ? 'bg-[#e8f0fe] text-[#1a73e8]'
-                : 'text-[#3c4043] hover:bg-[#f1f3f4]'
-            } ${collapsed ? 'px-0' : 'px-4'}`}
+            title="Modelos / Configurações"
+            className={itemCls(location.pathname === '/modelos')}
           >
             <Library className="w-4 h-4 flex-shrink-0" />
-            {!collapsed && 'Modelos de Referência'}
+            {!collapsed && 'Modelos / Configurações'}
           </Link>
-        </div>
-
-        <div className="flex-1 overflow-y-auto px-2">
-          {!collapsed && (
-            <div className="px-3 py-2 text-xs font-medium text-[#5f6368] uppercase tracking-wide">
-              Meus Templates
-            </div>
-          )}
-          {templates.length === 0 ? (
-            !collapsed && <div className="px-3 py-2 text-sm text-[#9aa0a6]">Nenhum template ainda</div>
-          ) : (
-            templates.map((t) => (
-              <Link
-                key={t.id}
-                to={`/templates/${t.id}`}
-                title={t.title}
-                className={`flex items-center gap-2 py-2 rounded-lg text-sm hover:bg-[#f1f3f4] transition-colors ${
-                  collapsed ? 'justify-center px-0' : 'px-3'
-                } ${
-                  location.pathname === `/templates/${t.id}` || location.pathname === `/templates/${t.id}/generate`
-                    ? 'bg-[#e8f0fe] text-[#1a73e8]'
-                    : 'text-[#3c4043]'
-                }`}
-              >
-                <FileText className="w-4 h-4 flex-shrink-0" />
-                {!collapsed && <span className="truncate">{t.title}</span>}
-              </Link>
-            ))
-          )}
         </div>
 
         <div className={`py-4 border-t border-[#dadce0] ${collapsed ? 'px-2 flex justify-center' : 'px-4'}`}>
