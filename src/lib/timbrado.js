@@ -3,10 +3,14 @@
 // o cabecalho funciona identico no editor, no preview e no app publicado.
 
 export const TIMBRADO = {
-  escritorio: 'FAV Advogados',
-  subtitulo: 'Fernando Andrade Vieira - Assessoria Juridica Trabalhista',
+  escritorio: 'FERNANDO VIEIRA ADVOGADOS',
+  subtitulo: 'ADVOCACIA TRABALHISTA',
+  site: 'www.favadvogados.com.br',
+  email: 'juridico@favadvogados.com.br',
+  telefone: '(11) 3151-2816',
+  cidades: 'SÃO PAULO   •   MINAS GERAIS   •   BRASÍLIA   •   SANTA CATARINA   •   PERNAMBUCO',
   rodape: {
-    email: 'trabalhista@favadvogados.com.br',
+    email: 'juridico@favadvogados.com.br',
     oab: 'OAB/SP 320.825',
   },
 };
