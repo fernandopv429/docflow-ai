@@ -58,6 +58,10 @@ export default function GerarPorEntrevista() {
       if (verificados.length) {
         nota += ` CNPJ(s) confirmado(s) na Receita: ${verificados.map((d) => `${d.razao_social} (${d.cnpj})`).join('; ')}.`;
       }
+      const temTextoIntegral = !!modelo.arquivo_url || (modelo.conteudo || '').length > 6000;
+      if (!temTextoIntegral) {
+        nota += ' ⚠️ Este modelo ainda está SEM o texto integral (só o resumo), então a redação é aproximada. Para a minuta seguir o template à risca, importe o .docx do modelo em “Modelos”.';
+      }
       setMessages((m) => [...m, { role: 'assistant', text: nota }]);
     } catch (err) {
       console.error(err);
