@@ -18,6 +18,7 @@ import {
 } from 'docx';
 import { TIMBRADO } from './timbrado';
 import { applyConditionals } from './variables';
+import { removeTextLetterhead } from './removeTextLetterhead';
 
 // ---------- Utilitarios de parsing HTML -> docx ----------
 
@@ -251,6 +252,7 @@ export async function exportToDocx(html, variables, title, opts = {}) {
   // Remove cercas de código markdown e tags de envelope que a IA possa ter incluído
   processed = processed.replace(/```[a-z]*\n?/gi, '');
   processed = processed.replace(/<\/?(?:html|head|body|!doctype)[^>]*>/gi, '').trim();
+  processed = removeTextLetterhead(processed);
 
   if (variables) {
     // 1) Resolve blocos condicionais primeiro, usando as entradas booleanas como flags

@@ -5,6 +5,7 @@ import { loadTemplateContent } from '@/lib/templateContent';
 import { extrairCasoDeTexto } from './parserEntrevista';
 import { calcularVerbasCaso } from './mathUtils';
 import { runtimeCacheKey, withRuntimeCache } from './runtimeCache';
+import { removeTextLetterhead } from '@/lib/removeTextLetterhead';
 
 // ============================================================
 // Anonimização (mesma lógica usada no cadastro dos modelos)
@@ -548,7 +549,7 @@ export function limparHtmlIA(html) {
   let t = typeof html === 'string' ? html : String(html || '');
   t = t.replace(/```[a-z]*\n?/gi, '');
   t = t.replace(/<\/?(?:html|head|body|!doctype)[^>]*>/gi, '');
-  return t.trim();
+  return removeTextLetterhead(t.trim());
 }
 
 export async function gerarPecaPadrao({ texto, fileUrls, attrs, modeloPadrao, onTool }) {
