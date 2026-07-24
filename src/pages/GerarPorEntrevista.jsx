@@ -45,12 +45,13 @@ export default function GerarPorEntrevista() {
     if (!modelo || generating || sending) return;
     setGenerating(true);
     try {
-      const resultado = await gerarPeca({ texto: userText, fileUrls: allUrls, attrs, modelo });
-      const html = typeof resultado === 'string' ? resultado : String(resultado || '');
-      setMessages((m) => [
-        ...m,
-        { role: 'assistant', text: `Minuta gerada com base no modelo "${modelo.titulo}".`, html },
-      ]);
+      const { html, dadosReceita } = await gerarPeca({ texto: userText, fileUrls: allUrls, attrs, modelo });
+      const verificados = (dadosReceita || []).filter((d) => !d.erro);
+      let nota = `Minuta gerada com base no modelo "${modelo.titulo}".`;
+      if (verificados.length) {
+        nota += ` CNPJ(s) confirmado(s) na Receita: ${verificados.map((d) => `${d.razao_social} (${d.cnpj})`).join('; ')}.`;
+      }
+      setMessages((m) => [...m, { role: 'assistant', text: nota, html }]);
     } catch (err) {
       console.error(err);
       setMessages((m) => [...m, { role: 'assistant', text: 'Erro ao gerar a minuta. Tente novamente.' }]);
