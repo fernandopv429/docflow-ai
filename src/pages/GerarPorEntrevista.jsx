@@ -1,9 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  ArrowLeft, Loader2, Paperclip, Send, X, FileText, Bot, FileDown, Library, RefreshCw, Wrench,
+  ArrowLeft, Loader2, Paperclip, Send, X, FileText, Bot, FileDown, Library, RefreshCw,
 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
+import ToolTraceMessage from '@/components/ToolTraceMessage';
 import { exportToDocx } from '@/lib/exportDocx';
 import { TIPO_DISPENSA_LABELS } from '@/lib/trabalhista/tokens';
 import { formatBRL } from '@/lib/trabalhista/mathUtils';
@@ -45,7 +46,7 @@ export default function GerarPorEntrevista() {
     setMessages((m) => [...m, { role: 'tool', text: `Usando modelo padrão: ${modeloPadrao.titulo}` }]);
     try {
       const geracaoTexto = opts.texto ?? userText;
-      const { html, dadosReceita, calculos, caso } = await gerarPecaPadrao({
+      const { html, dadosReceita, dadosCep, dadosDatajud, calculos, caso, modeloSemelhante } = await gerarPecaPadrao({
         texto: geracaoTexto,
         fileUrls: opts.urls ?? allUrls,
         attrs: opts.attrs ?? attrs,
@@ -53,6 +54,16 @@ export default function GerarPorEntrevista() {
         onTool: (msg) => setMessages((m) => [...m, { role: 'tool', text: msg }]),
       });
       setDocHtml(html);
+      const retornos = [
+        dadosReceita?.length && { role: 'tool_result', title: 'Retorno da Receita Federal (BrasilAPI)', text: JSON.stringify(dadosReceita, null, 2) },
+        dadosCep?.length && { role: 'tool_result', title: 'Retorno da consulta de CEP', text: JSON.stringify(dadosCep, null, 2) },
+        dadosDatajud?.length && { role: 'tool_result', title: 'Retorno do DataJud/CNJ', text: JSON.stringify(dadosDatajud, null, 2) },
+        caso && Object.keys(caso).length && { role: 'tool_result', title: 'Dados analisados e extraídos pela IA', text: JSON.stringify(caso, null, 2) },
+        calculos?.length && { role: 'tool_result', title: 'Retorno dos cálculos determinísticos', text: JSON.stringify(calculos, null, 2) },
+        modeloSemelhante && { role: 'tool_result', title: 'Modelo de referência selecionado', text: JSON.stringify(modeloSemelhante, null, 2) },
+      ].filter(Boolean);
+      if (retornos.length) setMessages((m) => [...m, ...retornos]);
+
       const verificados = (dadosReceita || []).filter((d) => !d.erro);
       let nota = docHtml
         ? 'Documento atualizado com base no modelo padrão. Veja as mudanças ao lado.'
@@ -76,7 +87,11 @@ export default function GerarPorEntrevista() {
         const corpo = alertas.length
           ? '\n' + alertas.map((a) => `${icone[a.severidade] || '•'} ${a.descricao}${a.sugestao ? ` — ${a.sugestao}` : ''}`).join('\n')
           : ' Nenhum problema aparente. A revisão humana do advogado continua obrigatória.';
-        setMessages((m) => [...m, { role: 'assistant', text: cabecalho + corpo }]);
+        setMessages((m) => [
+          ...m,
+          { role: 'tool_result', title: 'Retorno da auditoria de coerência (IA)', text: JSON.stringify(verif, null, 2) },
+          { role: 'assistant', text: cabecalho + corpo },
+        ]);
       } catch (e) {
         console.error(e);
       }
@@ -116,7 +131,18 @@ export default function GerarPorEntrevista() {
 
       const novoAttrs = { ...(attrs || {}), ...(res?.atributos || {}) };
       setAttrs(novoAttrs);
-      setMessages((m) => [...m, { role: 'assistant', text: res?.reply || 'Certo.' }]);
+      setMessages((m) => [
+        ...m,
+        { role: 'assistant', text: res?.reply || 'Certo.' },
+        {
+          role: 'tool_result',
+          title: 'Análise da IA sobre a entrevista',
+          text: JSON.stringify({
+            atributos: res?.atributos || {},
+            pronto_para_gerar: res?.pronto_para_gerar ?? false,
+          }, null, 2),
+        },
+      ]);
 
       // Inicia a geração/atualização da minuta automaticamente após cada envio
       const textoCompleto = novasMsgs
@@ -200,13 +226,8 @@ export default function GerarPorEntrevista() {
                 </div>
               )}
               {messages.map((m, i) =>
-                m.role === 'tool' ? (
-                  <div key={i} className="flex justify-start">
-                    <div className="flex items-center gap-1.5 px-3 py-1 bg-[#f1f3f4] border border-[#e8eaed] rounded-full text-[11px] text-[#5f6368]">
-                      <Wrench className="w-3 h-3 text-[#1a73e8] flex-shrink-0" />
-                      {m.text}
-                    </div>
-                  </div>
+                m.role === 'tool' || m.role === 'tool_result' ? (
+                  <ToolTraceMessage key={i} message={m} />
                 ) : (
                   <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                     <div
