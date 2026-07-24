@@ -103,7 +103,7 @@ export default function ModelosReferencia() {
     <div className="h-full overflow-y-auto">
       <div className="max-w-4xl mx-auto px-6 py-8 space-y-5">
         <div className="flex items-center gap-3">
-          <Link to="/trabalhista" className="text-[#5f6368] hover:text-[#202124]">
+          <Link to="/" className="text-[#5f6368] hover:text-[#202124]">
             <ArrowLeft className="w-5 h-5" />
           </Link>
           <div className="flex-1">
