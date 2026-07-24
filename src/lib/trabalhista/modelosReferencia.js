@@ -30,6 +30,58 @@ export function anonimizarTexto(txt) {
 // Matching determinístico: pontua cada modelo contra os
 // atributos extraídos da entrevista.
 // ============================================================
+const norm = (s) =>
+  (s || '').toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+
+export function pontuarModelo(modelo, attrs = {}) {
+  let score = 0;
+  const motivos = [];
+  if (attrs.tipo_dispensa && modelo.tipo_dispensa === attrs.tipo_dispensa) {
+    score += 5;
+    motivos.push('Mesma modalidade de rescisão');
+  }
+  if (attrs.funcao && modelo.funcao) {
+    const a = norm(attrs.funcao);
+    const m = norm(modelo.funcao);
+    const mesmaFuncao =
+      (a && (m.includes(a) || a.includes(m))) ||
+      (a.includes('controlador') && m.includes('controlador')) ||
+      (a.includes('porteiro') && m.includes('porteiro'));
+    if (mesmaFuncao) {
+      score += 2;
+      motivos.push('Mesma função');
+    }
+  }
+  if (attrs.rito && modelo.rito === attrs.rito) {
+    score += 1;
+    motivos.push('Mesmo rito');
+  }
+  if (attrs.tem_tomadora === true && modelo.tem_tomadora === true) {
+    score += 2;
+    motivos.push('Tem tomadora (Súm. 331 TST)');
+  }
+  const modeloTeses = (modelo.teses || []).map(norm);
+  for (const t of attrs.teses || []) {
+    const nt = norm(t);
+    if (nt && modeloTeses.some((x) => x.includes(nt) || nt.includes(x))) {
+      score += 1;
+      motivos.push(`Tese: ${t}`);
+    }
+  }
+  return { score, motivos };
+}
+
+export function rankearModelos(modelos, attrs) {
+  return (modelos || [])
+    .map((modelo) => ({ modelo, ...pontuarModelo(modelo, attrs) }))
+    .sort((a, b) => b.score - a.score);
+}
+
+export async function listarModelosAtivos() {
+  const todos = await base44.entities.ModeloReferencia.list('-updated_date', 100);
+  return todos.filter((m) => m.ativo !== false);
+}
+
 // Carrega o Único MODELO PADRÃO (de "Meus Templates") — traç o HTML formatado
 // (estilo/layout do escritório) que serve de base para a minuta.
 export async function carregarModeloPadrao() {
@@ -39,6 +91,21 @@ export async function carregarModeloPadrao() {
   if (!padrao) return null;
   const html = await loadTemplateContent(padrao);
   return { id: padrao.id, titulo: padrao.title, html: html || '' };
+}
+
+// Distila de uma peça o que é PARTICULAR (diferencial), ignorando o texto padrão comum.
+// Usada na importação para guardar só o que distingue cada modelo (escala melhor).
+export async function resumirDiferencial(textoDocx) {
+  const prompt = `Você recebe o texto de uma petição inicial trabalhista (modelo correto do escritório). A maior parte é texto PADRÃO, comum a quase toda petição (competência, justiça gratuita, juízo 100% digital, honorários, juros, IR, INSS, ofícios, etc.). IGNORE o padrão e extraia APENAS O QUE É PARTICULAR deste tipo de caso: modalidade de rescisão, teses/capítulos distintivos, argumentos e cláusulas específicas, e QUANDO usar. Seja objetivo (bullet points). Isso orientará a IA quando um caso semelhante aparecer.
+
+TEXTO:
+"""
+${(textoDocx || '').slice(0, 40000)}
+"""
+
+Responda em português, apenas o resumo do diferencial.`;
+  const r = await base44.integrations.Core.InvokeLLM({ prompt, model: 'gemini_3_flash' });
+  return typeof r === 'string' ? r : String(r || '');
 }
 
 // ============================================================
