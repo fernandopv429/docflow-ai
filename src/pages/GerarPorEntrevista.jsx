@@ -11,6 +11,7 @@ import {
   carregarModeloPadrao,
   conversarEntrevista,
   gerarPecaPadrao,
+  verificarCoerencia,
 } from '@/lib/trabalhista/modelosReferencia';
 
 export default function GerarPorEntrevista() {
@@ -44,8 +45,9 @@ export default function GerarPorEntrevista() {
     setGenerating(true);
     setMessages((m) => [...m, { role: 'tool', text: `Usando modelo padrão: ${modeloPadrao.titulo}` }]);
     try {
-      const { html, dadosReceita, calculos } = await gerarPecaPadrao({
-        texto: opts.texto ?? userText,
+      const geracaoTexto = opts.texto ?? userText;
+      const { html, dadosReceita, calculos, caso } = await gerarPecaPadrao({
+        texto: geracaoTexto,
         fileUrls: opts.urls ?? allUrls,
         attrs: opts.attrs ?? attrs,
         modeloPadrao,
@@ -64,6 +66,21 @@ export default function GerarPorEntrevista() {
         nota += `\n\nCálculos determinísticos (por código, sem IA):\n${comValor.map((c) => `• ${c.item}: ${formatBRL(c.valor)}`).join('\n')}`;
       }
       setMessages((m) => [...m, { role: 'assistant', text: nota }]);
+
+      // Verificação de coerência jurídica da minuta (LLM audita, não reescreve)
+      setMessages((m) => [...m, { role: 'tool', text: 'Verificando coerência jurídica da minuta...' }]);
+      try {
+        const verif = await verificarCoerencia({ texto: geracaoTexto, caso, html });
+        const alertas = verif?.alertas || [];
+        const icone = { BLOQUEANTE: '⛔', ATENCAO: '⚠️', INFO: 'ℹ️' };
+        const cabecalho = `Verificação de coerência — status: ${verif?.status || 'concluída'}.`;
+        const corpo = alertas.length
+          ? '\n' + alertas.map((a) => `${icone[a.severidade] || '•'} ${a.descricao}${a.sugestao ? ` — ${a.sugestao}` : ''}`).join('\n')
+          : ' Nenhum problema aparente. A revisão humana do advogado continua obrigatória.';
+        setMessages((m) => [...m, { role: 'assistant', text: cabecalho + corpo }]);
+      } catch (e) {
+        console.error(e);
+      }
     } catch (err) {
       console.error(err);
       setMessages((m) => [...m, { role: 'assistant', text: 'Erro ao gerar a minuta. Tente novamente.' }]);
