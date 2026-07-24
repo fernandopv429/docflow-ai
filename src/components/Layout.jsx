@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
-import { FileText, Plus, HelpCircle, PanelLeftClose, PanelLeftOpen, Briefcase } from 'lucide-react';
+import { FileText, Plus, HelpCircle, PanelLeftClose, PanelLeftOpen, Briefcase, Sparkles, Library } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 
 export default function Layout() {
@@ -54,6 +54,30 @@ export default function Layout() {
           >
             <Briefcase className="w-4 h-4 flex-shrink-0" />
             {!collapsed && 'Casos Trabalhistas'}
+          </Link>
+          <Link
+            to="/trabalhista/gerar-entrevista"
+            title="Gerar por Entrevista"
+            className={`flex items-center justify-center gap-2 w-full py-2.5 mt-2 rounded-lg text-sm font-medium transition-colors ${
+              location.pathname === '/trabalhista/gerar-entrevista'
+                ? 'bg-[#e8f0fe] text-[#1a73e8]'
+                : 'text-[#3c4043] hover:bg-[#f1f3f4]'
+            } ${collapsed ? 'px-0' : 'px-4'}`}
+          >
+            <Sparkles className="w-4 h-4 flex-shrink-0" />
+            {!collapsed && 'Gerar por Entrevista'}
+          </Link>
+          <Link
+            to="/modelos"
+            title="Modelos de Referência"
+            className={`flex items-center justify-center gap-2 w-full py-2.5 mt-2 rounded-lg text-sm font-medium transition-colors ${
+              location.pathname === '/modelos'
+                ? 'bg-[#e8f0fe] text-[#1a73e8]'
+                : 'text-[#3c4043] hover:bg-[#f1f3f4]'
+            } ${collapsed ? 'px-0' : 'px-4'}`}
+          >
+            <Library className="w-4 h-4 flex-shrink-0" />
+            {!collapsed && 'Modelos de Referência'}
           </Link>
         </div>
 
