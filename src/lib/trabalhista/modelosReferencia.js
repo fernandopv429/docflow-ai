@@ -219,6 +219,74 @@ export async function conversarEntrevista({ transcript, fileUrls, modelos }) {
 }
 
 // ============================================================
+// Consulta de CNPJ na Receita Federal (BrasilAPI) — determinística.
+// Usada sempre que houver CNPJ, para preencher a qualificação das
+// reclamadas com dados oficiais (sem alucinação da IA).
+// ============================================================
+const CNPJ_RE = /\b\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2}\b/g;
+
+export function extrairCnpjs(texto) {
+  const encontrados = new Set();
+  for (const m of (texto || '').matchAll(CNPJ_RE)) {
+    const d = m[0].replace(/\D/g, '');
+    if (d.length === 14) encontrados.add(d);
+  }
+  return [...encontrados];
+}
+
+function formatarCnpj(digits) {
+  return digits.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5');
+}
+
+export async function consultarCnpj(cnpj) {
+  const digits = (cnpj || '').replace(/\D/g, '');
+  if (digits.length !== 14) return { cnpj, erro: 'CNPJ inválido (precisa de 14 dígitos)' };
+  try {
+    const resp = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${digits}`);
+    if (resp.status === 404) return { cnpj: formatarCnpj(digits), erro: 'não encontrado na Receita' };
+    if (!resp.ok) return { cnpj: formatarCnpj(digits), erro: `erro HTTP ${resp.status}` };
+    const d = await resp.json();
+    const cep = (d.cep || '').replace(/\D/g, '');
+    const endereco = [
+      `${d.descricao_tipo_de_logradouro || ''} ${d.logradouro || ''}`.trim(),
+      d.numero,
+      d.complemento,
+      d.bairro,
+      [d.municipio, d.uf].filter(Boolean).join('/'),
+    ]
+      .filter(Boolean)
+      .join(', ');
+    return {
+      cnpj: formatarCnpj(digits),
+      razao_social: d.razao_social || '',
+      endereco,
+      cep: cep.length === 8 ? `${cep.slice(0, 5)}-${cep.slice(5)}` : cep,
+      situacao: d.descricao_situacao_cadastral || '',
+    };
+  } catch (e) {
+    return { cnpj: formatarCnpj(digits), erro: 'falha de rede ao consultar a Receita' };
+  }
+}
+
+export async function enriquecerCnpjs(cnpjs) {
+  const unicos = [
+    ...new Set((cnpjs || []).map((c) => (c || '').replace(/\D/g, '')).filter((d) => d.length === 14)),
+  ];
+  if (!unicos.length) return [];
+  return Promise.all(unicos.map(consultarCnpj));
+}
+
+function blocoReceita(dados) {
+  if (!dados?.length) return '';
+  const linhas = dados.map((d) =>
+    d.erro
+      ? `- CNPJ ${d.cnpj}: ${d.erro} — use o marcador [CNPJ - confirmar].`
+      : `- ${d.razao_social} — CNPJ ${d.cnpj}, ${d.endereco}, CEP ${d.cep} (situação cadastral: ${d.situacao}).`
+  );
+  return `\n\nDADOS OFICIAIS DAS RECLAMADAS (verificados na Receita Federal via BrasilAPI — USE ESTES dados exatos na qualificação das reclamadas, com a razão social e o endereço oficiais):\n${linhas.join('\n')}`;
+}
+
+// ============================================================
 // Passo 2: gerar a minuta usando o modelo como referência
 // ============================================================
 export const PROMPT_SISTEMA_PETICAO = `Você é um assistente jurídico especializado em Direito do Trabalho brasileiro, vinculado ao escritório FAV Advogados. A partir da entrevista do cliente, elabore o TEXTO COMPLETO da petição inicial trabalhista seguindo rigorosamente as regras abaixo.
@@ -281,7 +349,7 @@ REVISÃO FINAL (garantir antes de responder):
 REGRAS DE DADOS:
 - Use SOMENTE dados da entrevista/documentos do caso atual. Onde faltar um dado, insira marcador entre colchetes (ex.: [SALÁRIO], [DATA DE ADMISSÃO]). NÃO invente fatos nem valores. NÃO narre etapas, verificações ou alterações.`;
 
-export function buildGeracaoPrompt({ texto, attrs, modelo }) {
+export function buildGeracaoPrompt({ texto, attrs, modelo, dadosReceita }) {
   return `${PROMPT_SISTEMA_PETICAO}
 
 Use o MODELO DE REFERÊNCIA abaixo (uma peça correta já aprovada pelo escritório) como guia de ESTRUTURA, ORDEM DOS TÓPICOS, TESES e FUNDAMENTAÇÃO JURÍDICA (súmulas e artigos). NÃO copie dados pessoais, nomes de partes, CPF, endereços ou valores do modelo — ele é de OUTRO processo e serve apenas como forma e argumentação.
@@ -299,21 +367,26 @@ ${modelo.conteudo || modelo.resumo || ''}
 ${texto || '(ver documentos anexados)'}
 
 Atributos detectados: função=${attrs?.funcao || '-'}, modalidade=${attrs?.tipo_dispensa || '-'}, rito=${attrs?.rito || '-'}, tomadora=${attrs?.tem_tomadora ? 'sim' : 'não'}.
-=== FIM DA ENTREVISTA ===
+=== FIM DA ENTREVISTA ===${blocoReceita(dadosReceita)}
 
 FORMATO DE SAÍDA: retorne APENAS o HTML do corpo da petição (sem <html>, <head> ou <body>), pronto para formatação. Use <h2> para o título de cada tópico (ex.: <h2>DAS HORAS EXTRAS</h2>) e <p style="text-align: justify"> para os parágrafos. Comece direto pelo endereçamento ao Juízo (sem nome/letreiro do escritório antes). Inclua a qualificação das partes, os fatos, o direito (um tópico por tese cabível, seguindo a ordem), os cálculos/valor da causa e o fecho com a assinatura do Dr. Fernando Andrade Vieira — OAB/SP nº 320.825. Ao final, acrescente exatamente:
 <p><em>⚠️ Minuta gerada por IA a partir de modelo de referência — revisão obrigatória pelo advogado responsável.</em></p>`;
 }
 
 export async function gerarPeca({ texto, fileUrls, attrs, modelo }) {
+  // Consulta determinística dos CNPJs (do texto + os que a IA extraiu dos docs)
+  const cnpjs = [...extrairCnpjs(texto), ...((attrs && attrs.cnpjs) || [])];
+  const dadosReceita = await enriquecerCnpjs(cnpjs);
+
   const req = {
-    prompt: buildGeracaoPrompt({ texto, attrs, modelo }),
+    prompt: buildGeracaoPrompt({ texto, attrs, modelo, dadosReceita }),
     model: 'claude_sonnet_4_6',
   };
   const urls = [...(fileUrls || [])];
   if (modelo.arquivo_url) urls.push(modelo.arquivo_url);
   if (urls.length) req.file_urls = urls;
-  return base44.integrations.Core.InvokeLLM(req);
+  const resultado = await base44.integrations.Core.InvokeLLM(req);
+  return { html: typeof resultado === 'string' ? resultado : String(resultado || ''), dadosReceita };
 }
 
 // ============================================================
