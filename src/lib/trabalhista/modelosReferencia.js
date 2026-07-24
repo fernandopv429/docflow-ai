@@ -148,13 +148,14 @@ const CHAT_SCHEMA = {
           description: 'CEPs mencionados na conversa OU encontrados nos documentos (endereço do reclamante, local de prestação, reclamadas)',
         },
       },
+      required: ['cnpjs', 'ceps', 'teses'], 
     },
     pronto_para_gerar: {
       type: 'boolean',
       description: 'true quando o usuário pediu a minuta OU já há fatos essenciais suficientes',
     },
   },
-  required: ['reply'],
+  required: ['reply', 'atributos', 'pronto_para_gerar'],
 };
 
 function resumoModelos(modelos) {
@@ -179,7 +180,7 @@ CONVERSE em português, de forma objetiva e cordial (estilo chat). Seu papel AGO
 
 Peça, quando ainda não informado, os dados NECESSÁRIOS para uma petição completa: qualificação do reclamante (nome, nacionalidade, estado civil, RG, CPF, PIS, CTPS/Série, data de nascimento, filiação, endereço); reclamada(s) com razão social e CNPJ (e a tomadora, se houver); local de prestação dos serviços (define a competência); função e sindicato/CCT aplicável; datas de admissão e rescisão; salário e a maior remuneração na função (para dano moral e cálculos); jornada/escala; modalidade de rescisão; e as verbas/teses pretendidas. Faça poucas perguntas por vez e sinalize claramente o que ainda falta.
 
-Extraia em "atributos" o que já for possível inferir da conversa. Defina "pronto_para_gerar" como true SOMENTE quando o advogado pedir a minuta ou quando já houver fatos essenciais suficientes. Não invente dados.
+Extraia em "atributos" TUDO o que já for possível inferir da conversa. Nunca devolva "atributos" vazio quando o relato contiver função, CNPJ, CEP, tomadora, rito ou teses. Considere como teses fatos como dano moral, intervalo reduzido, folgas trabalhadas e jornada extraordinária. Defina "pronto_para_gerar" como true quando o advogado pedir a minuta OU quando já houver identificação do reclamante, função, reclamada, datas do contrato, salário, jornada e fatos essenciais. Não invente dados.
 
 MODELOS DE REFERÊNCIA DISPONÍVEIS (o sistema escolherá automaticamente o mais aderente aos atributos):
 ${resumoModelos(modelos)}
@@ -190,6 +191,33 @@ ${formatarTranscript(transcript)}
 Responda APENAS com o objeto JSON.`;
 }
 
+function inferirAtributosEntrevista(transcript) {
+  const texto = (transcript || []).filter((m) => m.role === 'user').map((m) => m.text || '').join('\n');
+  const funcao = texto.match(/\b(vigilante|porteiro|controlador(?:a)? de acesso)\b/i)?.[1];
+  const teses = [];
+  if (/dano[s]? moral|persegui|ass[eé]dio/i.test(texto)) teses.push('Dano moral');
+  if (/intrajornada|intervalo/i.test(texto)) teses.push('Intervalo intrajornada (art. 71 CLT)');
+  if (/folga[s]? trabalhada/i.test(texto)) teses.push('Folgas trabalhadas/DSR');
+
+  const atributos = {
+    ...(funcao && { funcao }),
+    cnpjs: extrairCnpjs(texto),
+    ceps: extrairCeps(texto),
+    tem_tomadora: /2[ªa]\s*reclamada|tomadora/i.test(texto),
+    teses,
+  };
+  const essenciais = Boolean(
+    funcao &&
+    atributos.cnpjs.length &&
+    /\b\d{3}\.?\d{3}\.?\d{3}-?\d{2}\b/.test(texto) &&
+    /admiss[aã]o\s*:?\s*\d{2}\/\d{2}\/\d{4}/i.test(texto) &&
+    /(?:demiss[aã]o|rescis[aã]o|dispensa)\s*:?\s*\d{2}\/\d{2}\/\d{4}/i.test(texto) &&
+    /sal[aá]rio\s*:?\s*(?:r\$\s*)?[\d.,]+/i.test(texto) &&
+    /(?:escala|hor[aá]rio|jornada)\s*:?/i.test(texto)
+  );
+  return { atributos, essenciais };
+}
+
 export async function conversarEntrevista({ transcript, fileUrls, modelos }) {
   const req = {
     prompt: buildChatPrompt({ transcript, modelos }),
@@ -197,8 +225,22 @@ export async function conversarEntrevista({ transcript, fileUrls, modelos }) {
     response_json_schema: CHAT_SCHEMA,
   };
   if (fileUrls?.length) req.file_urls = fileUrls;
-  const key = runtimeCacheKey({ transcript, fileUrls, modelos });
-  return withRuntimeCache('entrevista-ia', key, () => base44.integrations.Core.InvokeLLM(req));
+  const key = runtimeCacheKey({ version: 2, transcript, fileUrls, modelos });
+  const resposta = await withRuntimeCache('entrevista-ia', key, () => base44.integrations.Core.InvokeLLM(req));
+  const inferido = inferirAtributosEntrevista(transcript);
+  const ia = resposta?.atributos || {};
+  const atributos = {
+    ...inferido.atributos,
+    ...ia,
+    cnpjs: [...new Set([...(inferido.atributos.cnpjs || []), ...(ia.cnpjs || [])])],
+    ceps: [...new Set([...(inferido.atributos.ceps || []), ...(ia.ceps || [])])],
+    teses: [...new Set([...(inferido.atributos.teses || []), ...(ia.teses || [])])],
+  };
+  const pronto = Boolean(resposta?.pronto_para_gerar || inferido.essenciais);
+  const reply = pronto && /^certo[.!]?$/i.test((resposta?.reply || '').trim())
+    ? 'Dados essenciais identificados. Vou gerar a minuta com as informações fornecidas.'
+    : resposta?.reply || 'Dados recebidos e analisados.';
+  return { ...resposta, reply, atributos, pronto_para_gerar: pronto };
 }
 
 // ============================================================
