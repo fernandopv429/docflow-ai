@@ -32,32 +32,28 @@ export default function ModelosReferencia() {
     setErro(null);
     setMsg(null);
     let anexados = 0;
-    let criados = 0;
+    const ignorados = [];
     try {
       const atuais = await base44.entities.ModeloReferencia.list('-updated_date', 100);
       for (const file of files) {
+        const match = atuais.find((m) => norm(m.arquivo_nome) === norm(file.name));
+        if (!match) {
+          ignorados.push(file.name);
+          continue;
+        }
         const conteudo = await extrairTextoDocx(file);
         const { file_url } = await base44.integrations.Core.UploadFile({ file });
-        const match = atuais.find((m) => norm(m.arquivo_nome) === norm(file.name));
-        if (match) {
-          await base44.entities.ModeloReferencia.update(match.id, {
-            arquivo_url: file_url,
-            conteudo: conteudo || match.conteudo,
-          });
-          anexados++;
-        } else {
-          await base44.entities.ModeloReferencia.create({
-            titulo: file.name.replace(/\.docx$/i, ''),
-            arquivo_nome: file.name,
-            arquivo_url: file_url,
-            conteudo,
-            sindicato: 'SINDEEPRES',
-            ativo: true,
-          });
-          criados++;
-        }
+        await base44.entities.ModeloReferencia.update(match.id, {
+          arquivo_url: file_url,
+          conteudo: conteudo || match.conteudo,
+        });
+        anexados++;
       }
-      setMsg(`Importação concluída: ${anexados} modelo(s) enriquecido(s), ${criados} novo(s).`);
+      let resumo = `Importação concluída: ${anexados} modelo(s) atualizado(s).`;
+      if (ignorados.length) {
+        resumo += ` ${ignorados.length} arquivo(s) ignorado(s) por não corresponder a um modelo da base: ${ignorados.join(', ')}.`;
+      }
+      setMsg(resumo);
       await load();
     } catch (err) {
       console.error(err);
@@ -103,9 +99,9 @@ export default function ModelosReferencia() {
         </div>
 
         <div className="bg-[#e8f0fe] border border-[#c6dafc] rounded-xl p-4 text-xs text-[#3c4043]">
-          Ao importar, o arquivo original é anexado ao modelo e seu texto é <strong>anonimizado</strong> automaticamente
-          (nomes, CPF, RG, PIS, endereços). Arquivos com o mesmo nome de um modelo existente enriquecem aquele registro;
-          os demais criam novos modelos.
+          Ao importar, o arquivo original é anexado ao modelo <strong>já existente</strong> de mesmo nome e seu texto é
+          <strong>anonimizado</strong> automaticamente (nomes, CPF, RG, PIS, endereços). Arquivos que não correspondem a um
+          modelo da base são ignorados — novos modelos não são criados por aqui.
         </div>
 
         {msg && (
