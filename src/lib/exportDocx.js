@@ -16,7 +16,6 @@ import {
   PageNumber,
   ImageRun,
 } from 'docx';
-import { TIMBRADO } from './timbrado';
 import { applyConditionals } from './variables';
 import { removeTextLetterhead } from './removeTextLetterhead';
 
@@ -149,7 +148,7 @@ function processBlock(block, out) {
 
 // ---------- Timbrado: cabecalho e rodape ----------
 
-async function buildFirstPageHeader() {
+async function buildHeader() {
   const logoUrl = 'https://media.base44.com/images/public/6a5a44d24aa52c9fbdd61b1a/4f1847ac3_image.png';
   const logoBytes = await fetch(logoUrl).then((response) => response.arrayBuffer());
 
@@ -157,86 +156,43 @@ async function buildFirstPageHeader() {
     children: [
       new Paragraph({
         alignment: AlignmentType.CENTER,
-        spacing: { after: 80 },
         children: [
           new ImageRun({
             data: logoBytes,
-            transformation: { width: 312, height: 62 },
+            transformation: { width: 220, height: 44 },
             type: 'png',
           }),
         ],
       }),
       new Paragraph({
         children: [],
-        spacing: { after: 120 },
         border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: '000000', space: 4 } },
       }),
     ],
   });
 }
 
-async function buildNextPagesHeader() {
-  const logoUrl = 'https://media.base44.com/images/public/6a5a44d24aa52c9fbdd61b1a/442397987_image.png';
-  const logoBytes = await fetch(logoUrl).then((response) => response.arrayBuffer());
-
-  return new Header({
-    children: [
-      new Paragraph({
-        alignment: AlignmentType.RIGHT,
-        children: [
-          new ImageRun({
-            data: logoBytes,
-            transformation: { width: 95, height: 81 },
-            type: 'png',
-          }),
-        ],
-      }),
-    ],
-  });
-}
-
-async function buildFirstPageFooter() {
-  const footerUrl = 'https://media.base44.com/images/public/6a5a44d24aa52c9fbdd61b1a/b8db9dec4_image.png';
-  const footerBytes = await fetch(footerUrl).then((response) => response.arrayBuffer());
-
-  return new Footer({
-    children: [
-      new Paragraph({
-        alignment: AlignmentType.CENTER,
-        children: [
-          new ImageRun({
-            data: footerBytes,
-            transformation: { width: 720, height: 40 },
-            type: 'png',
-          }),
-        ],
-      }),
-    ],
-  });
-}
-
 function buildFooter() {
-  const contato = [TIMBRADO.site, TIMBRADO.email, TIMBRADO.telefone].filter(Boolean).join('   |   ');
   return new Footer({
     children: [
       new Paragraph({
         border: { top: { style: BorderStyle.SINGLE, size: 4, color: '888888', space: 4 } },
         alignment: AlignmentType.CENTER,
-        spacing: { before: 40 },
-        children: [new TextRun({ text: contato, size: 16, color: '555555' })],
-      }),
-      new Paragraph({
-        alignment: AlignmentType.CENTER,
-        children: [new TextRun({ text: TIMBRADO.cidades || '', size: 13, color: '888888' })],
-      }),
-      new Paragraph({
-        alignment: AlignmentType.CENTER,
-        spacing: { before: 40 },
         children: [
-          new TextRun({ text: 'Página ', size: 14, color: '999999' }),
-          new TextRun({ children: [PageNumber.CURRENT], size: 14, color: '999999' }),
-          new TextRun({ text: ' de ', size: 14, color: '999999' }),
-          new TextRun({ children: [PageNumber.TOTAL_PAGES], size: 14, color: '999999' }),
+          new TextRun({
+            text: 'trabalhista@favadvogados.com.br  |  OAB/SP 320.825',
+            size: 16,
+            color: '555555',
+          }),
+        ],
+      }),
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        children: [
+          new TextRun({ text: 'Pagina ', size: 14, color: '888888' }),
+          new TextRun({ children: [PageNumber.CURRENT], size: 14, color: '888888' }),
+          new TextRun({ text: ' de ', size: 14, color: '888888' }),
+          new TextRun({ children: [PageNumber.TOTAL_PAGES], size: 14, color: '888888' }),
         ],
       }),
     ],
@@ -245,8 +201,7 @@ function buildFooter() {
 
 // ---------- Export principal ----------
 
-export async function exportToDocx(html, variables, title, opts = {}) {
-  const { comTimbrado = true } = opts;
+export async function exportToDocx(html, variables, title) {
   let processed = html || '';
 
   // Remove cercas de código markdown e tags de envelope que a IA possa ter incluído
@@ -277,9 +232,7 @@ export async function exportToDocx(html, variables, title, opts = {}) {
     processBlock(block, children);
   }
 
-  const firstPageHeader = await buildFirstPageHeader();
-  const nextPagesHeader = await buildNextPagesHeader();
-  const firstPageFooter = await buildFirstPageFooter();
+  const header = await buildHeader();
   const footer = buildFooter();
 
   const docx = new Document({
@@ -291,21 +244,19 @@ export async function exportToDocx(html, variables, title, opts = {}) {
     },
     sections: [{
       properties: {
-        titlePage: comTimbrado,
         page: {
-          // Margens padrão de petição (3cm sup/esq, 2cm inf/dir) + espaço p/ timbrado
           margin: {
-            top: comTimbrado ? 1985 : 1701,
-            bottom: comTimbrado ? 1418 : 1134,
-            left: 1701,
-            right: 1134,
-            header: 567,
-            footer: 567,
+            top: 1440,
+            right: 1440,
+            bottom: 1440,
+            left: 1440,
+            header: 708,
+            footer: 708,
           },
         },
       },
-      headers: comTimbrado ? { first: firstPageHeader, default: nextPagesHeader } : undefined,
-      footers: comTimbrado ? { first: firstPageFooter, default: footer } : undefined,
+      headers: { default: header },
+      footers: { default: footer },
       children,
     }],
   });
