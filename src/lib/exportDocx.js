@@ -174,6 +174,26 @@ async function buildHeader() {
   });
 }
 
+async function buildFirstPageFooter() {
+  const footerUrl = 'https://media.base44.com/images/public/6a5a44d24aa52c9fbdd61b1a/b8db9dec4_image.png';
+  const footerBytes = await fetch(footerUrl).then((response) => response.arrayBuffer());
+
+  return new Footer({
+    children: [
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        children: [
+          new ImageRun({
+            data: footerBytes,
+            transformation: { width: 720, height: 40 },
+            type: 'png',
+          }),
+        ],
+      }),
+    ],
+  });
+}
+
 function buildFooter() {
   const contato = [TIMBRADO.site, TIMBRADO.email, TIMBRADO.telefone].filter(Boolean).join('   |   ');
   return new Footer({
@@ -236,6 +256,7 @@ export async function exportToDocx(html, variables, title, opts = {}) {
   }
 
   const header = await buildHeader();
+  const firstPageFooter = await buildFirstPageFooter();
   const footer = buildFooter();
 
   const docx = new Document({
@@ -247,6 +268,7 @@ export async function exportToDocx(html, variables, title, opts = {}) {
     },
     sections: [{
       properties: {
+        titlePage: comTimbrado,
         page: {
           // Margens padrão de petição (3cm sup/esq, 2cm inf/dir) + espaço p/ timbrado
           margin: {
@@ -260,7 +282,7 @@ export async function exportToDocx(html, variables, title, opts = {}) {
         },
       },
       headers: comTimbrado ? { default: header } : undefined,
-      footers: comTimbrado ? { default: footer } : undefined,
+      footers: comTimbrado ? { first: firstPageFooter, default: footer } : undefined,
       children,
     }],
   });
