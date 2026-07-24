@@ -192,7 +192,36 @@ Responda APENAS com o objeto JSON.`;
 }
 
 function inferirAtributosEntrevista(transcript) {
-  const texto = (transcript || []).filter((m) => m.role === 'user').map((m) => m.text || '').join('\n');
+  const userMessages = (transcript || []).filter((m) => m.role === 'user').map((m) => m.text || '');
+  const texto = userMessages.join('\n');
+  const ultimaMensagem = userMessages.at(-1) || '';
+  let pendencias = [];
+  for (const match of texto.matchAll(/\bcep\s*:?\s*([\d.-]+)/gi)) {
+    if (match[1].replace(/\D/g, '').length !== 8) {
+      pendencias.push(`CEP "${match[1]}" inválido. Informe o CEP correto com 8 dígitos.`);
+    }
+  }
+  for (const match of texto.matchAll(/\bcnpj(?:\/mf)?\s*:?\s*([\d./-]+)/gi)) {
+    if (match[1].replace(/\D/g, '').length !== 14) {
+      pendencias.push(`CNPJ "${match[1]}" inválido. Informe o CNPJ correto com 14 dígitos.`);
+    }
+  }
+  for (const match of texto.matchAll(/\bcpf(?:\/mf)?(?:\s*n[ºo]?)?\s*[:/]?\s*([\d.-]+)/gi)) {
+    if (match[1].replace(/\D/g, '').length !== 11) {
+      pendencias.push(`CPF "${match[1]}" inválido. Informe o CPF correto com 11 dígitos.`);
+    }
+  }
+  if (userMessages.length > 1) {
+    if (/\bcep\b\D{0,20}\d{5}[.-]?\d{3}\b/i.test(ultimaMensagem)) {
+      pendencias = pendencias.filter((item) => !item.startsWith('CEP'));
+    }
+    if (/\bcnpj\b\D{0,20}\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2}\b/i.test(ultimaMensagem)) {
+      pendencias = pendencias.filter((item) => !item.startsWith('CNPJ'));
+    }
+    if (/\bcpf\b\D{0,20}\d{3}\.?\d{3}\.?\d{3}-?\d{2}\b/i.test(ultimaMensagem)) {
+      pendencias = pendencias.filter((item) => !item.startsWith('CPF'));
+    }
+  }
   const funcao = texto.match(/\b(vigilante|porteiro|controlador(?:a)? de acesso)\b/i)?.[1];
   const teses = [];
   if (/dano[s]? moral|persegui|ass[eé]dio/i.test(texto)) teses.push('Dano moral');
@@ -215,7 +244,7 @@ function inferirAtributosEntrevista(transcript) {
     /sal[aá]rio\s*:?\s*(?:r\$\s*)?[\d.,]+/i.test(texto) &&
     /(?:escala|hor[aá]rio|jornada)\s*:?/i.test(texto)
   );
-  return { atributos, essenciais };
+  return { atributos, essenciais, pendencias: [...new Set(pendencias)] };
 }
 
 export async function conversarEntrevista({ transcript, fileUrls, modelos }) {
@@ -225,7 +254,7 @@ export async function conversarEntrevista({ transcript, fileUrls, modelos }) {
     response_json_schema: CHAT_SCHEMA,
   };
   if (fileUrls?.length) req.file_urls = fileUrls;
-  const key = runtimeCacheKey({ version: 2, transcript, fileUrls, modelos });
+  const key = runtimeCacheKey({ version: 3, transcript, fileUrls, modelos });
   const resposta = await withRuntimeCache('entrevista-ia', key, () => base44.integrations.Core.InvokeLLM(req));
   const inferido = inferirAtributosEntrevista(transcript);
   const ia = resposta?.atributos || {};
@@ -236,10 +265,13 @@ export async function conversarEntrevista({ transcript, fileUrls, modelos }) {
     ceps: [...new Set([...(inferido.atributos.ceps || []), ...(ia.ceps || [])])],
     teses: [...new Set([...(inferido.atributos.teses || []), ...(ia.teses || [])])],
   };
-  const pronto = Boolean(resposta?.pronto_para_gerar || inferido.essenciais);
-  const reply = pronto && /^certo[.!]?$/i.test((resposta?.reply || '').trim())
-    ? 'Dados essenciais identificados. Vou gerar a minuta com as informações fornecidas.'
-    : resposta?.reply || 'Dados recebidos e analisados.';
+  const pronto = Boolean(resposta?.pronto_para_gerar || inferido.essenciais) && !inferido.pendencias.length;
+  let reply = resposta?.reply || 'Dados recebidos e analisados.';
+  if (inferido.pendencias.length) {
+    reply = `Identifiquei dados que precisam ser corrigidos antes de gerar a minuta:\n\n${inferido.pendencias.map((item) => `• ${item}`).join('\n')}`;
+  } else if (pronto && /^certo[.!]?$/i.test(reply.trim())) {
+    reply = 'Dados essenciais identificados. Vou gerar a minuta com as informações fornecidas.';
+  }
   return { ...resposta, reply, atributos, pronto_para_gerar: pronto };
 }
 
