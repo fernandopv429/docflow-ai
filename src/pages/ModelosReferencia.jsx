@@ -215,9 +215,9 @@ export default function ModelosReferencia() {
                       {m.rito && <Badge>{RITO_LABEL[m.rito] || m.rito}</Badge>}
                       {m.tipo_dispensa && <Badge>{TIPO_DISPENSA_LABELS[m.tipo_dispensa]?.split('(')[0]?.trim() || m.tipo_dispensa}</Badge>}
                       {m.tem_tomadora && <Badge>Tomadora (Súm. 331)</Badge>}
-                      {m.conteudo_url
-                        ? <Badge tone="green">Texto integral</Badge>
-                        : <Badge tone="amber">Só resumo</Badge>}
+                      {m.diferencial
+                        ? <Badge tone="green">Diferencial extraído</Badge>
+                        : <Badge tone="amber">Sem diferencial</Badge>}
                     </div>
                     {(m.teses || []).length > 0 && (
                       <p className="text-xs text-[#5f6368] mt-2">
