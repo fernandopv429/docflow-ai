@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, Loader2, Upload, Library, CheckCircle2, AlertCircle, FileText } from 'lucide-react';
+import { ArrowLeft, Loader2, Upload, Library, CheckCircle2, AlertCircle, FileText, SlidersHorizontal } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { TIPO_DISPENSA_LABELS } from '@/lib/trabalhista/tokens';
 import { extrairTextoDocx } from '@/lib/trabalhista/modelosReferencia';
@@ -15,6 +15,7 @@ export default function ModelosReferencia() {
   const [importando, setImportando] = useState(false);
   const [msg, setMsg] = useState(null);
   const [erro, setErro] = useState(null);
+  const [config, setConfig] = useState(null);
 
   const load = () =>
     base44.entities.ModeloReferencia
@@ -24,6 +25,33 @@ export default function ModelosReferencia() {
       .finally(() => setLoading(false));
 
   useEffect(() => { load(); }, []);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const l = await base44.entities.IntegracaoConfig.list('-updated_date', 1);
+        if (l?.[0]) {
+          setConfig(l[0]);
+        } else {
+          const c = await base44.entities.IntegracaoConfig.create({
+            chave: 'default', cnpj_ativo: true, cep_ativo: true, datajud_ativo: false, datajud_tribunal: 'trt2', datajud_size: 5,
+          });
+          setConfig(c);
+        }
+      } catch (e) { /* mantém defaults implícitos */ }
+    })();
+  }, []);
+
+  const salvarConfig = async (patch) => {
+    if (!config?.id) return;
+    const novo = { ...config, ...patch };
+    setConfig(novo);
+    try {
+      await base44.entities.IntegracaoConfig.update(config.id, patch);
+    } catch (e) {
+      setErro('Erro ao salvar a configuração das integrações.');
+    }
+  };
 
   const handleImport = async (e) => {
     const files = Array.from(e.target.files || []);
@@ -104,6 +132,47 @@ export default function ModelosReferencia() {
           modelo da base são ignorados — novos modelos não são criados por aqui.
         </div>
 
+        {config && (
+          <div className="bg-white border border-[#dadce0] rounded-xl p-4">
+            <h2 className="text-sm font-semibold text-[#202124] mb-1 flex items-center gap-2">
+              <SlidersHorizontal className="w-4 h-4 text-[#1a73e8]" /> Integrações (consultas externas)
+            </h2>
+            <p className="text-xs text-[#5f6368] mb-3">Ligue/desligue as consultas usadas ao gerar a petição.</p>
+            <div className="space-y-1">
+              <Toggle
+                label="Consulta de CNPJ (BrasilAPI)"
+                desc="Razão social e endereço oficiais das reclamadas"
+                checked={!!config.cnpj_ativo}
+                onChange={() => salvarConfig({ cnpj_ativo: !config.cnpj_ativo })}
+              />
+              <Toggle
+                label="Consulta de CEP (ViaCEP)"
+                desc="Completa endereço e município (competência)"
+                checked={!!config.cep_ativo}
+                onChange={() => salvarConfig({ cep_ativo: !config.cep_ativo })}
+              />
+              <Toggle
+                label="Consulta ao DataJud (CNJ)"
+                desc="Contexto jurisprudencial por tema — requer a função de backend 'datajud' publicada"
+                checked={!!config.datajud_ativo}
+                onChange={() => salvarConfig({ datajud_ativo: !config.datajud_ativo })}
+              />
+            </div>
+            {config.datajud_ativo && (
+              <div className="mt-3 flex items-center gap-2 flex-wrap">
+                <label className="text-xs text-[#5f6368]">Tribunal DataJud:</label>
+                <input
+                  value={config.datajud_tribunal || 'trt2'}
+                  onChange={(e) => setConfig({ ...config, datajud_tribunal: e.target.value })}
+                  onBlur={(e) => salvarConfig({ datajud_tribunal: e.target.value.trim() || 'trt2' })}
+                  className="text-xs border border-[#dadce0] rounded-md px-2 py-1 w-24 focus:outline-none focus:border-[#1a73e8]"
+                />
+                <span className="text-[11px] text-[#9aa0a6]">ex.: trt2 (SP), trt1 (RJ), trt3 (MG), trt15 (Campinas)</span>
+              </div>
+            )}
+          </div>
+        )}
+
         {msg && (
           <p className="flex items-center gap-2 text-sm text-green-700">
             <CheckCircle2 className="w-4 h-4" /> {msg}
@@ -151,6 +220,22 @@ export default function ModelosReferencia() {
         )}
       </div>
     </div>
+  );
+}
+
+function Toggle({ label, desc, checked, onChange }) {
+  return (
+    <label className="flex items-start justify-between gap-3 py-1.5 cursor-pointer select-none">
+      <span className="min-w-0">
+        <span className="block text-sm text-[#202124]">{label}</span>
+        {desc && <span className="block text-xs text-[#5f6368]">{desc}</span>}
+      </span>
+      <span className="relative inline-flex flex-shrink-0 mt-0.5">
+        <input type="checkbox" checked={checked} onChange={onChange} className="peer sr-only" />
+        <span className="w-9 h-5 rounded-full bg-[#dadce0] peer-checked:bg-[#1a73e8] transition-colors" />
+        <span className="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform peer-checked:translate-x-4" />
+      </span>
+    </label>
   );
 }
 
