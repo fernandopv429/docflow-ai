@@ -141,6 +141,84 @@ Regras:
 }
 
 // ============================================================
+// Conversa (chat) para coletar dados da entrevista de forma
+// incremental e decidir quando gerar a minuta.
+// ============================================================
+const CHAT_SCHEMA = {
+  type: 'object',
+  properties: {
+    reply: { type: 'string', description: 'Resposta conversacional para o usuário, em português' },
+    atributos: {
+      type: 'object',
+      properties: {
+        funcao: { type: 'string' },
+        tipo_dispensa: {
+          type: 'string',
+          enum: [
+            'sem_justa_causa',
+            'rescisao_indireta',
+            'nulidade_pedido_demissao',
+            'reversao_justa_causa',
+            'acordo',
+          ],
+        },
+        rito: { type: 'string', enum: ['ordinario', 'sumarissimo'] },
+        tem_tomadora: { type: 'boolean' },
+        teses: { type: 'array', items: { type: 'string' } },
+      },
+    },
+    pronto_para_gerar: {
+      type: 'boolean',
+      description: 'true quando o usuário pediu a minuta OU já há fatos essenciais suficientes',
+    },
+  },
+  required: ['reply'],
+};
+
+function resumoModelos(modelos) {
+  return (modelos || [])
+    .map(
+      (m) =>
+        `- ${m.titulo} [modalidade=${m.tipo_dispensa || '-'}, rito=${m.rito || '-'}, teses: ${(m.teses || []).slice(0, 6).join(', ')}]`
+    )
+    .join('\n');
+}
+
+function formatarTranscript(transcript) {
+  return (transcript || [])
+    .map((m) => `${m.role === 'user' ? 'ADVOGADO' : 'ASSISTENTE'}: ${m.text}`)
+    .join('\n\n');
+}
+
+export function buildChatPrompt({ transcript, modelos }) {
+  return `Você é um assistente jurídico trabalhista que conversa com um advogado para reunir as informações de uma ENTREVISTA e, ao final, gerar uma petição inicial a partir de um modelo de referência.
+
+CONVERSE em português, de forma objetiva e cordial (estilo chat). Seu papel AGORA é entender o caso e coletar o que falta — NÃO redija a petição nesta etapa (o sistema cuida da redação quando você sinalizar).
+
+Peça, quando ainda não informado, os dados essenciais: partes (reclamante e reclamada(s)/tomadora), datas de admissão e rescisão, função, salário, jornada/escala, modalidade de rescisão, verbas/teses pretendidas e comarca/UF. Faça poucas perguntas por vez.
+
+Extraia em "atributos" o que já for possível inferir da conversa. Defina "pronto_para_gerar" como true SOMENTE quando o advogado pedir a minuta ou quando já houver fatos essenciais suficientes. Não invente dados.
+
+MODELOS DE REFERÊNCIA DISPONÍVEIS (o sistema escolherá automaticamente o mais aderente aos atributos):
+${resumoModelos(modelos)}
+
+CONVERSA ATÉ AGORA:
+${formatarTranscript(transcript)}
+
+Responda APENAS com o objeto JSON.`;
+}
+
+export async function conversarEntrevista({ transcript, fileUrls, modelos }) {
+  const req = {
+    prompt: buildChatPrompt({ transcript, modelos }),
+    model: 'claude_sonnet_4_6',
+    response_json_schema: CHAT_SCHEMA,
+  };
+  if (fileUrls?.length) req.file_urls = fileUrls;
+  return base44.integrations.Core.InvokeLLM(req);
+}
+
+// ============================================================
 // Passo 2: gerar a minuta usando o modelo como referência
 // ============================================================
 export function buildGeracaoPrompt({ texto, attrs, modelo }) {
