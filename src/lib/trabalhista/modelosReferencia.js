@@ -600,38 +600,6 @@ Responda APENAS com o objeto JSON.`;
   });
 }
 
-export async function gerarPeca({ texto, fileUrls, attrs, modelo }) {
-  const config = await carregarConfigIntegracoes();
-
-  // Consultas externas, cada uma condicionada ao seu toggle na configuração.
-  const cnpjs = config.cnpj_ativo ? [...extrairCnpjs(texto), ...((attrs && attrs.cnpjs) || [])] : [];
-  const ceps = config.cep_ativo ? [...extrairCeps(texto), ...((attrs && attrs.ceps) || [])] : [];
-  const [dadosReceita, dadosCep, dadosDatajud] = await Promise.all([
-    enriquecerCnpjs(cnpjs),
-    enriquecerCeps(ceps),
-    enriquecerDatajud(attrs, config),
-  ]);
-
-  const textoModelo = await carregarTextoModelo(modelo);
-
-  const req = {
-    prompt: buildGeracaoPrompt({ texto, attrs, modelo, textoModelo, dadosReceita, dadosCep, dadosDatajud }),
-    model: 'claude_sonnet_4_6',
-  };
-  // Anexa apenas os documentos da ENTREVISTA. O DOCX original do modelo NÃO é
-  // enviado à IA (contém dados pessoais reais de outro processo); usamos o
-  // texto anonimizado (textoModelo) como base.
-  const urls = [...(fileUrls || [])];
-  if (urls.length) req.file_urls = urls;
-  const resultado = await base44.integrations.Core.InvokeLLM(req);
-  return {
-    html: limparHtmlIA(resultado),
-    dadosReceita,
-    dadosCep,
-    dadosDatajud,
-  };
-}
-
 // ============================================================
 // Importação de um .docx real para enriquecer um modelo
 // (extrai texto, anonimiza e devolve para salvar no registro)
