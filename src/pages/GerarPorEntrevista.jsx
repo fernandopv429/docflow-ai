@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  ArrowLeft, Loader2, Paperclip, Send, X, FileText, Bot, Wand2, FileDown, Library, RefreshCw,
+  ArrowLeft, Loader2, Paperclip, Send, X, FileText, Bot, Wand2, FileDown, Library, RefreshCw, Wrench,
 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { exportToDocx } from '@/lib/exportDocx';
@@ -38,11 +38,17 @@ export default function GerarPorEntrevista() {
 
   const userText = messages.filter((m) => m.role === 'user').map((m) => m.text).filter(Boolean).join('\n\n');
 
-  const gerarMinuta = async () => {
-    if (!modeloPadrao || generating || sending) return;
+  const gerarMinuta = async (opts = {}) => {
+    if (!modeloPadrao || generating) return;
     setGenerating(true);
     try {
-      const { html, dadosReceita } = await gerarPecaPadrao({ texto: userText, fileUrls: allUrls, attrs, modeloPadrao });
+      const { html, dadosReceita } = await gerarPecaPadrao({
+        texto: opts.texto ?? userText,
+        fileUrls: opts.urls ?? allUrls,
+        attrs: opts.attrs ?? attrs,
+        modeloPadrao,
+        onTool: (msg) => setMessages((m) => [...m, { role: 'tool', text: msg }]),
+      });
       setDocHtml(html);
       const verificados = (dadosReceita || []).filter((d) => !d.erro);
       let nota = docHtml
@@ -80,14 +86,23 @@ export default function GerarPorEntrevista() {
         setAllUrls(urls);
       }
 
-      const transcript = novasMsgs.map((m) => ({ role: m.role, text: m.text || '' }));
+      const transcript = novasMsgs
+        .filter((m) => m.role !== 'tool')
+        .map((m) => ({ role: m.role, text: m.text || '' }));
       const modelosCtx = modeloPadrao ? [{ titulo: modeloPadrao.titulo, teses: [] }] : [];
       const res = await conversarEntrevista({ transcript, fileUrls: urls, modelos: modelosCtx });
 
-      setAttrs((prev) => ({ ...(prev || {}), ...(res?.atributos || {}) }));
+      const novoAttrs = { ...(attrs || {}), ...(res?.atributos || {}) };
+      setAttrs(novoAttrs);
       setMessages((m) => [...m, { role: 'assistant', text: res?.reply || 'Certo.' }]);
 
-      if (res?.pronto_para_gerar) await gerarMinuta();
+      // Inicia a geração/atualização da minuta automaticamente após cada envio
+      const textoCompleto = novasMsgs
+        .filter((m) => m.role === 'user')
+        .map((m) => m.text)
+        .filter(Boolean)
+        .join('\n\n');
+      await gerarMinuta({ texto: textoCompleto, urls, attrs: novoAttrs });
     } catch (err) {
       console.error(err);
       setMessages((m) => [...m, { role: 'assistant', text: 'Erro ao processar. Tente novamente.' }]);
@@ -165,29 +180,38 @@ export default function GerarPorEntrevista() {
                   </p>
                 </div>
               )}
-              {messages.map((m, i) => (
-                <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  <div
-                    className={`max-w-[88%] px-3.5 py-2 rounded-2xl text-sm whitespace-pre-wrap ${
-                      m.role === 'user'
-                        ? 'bg-[#1a73e8] text-white rounded-br-sm'
-                        : 'bg-white border border-[#dadce0] text-[#3c4043] rounded-bl-sm'
-                    }`}
-                  >
-                    {m.files?.length > 0 && (
-                      <div className="mb-1.5 space-y-0.5">
-                        {m.files.map((name, j) => (
-                          <div key={j} className="flex items-center gap-1 text-[12px] opacity-90">
-                            <FileText className="w-3 h-3 flex-shrink-0" />
-                            <span className="truncate">{name}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    {m.text}
+              {messages.map((m, i) =>
+                m.role === 'tool' ? (
+                  <div key={i} className="flex justify-start">
+                    <div className="flex items-center gap-1.5 px-3 py-1 bg-[#f1f3f4] border border-[#e8eaed] rounded-full text-[11px] text-[#5f6368]">
+                      <Wrench className="w-3 h-3 text-[#1a73e8] flex-shrink-0" />
+                      {m.text}
+                    </div>
                   </div>
-                </div>
-              ))}
+                ) : (
+                  <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    <div
+                      className={`max-w-[88%] px-3.5 py-2 rounded-2xl text-sm whitespace-pre-wrap ${
+                        m.role === 'user'
+                          ? 'bg-[#1a73e8] text-white rounded-br-sm'
+                          : 'bg-white border border-[#dadce0] text-[#3c4043] rounded-bl-sm'
+                      }`}
+                    >
+                      {m.files?.length > 0 && (
+                        <div className="mb-1.5 space-y-0.5">
+                          {m.files.map((name, j) => (
+                            <div key={j} className="flex items-center gap-1 text-[12px] opacity-90">
+                              <FileText className="w-3 h-3 flex-shrink-0" />
+                              <span className="truncate">{name}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {m.text}
+                    </div>
+                  </div>
+                )
+              )}
               {(sending || generating) && (
                 <div className="flex justify-start">
                   <div className="flex items-center gap-2 px-3.5 py-2 bg-white border border-[#dadce0] rounded-2xl rounded-bl-sm text-sm text-[#5f6368]">
@@ -284,7 +308,7 @@ export default function GerarPorEntrevista() {
               <div className="h-full flex flex-col items-center justify-center text-center">
                 <FileText className="w-10 h-10 text-[#dadce0] mb-3" />
                 <p className="text-sm text-[#5f6368]">A minuta aparecerá aqui.</p>
-                <p className="text-xs text-[#9aa0a6] mt-1">Converse à esquerda e clique em “Gerar minuta”.</p>
+                <p className="text-xs text-[#9aa0a6] mt-1">Envie a entrevista à esquerda — a minuta será gerada automaticamente.</p>
               </div>
             )}
             {generating && docHtml && (

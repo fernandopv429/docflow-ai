@@ -587,10 +587,25 @@ FORMATO DE SAÍDA: retorne APENAS o HTML adaptado do corpo da petição (sem <ht
 <p><em>⚠️ Minuta gerada por IA a partir do modelo padrão — revisão obrigatória pelo advogado responsável.</em></p>`;
 }
 
-export async function gerarPecaPadrao({ texto, fileUrls, attrs, modeloPadrao }) {
+export async function gerarPecaPadrao({ texto, fileUrls, attrs, modeloPadrao, onTool }) {
+  const notify = (msg) => {
+    try {
+      onTool?.(msg);
+    } catch (e) {
+      /* ignora */
+    }
+  };
   const config = await carregarConfigIntegracoes();
   const cnpjs = config.cnpj_ativo ? [...extrairCnpjs(texto), ...((attrs && attrs.cnpjs) || [])] : [];
   const ceps = config.cep_ativo ? [...extrairCeps(texto), ...((attrs && attrs.ceps) || [])] : [];
+  const cnpjsUnicos = [...new Set(cnpjs.map((c) => (c || '').replace(/\D/g, '')).filter((d) => d.length === 14))];
+  const cepsUnicos = [...new Set(ceps.map((c) => (c || '').replace(/\D/g, '')).filter((d) => d.length === 8))];
+  if (cnpjsUnicos.length) notify(`Consultando ${cnpjsUnicos.length} CNPJ(s) na Receita Federal (BrasilAPI)...`);
+  if (cepsUnicos.length) notify(`Consultando ${cepsUnicos.length} CEP(s) no ViaCEP...`);
+  if (config.datajud_ativo) {
+    const termos = montarTermosDatajud(attrs);
+    if (termos.length) notify(`Consultando DataJud/CNJ (${config.datajud_tribunal || 'trt2'}): ${termos.join(', ')}...`);
+  }
   const [dadosReceita, dadosCep, dadosDatajud] = await Promise.all([
     enriquecerCnpjs(cnpjs),
     enriquecerCeps(ceps),
