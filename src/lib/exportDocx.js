@@ -148,7 +148,7 @@ function processBlock(block, out) {
 
 // ---------- Timbrado: cabecalho e rodape ----------
 
-async function buildHeader() {
+async function buildFirstPageHeader() {
   const logoUrl = 'https://media.base44.com/images/public/6a5a44d24aa52c9fbdd61b1a/4f1847ac3_image.png';
   const logoBytes = await fetch(logoUrl).then((response) => response.arrayBuffer());
 
@@ -169,6 +169,26 @@ async function buildHeader() {
         children: [],
         spacing: { after: 120 },
         border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: '000000', space: 4 } },
+      }),
+    ],
+  });
+}
+
+async function buildNextPagesHeader() {
+  const logoUrl = 'https://media.base44.com/images/public/6a5a44d24aa52c9fbdd61b1a/442397987_image.png';
+  const logoBytes = await fetch(logoUrl).then((response) => response.arrayBuffer());
+
+  return new Header({
+    children: [
+      new Paragraph({
+        alignment: AlignmentType.RIGHT,
+        children: [
+          new ImageRun({
+            data: logoBytes,
+            transformation: { width: 95, height: 81 },
+            type: 'png',
+          }),
+        ],
       }),
     ],
   });
@@ -255,7 +275,8 @@ export async function exportToDocx(html, variables, title, opts = {}) {
     processBlock(block, children);
   }
 
-  const header = await buildHeader();
+  const firstPageHeader = await buildFirstPageHeader();
+  const nextPagesHeader = await buildNextPagesHeader();
   const firstPageFooter = await buildFirstPageFooter();
   const footer = buildFooter();
 
@@ -281,7 +302,7 @@ export async function exportToDocx(html, variables, title, opts = {}) {
           },
         },
       },
-      headers: comTimbrado ? { default: header } : undefined,
+      headers: comTimbrado ? { first: firstPageHeader, default: nextPagesHeader } : undefined,
       footers: comTimbrado ? { first: firstPageFooter, default: footer } : undefined,
       children,
     }],
