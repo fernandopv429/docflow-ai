@@ -1,5 +1,6 @@
 import { base44 } from '@/api/base44Client';
 import { buildLaudoPrompt, buildAuditorPrompt, AUDITORIA_SCHEMA } from './prompts';
+import { calcularVerbasCaso } from './mathUtils';
 
 // Passo 2 do fluxo: análise documental (issue-spotting) → laudo técnico
 export async function analisarDocumentos(caso) {
@@ -24,12 +25,15 @@ export async function auditarCaso(caso) {
     base44.entities.Template.list('-updated_date', 100),
   ]);
   const esp = especialistas[0];
+  // Cálculos aritméticos feitos por código (100% exatos) — a IA só audita juridicamente
+  const calculos = calcularVerbasCaso(caso);
   const resultado = await base44.integrations.Core.InvokeLLM({
-    prompt: buildAuditorPrompt({ caso, promptSistema: esp?.prompt_sistema, templates }),
+    prompt: buildAuditorPrompt({ caso, promptSistema: esp?.prompt_sistema, templates, calculos }),
     model: esp?.modelo_ia || 'claude_sonnet_4_6',
     file_urls: caso.document_urls?.length ? caso.document_urls : undefined,
     response_json_schema: AUDITORIA_SCHEMA,
   });
+  resultado.calculos_deterministicos = calculos;
   await base44.entities.CasoTrabalhista.update(caso.id, {
     analise_json: resultado,
     status_final_auditoria: resultado.status_final,

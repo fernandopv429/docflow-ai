@@ -93,7 +93,15 @@ IRREGULARIDADES/FLAGS: desvio=${!!caso.tem_desvio}, acúmulo=${!!caso.tem_acumul
 DOCUMENTOS ANEXADOS: ${(caso.document_names || []).join(', ') || 'nenhum'}`;
 }
 
-export function buildAuditorPrompt({ caso, promptSistema, templates }) {
+function blocoCalculos(calculos) {
+  if (!calculos?.length) return '';
+  const linhas = calculos.map(
+    (c) => `- ${c.item}: ${c.valor != null ? `R$ ${c.valor.toFixed(2)}` : ''} (${c.memoria})`
+  );
+  return `\n\nCÁLCULOS DETERMINÍSTICOS (feitos por código, matematicamente exatos — NÃO recalcule, NÃO altere estes valores; use-os como referência ao validar valores pedidos e o valor da causa):\n${linhas.join('\n')}\n\nSEU PAPEL É EXCLUSIVAMENTE JURÍDICO: não faça aritmética própria. Concentre-se em coerência factual e jurídica — ex.: pedido de adicional noturno sem jornada noturna, tese sem suporte documental, verba pedida em duplicidade, valor pedido muito divergente do cálculo determinístico correspondente.`;
+}
+
+export function buildAuditorPrompt({ caso, promptSistema, templates, calculos }) {
   const listaTemplates = (templates || [])
     .map((t) => `- "${t.title}"${t.description ? `: ${t.description}` : ''}`)
     .join('\n') || '- (nenhum template cadastrado)';
@@ -102,7 +110,7 @@ export function buildAuditorPrompt({ caso, promptSistema, templates }) {
 
 ---
 
-${contextoCaso(caso)}
+${contextoCaso(caso)}${blocoCalculos(calculos)}
 
 TEMPLATES DISPONÍVEIS (use o nome EXATO em template_sugerido):
 ${listaTemplates}

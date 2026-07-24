@@ -1,4 +1,5 @@
 import React from 'react';
+import { formatBRL } from '@/lib/trabalhista/mathUtils';
 
 const SEV_CLS = {
   BLOQUEANTE: 'bg-red-50 border-red-200 text-red-700',
@@ -38,6 +39,23 @@ export default function AuditoriaResultado({ auditoria }) {
         <div className="bg-[#e8f0fe] rounded-lg p-4 text-[#202124]">
           <p className="text-xs font-semibold text-[#1a73e8] uppercase mb-1">Resumo para o advogado</p>
           {auditoria.resumo_para_advogado}
+        </div>
+      )}
+
+      {auditoria.calculos_deterministicos?.length > 0 && (
+        <div>
+          <p className="text-xs font-semibold text-[#5f6368] uppercase mb-2">Cálculos determinísticos (código, sem IA)</p>
+          <div className="border border-[#dadce0] rounded-lg divide-y divide-[#f1f3f4]">
+            {auditoria.calculos_deterministicos.map((c, i) => (
+              <div key={i} className="flex items-center justify-between px-3 py-2">
+                <div>
+                  <p className="text-[#202124]">{c.item}</p>
+                  <p className="text-xs text-[#9aa0a6]">{c.memoria}</p>
+                </div>
+                {c.valor != null && <span className="font-medium text-[#202124]">{formatBRL(c.valor)}</span>}
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
