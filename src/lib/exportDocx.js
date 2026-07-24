@@ -14,6 +14,7 @@ import {
   WidthType,
   BorderStyle,
   PageNumber,
+  ImageRun,
 } from 'docx';
 import { TIMBRADO } from './timbrado';
 import { applyConditionals } from './variables';
@@ -147,19 +148,22 @@ function processBlock(block, out) {
 
 // ---------- Timbrado: cabecalho e rodape ----------
 
-function buildHeader() {
-  // Cabeçalho em TEXTO (sem imagem) — sempre renderiza; imagem embutida corrompida
-  // fazia o Word descartar o timbrado ao abrir o arquivo.
+async function buildHeader() {
+  const logoUrl = 'https://media.base44.com/images/public/6a5a44d24aa52c9fbdd61b1a/4f1847ac3_image.png';
+  const logoBytes = await fetch(logoUrl).then((response) => response.arrayBuffer());
+
   return new Header({
     children: [
       new Paragraph({
         alignment: AlignmentType.CENTER,
-        spacing: { after: 20 },
-        children: [new TextRun({ text: TIMBRADO.escritorio, bold: true, size: 28, color: '111111' })],
-      }),
-      new Paragraph({
-        alignment: AlignmentType.CENTER,
-        children: [new TextRun({ text: TIMBRADO.subtitulo || '', size: 15, color: '666666' })],
+        spacing: { after: 80 },
+        children: [
+          new ImageRun({
+            data: logoBytes,
+            transformation: { width: 312, height: 62 },
+            type: 'png',
+          }),
+        ],
       }),
       new Paragraph({
         children: [],
@@ -231,7 +235,7 @@ export async function exportToDocx(html, variables, title, opts = {}) {
     processBlock(block, children);
   }
 
-  const header = buildHeader();
+  const header = await buildHeader();
   const footer = buildFooter();
 
   const docx = new Document({
