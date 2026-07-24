@@ -4,6 +4,7 @@ import { TIPO_DISPENSA_LABELS } from './tokens';
 import { loadTemplateContent } from '@/lib/templateContent';
 import { extrairCasoDeTexto } from './parserEntrevista';
 import { calcularVerbasCaso } from './mathUtils';
+import { runtimeCacheKey, withRuntimeCache } from './runtimeCache';
 
 // ============================================================
 // Anonimização (mesma lógica usada no cadastro dos modelos)
@@ -78,8 +79,10 @@ export function rankearModelos(modelos, attrs) {
 }
 
 export async function listarModelosAtivos() {
-  const todos = await base44.entities.ModeloReferencia.list('-updated_date', 100);
-  return todos.filter((m) => m.ativo !== false);
+  return withRuntimeCache('modelos-ativos', 'lista', async () => {
+    const todos = await base44.entities.ModeloReferencia.list('-updated_date', 100);
+    return todos.filter((m) => m.ativo !== false);
+  }, { ttlMs: 5 * 60 * 1000 });
 }
 
 // Carrega o Único MODELO PADRÃO (de "Meus Templates") — traç o HTML formatado
@@ -193,7 +196,8 @@ export async function conversarEntrevista({ transcript, fileUrls, modelos }) {
     response_json_schema: CHAT_SCHEMA,
   };
   if (fileUrls?.length) req.file_urls = fileUrls;
-  return base44.integrations.Core.InvokeLLM(req);
+  const key = runtimeCacheKey({ transcript, fileUrls, modelos });
+  return withRuntimeCache('entrevista-ia', key, () => base44.integrations.Core.InvokeLLM(req));
 }
 
 // ============================================================
@@ -251,7 +255,8 @@ export async function enriquecerCnpjs(cnpjs) {
     ...new Set((cnpjs || []).map((c) => (c || '').replace(/\D/g, '')).filter((d) => d.length === 14)),
   ];
   if (!unicos.length) return [];
-  return Promise.all(unicos.map(consultarCnpj));
+  const key = [...unicos].sort().join(',');
+  return withRuntimeCache('cnpj', key, () => Promise.all(unicos.map(consultarCnpj)), { ttlMs: 60 * 60 * 1000 });
 }
 
 function blocoReceita(dados) {
@@ -333,7 +338,8 @@ export async function enriquecerCeps(ceps) {
     ...new Set((ceps || []).map((c) => (c || '').replace(/\D/g, '')).filter((d) => d.length === 8)),
   ];
   if (!unicos.length) return [];
-  return Promise.all(unicos.map(consultarCep));
+  const key = [...unicos].sort().join(',');
+  return withRuntimeCache('cep', key, () => Promise.all(unicos.map(consultarCep)), { ttlMs: 60 * 60 * 1000 });
 }
 
 function blocoCeps(dados) {
@@ -358,12 +364,14 @@ export const CONFIG_INTEGRACOES_PADRAO = {
 };
 
 export async function carregarConfigIntegracoes() {
-  try {
-    const lista = await base44.entities.IntegracaoConfig.list('-updated_date', 1);
-    return { ...CONFIG_INTEGRACOES_PADRAO, ...(lista?.[0] || {}) };
-  } catch (e) {
-    return { ...CONFIG_INTEGRACOES_PADRAO };
-  }
+  return withRuntimeCache('config-integracoes', 'atual', async () => {
+    try {
+      const lista = await base44.entities.IntegracaoConfig.list('-updated_date', 1);
+      return { ...CONFIG_INTEGRACOES_PADRAO, ...(lista?.[0] || {}) };
+    } catch (e) {
+      return { ...CONFIG_INTEGRACOES_PADRAO };
+    }
+  }, { ttlMs: 5 * 60 * 1000 });
 }
 
 // ============================================================
@@ -393,7 +401,8 @@ export async function enriquecerDatajud(attrs, config) {
   if (!config?.datajud_ativo) return [];
   const termos = montarTermosDatajud(attrs);
   if (!termos.length) return [];
-  return Promise.all(
+  const key = runtimeCacheKey({ termos, tribunal: config.datajud_tribunal, size: config.datajud_size });
+  return withRuntimeCache('datajud', key, () => Promise.all(
     termos.map((termo) =>
       consultarDatajud({
         termo,
@@ -401,7 +410,7 @@ export async function enriquecerDatajud(attrs, config) {
         size: config.datajud_size || 5,
       })
     )
-  );
+  ), { ttlMs: 30 * 60 * 1000 });
 }
 
 function blocoDatajud(resultados) {
@@ -567,7 +576,11 @@ export async function gerarPecaPadrao({ texto, fileUrls, attrs, modeloPadrao, on
     enriquecerCnpjs(cnpjs),
     enriquecerCeps(ceps),
     enriquecerDatajud(attrs, config),
-    texto && texto.trim() ? extrairCasoDeTexto(texto).catch(() => ({})) : Promise.resolve({}),
+    texto && texto.trim()
+      ? withRuntimeCache('extracao-caso', runtimeCacheKey(texto), () => extrairCasoDeTexto(texto), {
+          onHit: () => notify('Reutilizando análise estruturada da entrevista em cache...'),
+        }).catch(() => ({}))
+      : Promise.resolve({}),
   ]);
 
   // Cálculo 100% determinístico (a IA não faz aritmética).
@@ -604,7 +617,12 @@ export async function gerarPecaPadrao({ texto, fileUrls, attrs, modeloPadrao, on
   };
   const urls = [...(fileUrls || [])];
   if (urls.length) req.file_urls = urls;
-  const resultado = await base44.integrations.Core.InvokeLLM(req);
+  const resultado = await withRuntimeCache(
+    'geracao-minuta',
+    runtimeCacheKey({ prompt: req.prompt, fileUrls: urls }),
+    () => base44.integrations.Core.InvokeLLM(req),
+    { onHit: () => notify('Reutilizando geração idêntica em cache...') }
+  );
   return {
     html: limparHtmlIA(resultado),
     dadosReceita,
@@ -654,11 +672,13 @@ RELATO/ENTREVISTA: """${texto || ''}"""
 MINUTA GERADA (HTML): """${html || ''}"""
 
 Responda APENAS com o objeto JSON.`;
-  return base44.integrations.Core.InvokeLLM({
-    prompt,
-    model: 'claude_sonnet_4_6',
-    response_json_schema: COERENCIA_SCHEMA,
-  });
+  return withRuntimeCache('auditoria-coerencia', runtimeCacheKey(prompt), () =>
+    base44.integrations.Core.InvokeLLM({
+      prompt,
+      model: 'claude_sonnet_4_6',
+      response_json_schema: COERENCIA_SCHEMA,
+    })
+  );
 }
 
 // ============================================================

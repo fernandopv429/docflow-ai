@@ -150,7 +150,9 @@ export default function GerarPorEntrevista() {
         .map((m) => m.text)
         .filter(Boolean)
         .join('\n\n');
-      await gerarMinuta({ texto: textoCompleto, urls, attrs: novoAttrs });
+      if (res?.pronto_para_gerar || docHtml) {
+        await gerarMinuta({ texto: textoCompleto, urls, attrs: novoAttrs });
+      }
     } catch (err) {
       console.error(err);
       setMessages((m) => [...m, { role: 'assistant', text: 'Erro ao processar. Tente novamente.' }]);
