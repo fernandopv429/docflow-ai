@@ -8,11 +8,6 @@ import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import ScrollToTop from './components/ScrollToTop';
 // Add page imports here
 import Layout from '@/components/Layout';
-import TemplateEditor from '@/pages/TemplateEditor';
-import GenerateDocument from '@/pages/GenerateDocument';
-import TrabalhistaList from '@/pages/TrabalhistaList';
-import TrabalhistaForm from '@/pages/TrabalhistaForm';
-import CasoTrabalhistaPage from '@/pages/CasoTrabalhistaPage';
 import GerarPorEntrevista from '@/pages/GerarPorEntrevista';
 import ModelosReferencia from '@/pages/ModelosReferencia';
 
@@ -45,14 +40,8 @@ const AuthenticatedApp = () => {
       {/* Add your page Route elements here */}
       <Route element={<Layout />}>
         <Route path="/" element={<Navigate to="/trabalhista/gerar-entrevista" replace />} />
-        <Route path="/templates/new" element={<TemplateEditor />} />
-        <Route path="/templates/:id" element={<TemplateEditor />} />
-        <Route path="/templates/:id/generate" element={<GenerateDocument />} />
-        <Route path="/trabalhista" element={<TrabalhistaList />} />
-        <Route path="/trabalhista/novo" element={<TrabalhistaForm />} />
         <Route path="/trabalhista/gerar-entrevista" element={<GerarPorEntrevista />} />
         <Route path="/modelos" element={<ModelosReferencia />} />
-        <Route path="/trabalhista/:id" element={<CasoTrabalhistaPage />} />
       </Route>
       <Route path="*" element={<PageNotFound />} />
     </Routes>
