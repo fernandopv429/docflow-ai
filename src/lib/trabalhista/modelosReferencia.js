@@ -538,7 +538,26 @@ REVISÃO FINAL (garantir antes de responder):
 - Cada causa de pedir tem pedido correspondente; CNPJ, endereço, competência e CCT confirmados ou marcados; total ≤ R$ 400.000,00.
 
 REGRAS DE DADOS:
-- Use SOMENTE dados da entrevista/documentos do caso atual. Onde faltar um dado, insira marcador entre colchetes (ex.: [SALÁRIO], [DATA DE ADMISSÃO]). NÃO invente fatos nem valores. NÃO narre etapas, verificações ou alterações.`;
+- Use SOMENTE dados da entrevista/documentos do caso atual. Onde faltar um dado, insira marcador entre colchetes (ex.: [SALÁRIO], [DATA DE ADMISSÃO]). NÃO invente fatos nem valores. NÃO narre etapas, verificações ou alterações.
+
+O QUE É PADRÃO (boilerplate — reproduza IGUAL, palavra por palavra, do modelo):
+- Endereçamento: "AO JUÍZO DA VARA DO TRABALHO DE SÃO PAULO – SEGUNDA REGIÃO" (ajuste a comarca/região apenas se o local de prestação for outro).
+- Fecho da qualificação: "...por seu advogado constituído nos termos do incluso documento de procuração em anexo, com endereço de e-mail: trabalhista@favadvogados.com.br, vem, com fulcro nos artigos 840, §1º, da CLT, c/c 319 do CPC, propor a presente RECLAMAÇÃO TRABALHISTA".
+- Bloco de preliminares, SEMPRE nesta ordem: Da Competência Processual → Da Não Limitação ao Valor da Causa (Estimativa) → Do Juízo 100% Digital → Da Extinção do Feito sem Julgamento de Mérito → Da Justiça Gratuita.
+- Teses de mérito genéricas com texto praticamente idêntico ao modelo: Do Dano Moral; Da Súmula 331 (responsabilidade subsidiária da tomadora); Do Acúmulo de Função; Da Jornada; Das Horas Extras; Da Descaracterização da Escala 12x36/4x2; Do Artigo 71 (intervalo); Do Adicional Noturno; Dos Minutos que Antecedem/Sucedem; DSR; Folgas/Feriados 100%; Integração do "pagamento por fora"; Vale-Transporte; Auxílio-Alimentação; Multas Convencionais; FGTS+40%; Aviso Prévio; Verbas Rescisórias; Multa 477; Multa 467; IR; Previdência; Expedição de Ofícios; Atribuição Estimativa; Dos Pedidos.
+- Jurisprudências, citações de doutrina e quadros sinóticos (tabelas de escala) são copiados do modelo sem alteração.
+- Fecho: "Pede deferimento. São Paulo, [data]. FERNANDO ANDRADE VIEIRA – OAB/SP 320.825", com honorários de 20% e Súmulas 425/427 do TST.
+
+O QUE MUDA (variáveis a preencher caso a caso):
+- Qualificação do reclamante: nome, RG, CPF, PIS, CTPS, data de nascimento, filiação, endereço e função (ex.: porteiro ou controlador de acesso).
+- Qualificação das reclamadas: razão social, CNPJ e endereço (1ª terceirizada / 2ª tomadora).
+- Datas de admissão/demissão e o último salário.
+- A escala alegada (12x36 ou 4x2) — a seção de descaracterização deve corresponder à escala do caso.
+- Rol e valores dos pedidos e o valor da causa.
+- O MOTIVO DA SAÍDA determina o "capítulo especial" da peça: justa causa → "Da Reversão da Dispensa por Justa Causa"; rescisão indireta (art. 483) → "Da Rescisão Indireta / Da Falta Grave do Empregador"; pedido de demissão sob coação → narrativa de coação/ameaça; sem justa causa → NENHUM capítulo de reversão/rescisão indireta (peça mais curta).
+- Teses "avulsas" ligadas ao caso concreto (ex.: periculosidade, doença ocupacional, estabilidade provisória, pensão vitalícia) entram APENAS quando houver suporte no relato.
+
+Em resumo: cerca de 80–85% do texto é modelo fixo — o que varia é a qualificação das partes, datas/salário, o motivo da rescisão (que puxa o capítulo correspondente) e os valores.`;
 
 export function buildGeracaoPrompt({ texto, attrs, modelo, textoModelo, dadosReceita, dadosCep, dadosDatajud }) {
   return `${PROMPT_SISTEMA_PETICAO}
