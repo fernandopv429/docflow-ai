@@ -30,64 +30,6 @@ export function anonimizarTexto(txt) {
 // Matching determinístico: pontua cada modelo contra os
 // atributos extraídos da entrevista.
 // ============================================================
-const norm = (s) =>
-  (s || '').toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
-
-export function pontuarModelo(modelo, attrs = {}) {
-  let score = 0;
-  const motivos = [];
-
-  if (attrs.tipo_dispensa && modelo.tipo_dispensa === attrs.tipo_dispensa) {
-    score += 5;
-    motivos.push('Mesma modalidade de rescisão');
-  }
-
-  if (attrs.funcao && modelo.funcao) {
-    const a = norm(attrs.funcao);
-    const m = norm(modelo.funcao);
-    const mesmaFuncao =
-      (a && (m.includes(a) || a.includes(m))) ||
-      (a.includes('controlador') && m.includes('controlador')) ||
-      (a.includes('porteiro') && m.includes('porteiro'));
-    if (mesmaFuncao) {
-      score += 2;
-      motivos.push('Mesma função');
-    }
-  }
-
-  if (attrs.rito && modelo.rito === attrs.rito) {
-    score += 1;
-    motivos.push('Mesmo rito');
-  }
-
-  if (attrs.tem_tomadora === true && modelo.tem_tomadora === true) {
-    score += 2;
-    motivos.push('Tem tomadora (Súm. 331 TST)');
-  }
-
-  const modeloTeses = (modelo.teses || []).map(norm);
-  for (const t of attrs.teses || []) {
-    const nt = norm(t);
-    if (nt && modeloTeses.some((x) => x.includes(nt) || nt.includes(x))) {
-      score += 1;
-      motivos.push(`Tese: ${t}`);
-    }
-  }
-
-  return { score, motivos };
-}
-
-export function rankearModelos(modelos, attrs) {
-  return (modelos || [])
-    .map((modelo) => ({ modelo, ...pontuarModelo(modelo, attrs) }))
-    .sort((a, b) => b.score - a.score);
-}
-
-export async function listarModelosAtivos() {
-  const todos = await base44.entities.ModeloReferencia.list('-updated_date', 100);
-  return todos.filter((m) => m.ativo !== false);
-}
-
 // Carrega o Único MODELO PADRÃO (de "Meus Templates") — traç o HTML formatado
 // (estilo/layout do escritório) que serve de base para a minuta.
 export async function carregarModeloPadrao() {
@@ -97,20 +39,6 @@ export async function carregarModeloPadrao() {
   if (!padrao) return null;
   const html = await loadTemplateContent(padrao);
   return { id: padrao.id, titulo: padrao.title, html: html || '' };
-}
-
-// Texto integral (anonimizado) do modelo: busca do arquivo hospedado (conteudo_url)
-// e cai para a prévia inline / resumo se não houver.
-export async function carregarTextoModelo(modelo) {
-  if (modelo?.conteudo_url) {
-    try {
-      const r = await fetch(modelo.conteudo_url);
-      if (r.ok) return await r.text();
-    } catch (e) {
-      /* cai para o fallback */
-    }
-  }
-  return modelo?.conteudo || modelo?.resumo || '';
 }
 
 // ============================================================
