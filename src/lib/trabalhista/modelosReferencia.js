@@ -196,9 +196,15 @@ function inferirAtributosEntrevista(transcript) {
   const texto = userMessages.join('\n');
   const ultimaMensagem = userMessages.at(-1) || '';
   let pendencias = [];
+  const cepsIncompletosComCnpj = [];
   for (const match of texto.matchAll(/\bcep\s*:?\s*([\d.-]+)/gi)) {
     if (match[1].replace(/\D/g, '').length !== 8) {
+      const contextoAnterior = texto.slice(Math.max(0, match.index - 500), match.index);
+      const cnpjRelacionado = extrairCnpjs(contextoAnterior).at(-1);
       pendencias.push(`CEP "${match[1]}" inválido. Informe o CEP correto com 8 dígitos.`);
+      if (cnpjRelacionado) {
+        cepsIncompletosComCnpj.push({ cepInformado: match[1], cnpj: cnpjRelacionado });
+      }
     }
   }
   for (const match of texto.matchAll(/\bcnpj(?:\/mf)?\s*:?\s*([\d./-]+)/gi)) {
@@ -244,7 +250,12 @@ function inferirAtributosEntrevista(transcript) {
     /sal[aá]rio\s*:?\s*(?:r\$\s*)?[\d.,]+/i.test(texto) &&
     /(?:escala|hor[aá]rio|jornada)\s*:?/i.test(texto)
   );
-  return { atributos, essenciais, pendencias: [...new Set(pendencias)] };
+  return {
+    atributos,
+    essenciais,
+    pendencias: [...new Set(pendencias)],
+    cepsIncompletosComCnpj,
+  };
 }
 
 export async function conversarEntrevista({ transcript, fileUrls, modelos }) {
@@ -254,7 +265,7 @@ export async function conversarEntrevista({ transcript, fileUrls, modelos }) {
     response_json_schema: CHAT_SCHEMA,
   };
   if (fileUrls?.length) req.file_urls = fileUrls;
-  const key = runtimeCacheKey({ version: 3, transcript, fileUrls, modelos });
+  const key = runtimeCacheKey({ version: 4, transcript, fileUrls, modelos });
   const resposta = await withRuntimeCache('entrevista-ia', key, () => base44.integrations.Core.InvokeLLM(req));
   const inferido = inferirAtributosEntrevista(transcript);
   const ia = resposta?.atributos || {};
@@ -265,10 +276,31 @@ export async function conversarEntrevista({ transcript, fileUrls, modelos }) {
     ceps: [...new Set([...(inferido.atributos.ceps || []), ...(ia.ceps || [])])],
     teses: [...new Set([...(inferido.atributos.teses || []), ...(ia.teses || [])])],
   };
+  const correcoesAutomaticas = [];
+  if (inferido.cepsIncompletosComCnpj.length) {
+    const dadosOficiais = await enriquecerCnpjs(
+      inferido.cepsIncompletosComCnpj.map((item) => item.cnpj)
+    );
+    for (const item of inferido.cepsIncompletosComCnpj) {
+      const cnpjDigits = item.cnpj.replace(/\D/g, '');
+      const oficial = dadosOficiais.find((dado) => (dado.cnpj || '').replace(/\D/g, '') === cnpjDigits);
+      const cepOficial = (oficial?.cep || '').replace(/\D/g, '');
+      if (!oficial?.erro && cepOficial.length === 8) {
+        inferido.pendencias = inferido.pendencias.filter(
+          (pendencia) => !pendencia.startsWith(`CEP "${item.cepInformado}"`)
+        );
+        atributos.ceps = [...new Set([...(atributos.ceps || []), cepOficial])];
+        correcoesAutomaticas.push(`CEP ${oficial.cep} confirmado pelo CNPJ ${oficial.cnpj}`);
+      }
+    }
+  }
+
   const pronto = Boolean(resposta?.pronto_para_gerar || inferido.essenciais) && !inferido.pendencias.length;
   let reply = resposta?.reply || 'Dados recebidos e analisados.';
   if (inferido.pendencias.length) {
     reply = `Identifiquei dados que precisam ser corrigidos antes de gerar a minuta:\n\n${inferido.pendencias.map((item) => `• ${item}`).join('\n')}`;
+  } else if (correcoesAutomaticas.length) {
+    reply = `Completei dados incompletos usando informações oficiais disponíveis:\n\n${correcoesAutomaticas.map((item) => `• ${item}`).join('\n')}\n\n${pronto ? 'Os dados essenciais estão completos e a minuta será gerada.' : reply}`;
   } else if (pronto && /^certo[.!]?$/i.test(reply.trim())) {
     reply = 'Dados essenciais identificados. Vou gerar a minuta com as informações fornecidas.';
   }
