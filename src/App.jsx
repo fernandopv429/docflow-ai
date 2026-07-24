@@ -1,14 +1,13 @@
 import { Toaster } from "@/components/ui/toaster"
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
-import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
+import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import ScrollToTop from './components/ScrollToTop';
 // Add page imports here
 import Layout from '@/components/Layout';
-import Home from '@/pages/Home';
 import TemplateEditor from '@/pages/TemplateEditor';
 import GenerateDocument from '@/pages/GenerateDocument';
 import TrabalhistaList from '@/pages/TrabalhistaList';
@@ -45,7 +44,7 @@ const AuthenticatedApp = () => {
     <Routes>
       {/* Add your page Route elements here */}
       <Route element={<Layout />}>
-        <Route path="/" element={<Home />} />
+        <Route path="/" element={<Navigate to="/trabalhista/gerar-entrevista" replace />} />
         <Route path="/templates/new" element={<TemplateEditor />} />
         <Route path="/templates/:id" element={<TemplateEditor />} />
         <Route path="/templates/:id/generate" element={<GenerateDocument />} />
