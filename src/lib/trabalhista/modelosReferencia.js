@@ -165,6 +165,11 @@ const CHAT_SCHEMA = {
         rito: { type: 'string', enum: ['ordinario', 'sumarissimo'] },
         tem_tomadora: { type: 'boolean' },
         teses: { type: 'array', items: { type: 'string' } },
+        cnpjs: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'CNPJs das reclamadas mencionados na conversa OU encontrados nos documentos anexados',
+        },
       },
     },
     pronto_para_gerar: {
