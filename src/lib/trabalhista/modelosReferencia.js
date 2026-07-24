@@ -606,6 +606,15 @@ FORMATO DE SAÍDA: retorne APENAS o HTML adaptado do corpo da petição (sem <ht
 <p><em>⚠️ Minuta gerada por IA a partir do modelo padrão — revisão obrigatória pelo advogado responsável.</em></p>`;
 }
 
+// Limpa a saída da IA: remove cercas de código markdown (```html) e tags de
+// envelope (<html>/<head>/<body>) que aparecem como texto no preview/export.
+export function limparHtmlIA(html) {
+  let t = typeof html === 'string' ? html : String(html || '');
+  t = t.replace(/```[a-z]*\n?/gi, '');
+  t = t.replace(/<\/?(?:html|head|body|!doctype)[^>]*>/gi, '');
+  return t.trim();
+}
+
 export async function gerarPecaPadrao({ texto, fileUrls, attrs, modeloPadrao, onTool }) {
   const notify = (msg) => {
     try {
@@ -646,7 +655,7 @@ export async function gerarPecaPadrao({ texto, fileUrls, attrs, modeloPadrao, on
   if (urls.length) req.file_urls = urls;
   const resultado = await base44.integrations.Core.InvokeLLM(req);
   return {
-    html: typeof resultado === 'string' ? resultado : String(resultado || ''),
+    html: limparHtmlIA(resultado),
     dadosReceita,
     dadosCep,
     dadosDatajud,
@@ -678,7 +687,7 @@ export async function gerarPeca({ texto, fileUrls, attrs, modelo }) {
   if (urls.length) req.file_urls = urls;
   const resultado = await base44.integrations.Core.InvokeLLM(req);
   return {
-    html: typeof resultado === 'string' ? resultado : String(resultado || ''),
+    html: limparHtmlIA(resultado),
     dadosReceita,
     dadosCep,
     dadosDatajud,

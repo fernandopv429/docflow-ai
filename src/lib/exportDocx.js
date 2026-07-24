@@ -136,7 +136,12 @@ function processBlock(block, out) {
   } else if (tag === 'h3') {
     out.push(new Paragraph({ heading: HeadingLevel.HEADING_3, children: runs, alignment }));
   } else {
-    out.push(new Paragraph({ children: runs, alignment }));
+    // Peças jurídicas: parágrafos comuns saem justificados (como no modelo do escritório)
+    out.push(new Paragraph({
+      children: runs,
+      alignment: alignment === AlignmentType.LEFT ? AlignmentType.JUSTIFIED : alignment,
+      spacing: { after: 120 },
+    }));
   }
 }
 
@@ -168,6 +173,7 @@ function buildHeader(comLogo) {
 
   children.push(new Paragraph({
     children: [],
+    spacing: { after: 120 },
     border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: '000000', space: 4 } },
   }));
 
@@ -205,6 +211,10 @@ export async function exportToDocx(html, variables, title, opts = {}) {
   const { comTimbrado = true } = opts;
   let processed = html || '';
 
+  // Remove cercas de código markdown e tags de envelope que a IA possa ter incluído
+  processed = processed.replace(/```[a-z]*\n?/gi, '');
+  processed = processed.replace(/<\/?(?:html|head|body|!doctype)[^>]*>/gi, '').trim();
+
   if (variables) {
     Object.entries(variables).forEach(([key, value]) => {
       processed = processed.split(`{{${key}}}`).join(value || '');
@@ -230,7 +240,19 @@ export async function exportToDocx(html, variables, title, opts = {}) {
       }],
     },
     sections: [{
-      properties: comTimbrado ? {} : {},
+      properties: {
+        page: {
+          // Margens padrão de petição (3cm sup/esq, 2cm inf/dir) + espaço p/ timbrado
+          margin: {
+            top: comTimbrado ? 1985 : 1701,
+            bottom: comTimbrado ? 1418 : 1134,
+            left: 1701,
+            right: 1134,
+            header: 567,
+            footer: 567,
+          },
+        },
+      },
       headers: comTimbrado ? { default: header } : undefined,
       footers: comTimbrado ? { default: footer } : undefined,
       children,
