@@ -69,13 +69,21 @@ export default function ModelosReferencia() {
           ignorados.push(file.name);
           continue;
         }
-        const conteudo = await extrairTextoDocx(file);
-        const { file_url } = await base44.integrations.Core.UploadFile({ file });
+        const textoAnon = await extrairTextoDocx(file); // texto já anonimizado
+        // Texto integral vai para arquivo hospedado (o campo da entidade tem limite de tamanho).
+        const anonFile = new File(
+          [textoAnon],
+          `${file.name.replace(/\.docx$/i, '')}-anon.txt`,
+          { type: 'text/plain' }
+        );
+        const [anon, orig] = await Promise.all([
+          base44.integrations.Core.UploadFile({ file: anonFile }),
+          base44.integrations.Core.UploadFile({ file }),
+        ]);
         await base44.entities.ModeloReferencia.update(match.id, {
-          arquivo_url: file_url,
-          // Texto integral anonimizado substitui o resumo; limitado para caber na entidade.
-          // A fidelidade total é garantida pelo DOCX anexado (arquivo_url), lido pela IA.
-          conteudo: (conteudo || match.conteudo || '').slice(0, 45000),
+          conteudo_url: anon.file_url,        // texto integral anonimizado (usado na geração)
+          arquivo_url: orig.file_url,         // DOCX original (arquivo/referência; não vai à IA)
+          conteudo: (textoAnon || '').slice(0, 1500), // prévia curta
         });
         anexados++;
       }
@@ -205,9 +213,9 @@ export default function ModelosReferencia() {
                       {m.rito && <Badge>{RITO_LABEL[m.rito] || m.rito}</Badge>}
                       {m.tipo_dispensa && <Badge>{TIPO_DISPENSA_LABELS[m.tipo_dispensa]?.split('(')[0]?.trim() || m.tipo_dispensa}</Badge>}
                       {m.tem_tomadora && <Badge>Tomadora (Súm. 331)</Badge>}
-                      {m.arquivo_url
-                        ? <Badge tone="green">DOCX anexado</Badge>
-                        : <Badge tone="amber">Sem DOCX — só resumo</Badge>}
+                      {m.conteudo_url
+                        ? <Badge tone="green">Texto integral</Badge>
+                        : <Badge tone="amber">Só resumo</Badge>}
                     </div>
                     {(m.teses || []).length > 0 && (
                       <p className="text-xs text-[#5f6368] mt-2">
