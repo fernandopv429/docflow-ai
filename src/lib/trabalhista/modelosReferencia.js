@@ -593,3 +593,33 @@ export async function extrairTextoDocx(file) {
   const { value } = await mammoth.extractRawText({ arrayBuffer });
   return anonimizarTexto(value || '');
 }
+
+// Classificação leve (para modelos NOVOS criados na importação): detecta rito,
+// teses e tomadora por palavras-chave, para o modelo já entrar no matching.
+const TESES_KEYWORDS = [
+  [/hora[s]? extra/i, 'Horas extras'],
+  [/adicional noturno|hora noturna/i, 'Adicional noturno e hora noturna reduzida'],
+  [/art\.?\s*71|intrajornada|intervalo (intra|para|de)/i, 'Intervalo intrajornada (art. 71 CLT)'],
+  [/folga[s]? trabalhada|\bDSR\b|descanso semanal/i, 'Folgas trabalhadas/DSR'],
+  [/dano[s]? moral/i, 'Dano moral'],
+  [/s[uú]mula\s*331|subsidi[aá]ri|tomador/i, 'Responsabilidade subsidiária (Súm. 331 TST)'],
+  [/insalubr/i, 'Insalubridade'],
+  [/periculos/i, 'Adicional de periculosidade'],
+  [/desvio de fun/i, 'Desvio de função'],
+  [/ac[uú]mulo de fun/i, 'Acúmulo de função'],
+  [/rescis[aã]o indireta|art\.?\s*483/i, 'Rescisão indireta (art. 483 CLT)'],
+  [/revers[aã]o da (justa causa|dispensa)/i, 'Reversão da justa causa'],
+  [/\bFGTS\b/i, 'FGTS + 40%'],
+  [/verbas rescis|TRCT|aviso pr[eé]vio/i, 'Verbas rescisórias'],
+];
+
+export function classificarTextoModelo(texto) {
+  const t = texto || '';
+  const teses = TESES_KEYWORDS.filter(([re]) => re.test(t)).map(([, label]) => label);
+  const cls = { teses, tem_tomadora: /2[ªa]\s*reclamada|tomador|s[uú]mula\s*331/i.test(t) };
+  if (/sumar[ií]ss/i.test(t)) cls.rito = 'sumarissimo';
+  else if (/ordin[aá]ri/i.test(t)) cls.rito = 'ordinario';
+  if (/rescis[aã]o indireta|art\.?\s*483/i.test(t)) cls.tipo_dispensa = 'rescisao_indireta';
+  else if (/revers[aã]o da (justa causa|dispensa)/i.test(t)) cls.tipo_dispensa = 'reversao_justa_causa';
+  return cls;
+}
