@@ -1,6 +1,7 @@
 import { base44 } from '@/api/base44Client';
 import mammoth from 'mammoth';
 import { TIPO_DISPENSA_LABELS } from './tokens';
+import { loadTemplateContent } from '@/lib/templateContent';
 
 // ============================================================
 // Anonimização (mesma lógica usada no cadastro dos modelos)
@@ -83,6 +84,17 @@ export function rankearModelos(modelos, attrs) {
 export async function listarModelosAtivos() {
   const todos = await base44.entities.ModeloReferencia.list('-updated_date', 100);
   return todos.filter((m) => m.ativo !== false);
+}
+
+// Carrega o Único MODELO PADRÃO (de "Meus Templates") — traç o HTML formatado
+// (estilo/layout do escritório) que serve de base para a minuta.
+export async function carregarModeloPadrao() {
+  const templates = await base44.entities.Template.list('-updated_date', 100);
+  const padrao =
+    templates.find((t) => /modelo\s*padr[aã]o/i.test(t.title || '')) || templates[0];
+  if (!padrao) return null;
+  const html = await loadTemplateContent(padrao);
+  return { id: padrao.id, titulo: padrao.title, html: html || '' };
 }
 
 // Texto integral (anonimizado) do modelo: busca do arquivo hospedado (conteudo_url)
@@ -550,6 +562,61 @@ Atributos detectados: função=${attrs?.funcao || '-'}, modalidade=${attrs?.tipo
 
 FORMATO DE SAÍDA: retorne APENAS o HTML do corpo da petição (sem <html>, <head> ou <body>), pronto para formatação. Use <h2> para o título de cada tópico (ex.: <h2>DAS HORAS EXTRAS</h2>) e <p style="text-align: justify"> para os parágrafos. Comece direto pelo endereçamento ao Juízo (sem nome/letreiro do escritório antes). Inclua a qualificação das partes, os fatos, o direito (um tópico por tese cabível, seguindo a ordem e reproduzindo o texto-padrão do modelo), os cálculos/valor da causa e o fecho com a assinatura do Dr. Fernando Andrade Vieira — OAB/SP nº 320.825. Ao final, acrescente exatamente:
 <p><em>⚠️ Minuta gerada por IA a partir de modelo de referência — revisão obrigatória pelo advogado responsável.</em></p>`;
+}
+
+// Geração adaptando o MODELO PADRÃO (HTML formatado), preservando o estilo.
+export function buildGeracaoPadraoPrompt({ texto, attrs, modeloHtml, dadosReceita, dadosCep, dadosDatajud }) {
+  return `${PROMPT_SISTEMA_PETICAO}
+
+REGRA PRINCIPAL — ADAPTE O MODELO PADRÃO MANTENDO O ESTILO: abaixo está o MODELO PADRÃO do escritório em HTML (com a formatação, o layout e o texto-padrão corretos, podendo conter marcadores como {{VARIAVEL}}). Sua tarefa é ADAPTAR este HTML ao caso atual:
+- Substitua os marcadores {{...}} e quaisquer dados de exemplo pelos dados REAIS do caso (entrevista/documentos). Onde faltar um dado, deixe um marcador claro entre colchetes, ex.: [SALÁRIO].
+- Ajuste ou REMOVA os tópicos que não se aplicam ao caso; mantenha os tópicos fixos.
+- MANTENHA EXATAMENTE a formatação e a estrutura HTML do modelo (mesmas tags e estilos). NÃO reescreva o texto-padrão nem crie estrutura nova.
+
+=== MODELO PADRÃO (HTML — preserve a formatação) ===
+${modeloHtml}
+=== FIM DO MODELO PADRÃO ===
+
+=== ENTREVISTA / CASO ATUAL ===
+${texto || '(ver documentos anexados)'}
+
+Atributos detectados: função=${attrs?.funcao || '-'}, modalidade=${attrs?.tipo_dispensa || '-'}, rito=${attrs?.rito || '-'}, tomadora=${attrs?.tem_tomadora ? 'sim' : 'não'}.
+=== FIM DA ENTREVISTA ===${blocoReceita(dadosReceita)}${blocoCeps(dadosCep)}${blocoDatajud(dadosDatajud)}
+
+FORMATO DE SAÍDA: retorne APENAS o HTML adaptado do corpo da petição (sem <html>, <head> ou <body>), PRESERVANDO a formatação/estilo do modelo. Ao final, acrescente exatamente:
+<p><em>⚠️ Minuta gerada por IA a partir do modelo padrão — revisão obrigatória pelo advogado responsável.</em></p>`;
+}
+
+export async function gerarPecaPadrao({ texto, fileUrls, attrs, modeloPadrao }) {
+  const config = await carregarConfigIntegracoes();
+  const cnpjs = config.cnpj_ativo ? [...extrairCnpjs(texto), ...((attrs && attrs.cnpjs) || [])] : [];
+  const ceps = config.cep_ativo ? [...extrairCeps(texto), ...((attrs && attrs.ceps) || [])] : [];
+  const [dadosReceita, dadosCep, dadosDatajud] = await Promise.all([
+    enriquecerCnpjs(cnpjs),
+    enriquecerCeps(ceps),
+    enriquecerDatajud(attrs, config),
+  ]);
+
+  const req = {
+    prompt: buildGeracaoPadraoPrompt({
+      texto,
+      attrs,
+      modeloHtml: modeloPadrao?.html || '',
+      dadosReceita,
+      dadosCep,
+      dadosDatajud,
+    }),
+    model: 'claude_sonnet_4_6',
+  };
+  const urls = [...(fileUrls || [])];
+  if (urls.length) req.file_urls = urls;
+  const resultado = await base44.integrations.Core.InvokeLLM(req);
+  return {
+    html: typeof resultado === 'string' ? resultado : String(resultado || ''),
+    dadosReceita,
+    dadosCep,
+    dadosDatajud,
+  };
 }
 
 export async function gerarPeca({ texto, fileUrls, attrs, modelo }) {
