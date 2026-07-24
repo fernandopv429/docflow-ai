@@ -121,6 +121,25 @@ export default function TrabalhistaForm() {
               ))}
             </select>
           </div>
+          {f.tipo_dispensa && f.tipo_dispensa !== 'sem_justa_causa' && (
+            <div className="md:col-span-2">
+              <CampoInput
+                label="Fatos da modalidade de rescisão"
+                placeholder={
+                  f.tipo_dispensa === 'rescisao_indireta'
+                    ? 'Ex: não pagamento de horas extras, atraso reiterado de salário, ausência de recolhimento do FGTS...'
+                    : f.tipo_dispensa === 'reversao_justa_causa'
+                    ? 'Ex: motivo alegado pela empresa e por que a justa causa é desproporcional/não comprovada...'
+                    : f.tipo_dispensa === 'nulidade_pedido_demissao'
+                    ? 'Ex: como se deu a coação/ameaça que levou ao pedido de demissão...'
+                    : 'Ex: termos do acordo entre as partes (art. 484-A CLT)...'
+                }
+                hint="Obrigatório para esta modalidade — alimenta o tópico jurídico correspondente no Modelo Padrão. Revisão humana obrigatória."
+                value={f.motivo_rescisao_fatos || ''}
+                onChange={set('motivo_rescisao_fatos')}
+              />
+            </div>
+          )}
           <CampoInput label="Comarca/UF" required placeholder="Ex: SP" maxLength={2} hint="A Região TRT é derivada automaticamente" value={f.comarca_uf || ''} onChange={set('comarca_uf')} />
         </Section>
 
