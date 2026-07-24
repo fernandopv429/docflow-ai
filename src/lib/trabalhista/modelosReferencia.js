@@ -42,61 +42,6 @@ export async function carregarModeloPadrao() {
 }
 
 // ============================================================
-// Passo 1: extrair atributos estruturados da entrevista (IA)
-// ============================================================
-const ATTRS_SCHEMA = {
-  type: 'object',
-  properties: {
-    funcao: {
-      type: 'string',
-      description: 'Função/cargo do trabalhador (ex.: Porteiro, Controlador de acesso)',
-    },
-    tipo_dispensa: {
-      type: 'string',
-      enum: [
-        'sem_justa_causa',
-        'rescisao_indireta',
-        'nulidade_pedido_demissao',
-        'reversao_justa_causa',
-        'acordo',
-      ],
-      description: 'Modalidade de rescisão mais aderente ao relato',
-    },
-    rito: { type: 'string', enum: ['ordinario', 'sumarissimo'] },
-    tem_tomadora: {
-      type: 'boolean',
-      description: 'Existe empresa tomadora de serviços (terceirização)?',
-    },
-    teses: {
-      type: 'array',
-      items: { type: 'string' },
-      description: 'Teses/verbas com suporte no relato',
-    },
-    resumo_caso: { type: 'string', description: 'Resumo objetivo dos fatos relevantes' },
-  },
-};
-
-export async function extrairAtributos({ texto, fileUrls }) {
-  const req = {
-    prompt: `Você é um advogado trabalhista. Leia a ENTREVISTA/relato abaixo (e os documentos anexados, se houver) e extraia os atributos estruturados que servirão para escolher o modelo de petição mais adequado.
-
-ENTREVISTA:
-"""
-${texto || '(sem texto colado; baseie-se nos documentos anexados)'}
-"""
-
-Regras:
-- tipo_dispensa: escolha a modalidade mais aderente ao relato.
-- teses: liste apenas as que têm suporte no relato (ex.: "Horas extras", "Adicional noturno", "Intervalo intrajornada", "Folgas trabalhadas/DSR", "Rescisão indireta", "Reversão da justa causa", "Adicional de periculosidade", "Adicional de insalubridade", "Dano moral", "Acúmulo de função", "Responsabilidade subsidiária").
-- Não invente fatos. Responda APENAS com o objeto JSON.`,
-    model: 'claude_sonnet_4_6',
-    response_json_schema: ATTRS_SCHEMA,
-  };
-  if (fileUrls?.length) req.file_urls = fileUrls;
-  return base44.integrations.Core.InvokeLLM(req);
-}
-
-// ============================================================
 // Conversa (chat) para coletar dados da entrevista de forma
 // incremental e decidir quando gerar a minuta.
 // ============================================================
