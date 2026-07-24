@@ -434,30 +434,6 @@ O QUE MUDA (variáveis a preencher caso a caso):
 
 Em resumo: cerca de 80–85% do texto é modelo fixo — o que varia é a qualificação das partes, datas/salário, o motivo da rescisão (que puxa o capítulo correspondente) e os valores.`;
 
-export function buildGeracaoPrompt({ texto, attrs, modelo, textoModelo, dadosReceita, dadosCep, dadosDatajud }) {
-  return `${PROMPT_SISTEMA_PETICAO}
-
-REGRA PRINCIPAL — SIGA O MODELO À RISCA: sua tarefa é PREENCHER o MODELO DE REFERÊNCIA abaixo, NÃO reescrevê-lo. Mantenha EXATAMENTE os mesmos tópicos, na mesma ORDEM, com os MESMOS textos-padrão e a MESMA fundamentação jurídica (súmulas e artigos), reproduzindo o texto fixo do modelo praticamente palavra por palavra. Altere SOMENTE os dados do caso atual (partes, datas, função, salário, valores, fatos concretos) e inclua ou exclua apenas os TÓPICOS CONEXOS conforme o caso exigir. NÃO parafraseie, NÃO resuma e NÃO crie uma redação nova para as partes padrão. Onde o modelo tiver marcadores como [RECLAMANTE], [CPF], [CNPJ], [DATA DE ADMISSÃO], substitua pelos dados do caso; se um dado faltar, mantenha um marcador claro entre colchetes. Os dados pessoais são SEMPRE os do caso atual — nunca reaproveite partes/valores de outro processo do modelo.
-
-=== MODELO DE REFERÊNCIA: ${modelo.titulo} ===
-Rito: ${modelo.rito || '-'} | Modalidade: ${TIPO_DISPENSA_LABELS[modelo.tipo_dispensa] || modelo.tipo_dispensa || '-'} | Comarca: ${modelo.comarca_uf || '-'} (${modelo.regiao_trt || '-'})
-Esqueleto de tópicos (base — ajuste os tópicos conexos ao caso):
-${(modelo.secoes || []).map((s) => `- ${s}`).join('\n')}
-
-TEXTO DO MODELO (anonimizado — reproduza FIELMENTE, preenchendo os marcadores [ ] com os dados do caso atual):
-${textoModelo || modelo.conteudo || modelo.resumo || ''}
-=== FIM DO MODELO ===
-
-=== ENTREVISTA / CASO ATUAL ===
-${texto || '(ver documentos anexados)'}
-
-Atributos detectados: função=${attrs?.funcao || '-'}, modalidade=${attrs?.tipo_dispensa || '-'}, rito=${attrs?.rito || '-'}, tomadora=${attrs?.tem_tomadora ? 'sim' : 'não'}.
-=== FIM DA ENTREVISTA ===${blocoReceita(dadosReceita)}${blocoCeps(dadosCep)}${blocoDatajud(dadosDatajud)}
-
-FORMATO DE SAÍDA: retorne APENAS o HTML do corpo da petição (sem <html>, <head> ou <body>), pronto para formatação. Use <h2> para o título de cada tópico (ex.: <h2>DAS HORAS EXTRAS</h2>) e <p style="text-align: justify"> para os parágrafos. Comece direto pelo endereçamento ao Juízo (sem nome/letreiro do escritório antes). Inclua a qualificação das partes, os fatos, o direito (um tópico por tese cabível, seguindo a ordem e reproduzindo o texto-padrão do modelo), os cálculos/valor da causa e o fecho com a assinatura do Dr. Fernando Andrade Vieira — OAB/SP nº 320.825. Ao final, acrescente exatamente:
-<p><em>⚠️ Minuta gerada por IA a partir de modelo de referência — revisão obrigatória pelo advogado responsável.</em></p>`;
-}
-
 // Bloco de cálculos determinísticos para o prompt (mesma lógica da auditoria).
 function blocoCalculos(calculos) {
   if (!calculos?.length) return '';
