@@ -58,7 +58,7 @@ export default function GerarPorEntrevista() {
       if (verificados.length) {
         nota += ` CNPJ(s) confirmado(s) na Receita: ${verificados.map((d) => `${d.razao_social} (${d.cnpj})`).join('; ')}.`;
       }
-      const temTextoIntegral = !!modelo.arquivo_url || (modelo.conteudo || '').length > 6000;
+      const temTextoIntegral = !!modelo.conteudo_url;
       if (!temTextoIntegral) {
         nota += ' ⚠️ Este modelo ainda está SEM o texto integral (só o resumo), então a redação é aproximada. Para a minuta seguir o template à risca, importe o .docx do modelo em “Modelos”.';
       }
@@ -159,7 +159,7 @@ export default function GerarPorEntrevista() {
           >
             {ranking.map(({ modelo, score }) => (
               <option key={modelo.id} value={modelo.id}>
-                {modelo.titulo} ({score} pts{!modelo.arquivo_url ? ', sem DOCX' : ''})
+                {modelo.titulo} ({score} pts{!modelo.conteudo_url ? ', sem texto' : ''})
               </option>
             ))}
           </select>
