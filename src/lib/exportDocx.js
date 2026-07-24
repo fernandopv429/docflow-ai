@@ -6,7 +6,6 @@ import {
   HeadingLevel,
   AlignmentType,
   UnderlineType,
-  ImageRun,
   Header,
   Footer,
   Table,
@@ -16,7 +15,7 @@ import {
   BorderStyle,
   PageNumber,
 } from 'docx';
-import { TIMBRADO, carregarLogoBytes } from './timbrado';
+import { TIMBRADO } from './timbrado';
 import { applyConditionals } from './variables';
 
 // ---------- Utilitarios de parsing HTML -> docx ----------
@@ -148,58 +147,51 @@ function processBlock(block, out) {
 
 // ---------- Timbrado: cabecalho e rodape ----------
 
-function buildHeader(comLogo) {
-  const children = [];
-  const logoBytes = comLogo ? carregarLogoBytes() : null;
-
-  if (logoBytes) {
-    children.push(new Paragraph({
-      alignment: AlignmentType.CENTER,
-      children: [new ImageRun({
-        type: 'png',
-        data: logoBytes,
-        transformation: { width: 220, height: 44 },
-      })],
-    }));
-  } else {
-    children.push(new Paragraph({
-      alignment: AlignmentType.CENTER,
-      children: [new TextRun({ text: TIMBRADO.escritorio, bold: true, size: 22 })],
-    }));
-    children.push(new Paragraph({
-      alignment: AlignmentType.CENTER,
-      children: [new TextRun({ text: TIMBRADO.subtitulo, size: 16 })],
-    }));
-  }
-
-  children.push(new Paragraph({
-    children: [],
-    spacing: { after: 120 },
-    border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: '000000', space: 4 } },
-  }));
-
-  return new Header({ children });
+function buildHeader() {
+  // Cabeçalho em TEXTO (sem imagem) — sempre renderiza; imagem embutida corrompida
+  // fazia o Word descartar o timbrado ao abrir o arquivo.
+  return new Header({
+    children: [
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { after: 20 },
+        children: [new TextRun({ text: TIMBRADO.escritorio, bold: true, size: 28, color: '111111' })],
+      }),
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        children: [new TextRun({ text: TIMBRADO.subtitulo || '', size: 15, color: '666666' })],
+      }),
+      new Paragraph({
+        children: [],
+        spacing: { after: 120 },
+        border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: '000000', space: 4 } },
+      }),
+    ],
+  });
 }
 
 function buildFooter() {
+  const contato = [TIMBRADO.site, TIMBRADO.email, TIMBRADO.telefone].filter(Boolean).join('   |   ');
   return new Footer({
     children: [
       new Paragraph({
         border: { top: { style: BorderStyle.SINGLE, size: 4, color: '888888', space: 4 } },
         alignment: AlignmentType.CENTER,
-        children: [new TextRun({
-          text: `${TIMBRADO.rodape.email}  |  ${TIMBRADO.rodape.oab}`,
-          size: 16,
-          color: '555555',
-        })],
+        spacing: { before: 40 },
+        children: [new TextRun({ text: contato, size: 16, color: '555555' })],
       }),
       new Paragraph({
         alignment: AlignmentType.CENTER,
+        children: [new TextRun({ text: TIMBRADO.cidades || '', size: 13, color: '888888' })],
+      }),
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { before: 40 },
         children: [
-          new TextRun({ text: 'Pagina ', size: 14, color: '888888' }),
-          new TextRun({ children: [PageNumber.CURRENT], size: 14, color: '888888' }),
-          new TextRun({ text: ' de ', size: 14, color: '888888' }),
-          new TextRun({ children: [PageNumber.TOTAL_PAGES], size: 14, color: '888888' }),
+          new TextRun({ text: 'Página ', size: 14, color: '999999' }),
+          new TextRun({ children: [PageNumber.CURRENT], size: 14, color: '999999' }),
+          new TextRun({ text: ' de ', size: 14, color: '999999' }),
+          new TextRun({ children: [PageNumber.TOTAL_PAGES], size: 14, color: '999999' }),
         ],
       }),
     ],
@@ -239,7 +231,7 @@ export async function exportToDocx(html, variables, title, opts = {}) {
     processBlock(block, children);
   }
 
-  const header = buildHeader(comTimbrado);
+  const header = buildHeader();
   const footer = buildFooter();
 
   const docx = new Document({
