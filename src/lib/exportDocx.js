@@ -3,7 +3,6 @@ import {
   Packer,
   Paragraph,
   TextRun,
-  HeadingLevel,
   AlignmentType,
   UnderlineType,
   Header,
@@ -18,6 +17,7 @@ import {
 } from 'docx';
 import { applyConditionals } from './variables';
 import { removeTextLetterhead } from './removeTextLetterhead';
+import { TIMBRADO, carregarLogoBytes } from './timbrado';
 
 // ---------- Utilitarios de parsing HTML -> docx ----------
 
@@ -29,27 +29,56 @@ function getAlignment(el) {
   return AlignmentType.LEFT;
 }
 
+function cssValues(el) {
+  const values = {};
+  const raw = (el?.getAttribute && el.getAttribute('style')) || '';
+  raw.split(';').forEach((part) => {
+    const index = part.indexOf(':');
+    if (index > -1) values[part.slice(0, index).trim().toLowerCase()] = part.slice(index + 1).trim();
+  });
+  return values;
+}
+
+function pt(value) {
+  const match = String(value || '').match(/-?[\d.]+/);
+  return match ? Number(match[0]) : undefined;
+}
+
+function inlineStyle(el, inherited = {}) {
+  const css = cssValues(el);
+  const size = pt(css['font-size']);
+  return {
+    ...inherited,
+    font: css['font-family']?.replace(/["']/g, '').split(',')[0] || inherited.font || 'Arial',
+    size: size ? Math.round(size * 2) : inherited.size || 24,
+    bold: /bold|[6-9]00/.test(css['font-weight'] || '') || inherited.bold || false,
+    italics: css['font-style'] === 'italic' || inherited.italics || false,
+    underline: (css['text-decoration'] || '').includes('underline') || inherited.underline || false,
+    color: css.color?.replace('#', '') || inherited.color,
+  };
+}
+
 function processInlineNodes(node, style = {}) {
   const runs = [];
   for (const child of node.childNodes) {
     if (child.nodeType === Node.TEXT_NODE) {
-      const text = child.textContent;
-      if (text) {
-        runs.push(new TextRun({
-          text,
-          bold: style.bold || false,
-          italics: style.italic || false,
-          underline: style.underline ? { type: UnderlineType.SINGLE } : undefined,
-        }));
-      }
+      if (child.textContent) runs.push(new TextRun({
+        text: child.textContent,
+        font: style.font || 'Arial',
+        size: style.size || 24,
+        bold: style.bold || false,
+        italics: style.italics || false,
+        color: style.color,
+        underline: style.underline ? { type: UnderlineType.SINGLE } : undefined,
+      }));
     } else if (child.nodeType === Node.ELEMENT_NODE) {
       const tag = child.tagName.toLowerCase();
-      const newStyle = { ...style };
-      if (tag === 'strong' || tag === 'b') newStyle.bold = true;
-      if (tag === 'em' || tag === 'i') newStyle.italic = true;
-      if (tag === 'u') newStyle.underline = true;
+      const next = inlineStyle(child, style);
+      if (tag === 'strong' || tag === 'b') next.bold = true;
+      if (tag === 'em' || tag === 'i') next.italics = true;
+      if (tag === 'u') next.underline = true;
       if (tag === 'br') { runs.push(new TextRun({ break: 1 })); continue; }
-      runs.push(...processInlineNodes(child, newStyle));
+      runs.push(...processInlineNodes(child, next));
     }
   }
   return runs;
@@ -91,83 +120,65 @@ function isPageBreak(el) {
   return style.includes('page-break-after') || style.includes('page-break-before');
 }
 
-function processBlock(block, out) {
+function processBlock(block, out, state) {
   const tag = block.tagName ? block.tagName.toLowerCase() : '';
+  const css = cssValues(block);
 
-  if (isPageBreak(block)) {
-    out.push(new Paragraph({ children: [new TextRun({ break: 0 })], pageBreakBefore: true }));
-    return;
+  if (tag === 'section' && block.classList?.contains('docx')) {
+    if (state.pageCount > 0) out.push(new Paragraph({ pageBreakBefore: true, children: [] }));
+    state.pageCount += 1;
+  } else if (isPageBreak(block)) {
+    out.push(new Paragraph({ pageBreakBefore: true, children: [] }));
   }
 
   if (tag === 'table') {
-    const t = buildTable(block);
-    if (t) { out.push(t); out.push(new Paragraph({ children: [] })); }
+    const table = buildTable(block);
+    if (table) out.push(table);
     return;
   }
-
-  if (tag === 'ul') {
+  if (tag === 'ul' || tag === 'ol') {
     for (const li of block.children) {
-      out.push(new Paragraph({ children: processInlineNodes(li), bullet: { level: 0 } }));
+      out.push(new Paragraph({
+        children: processInlineNodes(li, inlineStyle(li)),
+        ...(tag === 'ul' ? { bullet: { level: 0 } } : { numbering: { reference: 'doc-numbering', level: 0 } }),
+      }));
     }
     return;
   }
-
-  if (tag === 'ol') {
-    for (const li of block.children) {
-      out.push(new Paragraph({ children: processInlineNodes(li), numbering: { reference: 'doc-numbering', level: 0 } }));
-    }
+  if (['div', 'section', 'article'].includes(tag) && block.children?.length) {
+    for (const child of block.children) processBlock(child, out, state);
     return;
   }
 
-  if (tag === 'div' || tag === 'section' || tag === 'article') {
-    // Container: processa filhos recursivamente para nao perder conteudo/paginas
-    if (block.children && block.children.length) {
-      for (const child of block.children) processBlock(child, out);
-      return;
-    }
-  }
-
-  const runs = processInlineNodes(block);
-  const alignment = getAlignment(block);
-
-  if (tag === 'h1') {
-    out.push(new Paragraph({ heading: HeadingLevel.HEADING_1, children: runs, alignment }));
-  } else if (tag === 'h2') {
-    out.push(new Paragraph({ heading: HeadingLevel.HEADING_2, children: runs, alignment }));
-  } else if (tag === 'h3') {
-    out.push(new Paragraph({ heading: HeadingLevel.HEADING_3, children: runs, alignment }));
-  } else {
-    // Peças jurídicas: parágrafos comuns saem justificados (como no modelo do escritório)
-    out.push(new Paragraph({
-      children: runs,
-      alignment: alignment === AlignmentType.LEFT ? AlignmentType.JUSTIFIED : alignment,
-      spacing: { after: 120 },
-    }));
-  }
+  const heading = ['h1', 'h2', 'h3'].includes(tag);
+  const runs = processInlineNodes(block, inlineStyle(block, { bold: heading }));
+  const firstLine = pt(css['text-indent']);
+  const left = pt(css['margin-left']);
+  const right = pt(css['margin-right']);
+  const lineHeight = Number.parseFloat(css['line-height']);
+  out.push(new Paragraph({
+    children: runs,
+    alignment: getAlignment(block) === AlignmentType.LEFT ? AlignmentType.JUSTIFIED : getAlignment(block),
+    indent: {
+      ...(firstLine ? { firstLine: Math.round(firstLine * 20) } : {}),
+      ...(left ? { left: Math.round(left * 20) } : {}),
+      ...(right ? { right: Math.round(right * 20) } : {}),
+    },
+    spacing: { after: 0, ...(lineHeight ? { line: Math.round(lineHeight * 240) } : {}) },
+  }));
 }
 
 // ---------- Timbrado: cabecalho e rodape ----------
 
-async function buildHeader() {
-  const logoUrl = 'https://media.base44.com/images/public/6a5a44d24aa52c9fbdd61b1a/4f1847ac3_image.png';
-  const logoBytes = await fetch(logoUrl).then((response) => response.arrayBuffer());
-
+function buildHeader() {
+  const logoBytes = carregarLogoBytes();
   return new Header({
     children: [
       new Paragraph({
         alignment: AlignmentType.CENTER,
-        children: [
-          new ImageRun({
-            data: logoBytes,
-            transformation: { width: 220, height: 44 },
-            type: 'png',
-          }),
-        ],
+        children: logoBytes ? [new ImageRun({ data: logoBytes, transformation: { width: 220, height: 44 }, type: 'png' })] : [new TextRun({ text: TIMBRADO.escritorio, bold: true, font: 'Arial', size: 20 })],
       }),
-      new Paragraph({
-        children: [],
-        border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: '000000', space: 4 } },
-      }),
+      new Paragraph({ children: [], border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: '000000', space: 4 } } }),
     ],
   });
 }
@@ -178,21 +189,15 @@ function buildFooter() {
       new Paragraph({
         border: { top: { style: BorderStyle.SINGLE, size: 4, color: '888888', space: 4 } },
         alignment: AlignmentType.CENTER,
-        children: [
-          new TextRun({
-            text: 'trabalhista@favadvogados.com.br  |  OAB/SP 320.825',
-            size: 16,
-            color: '555555',
-          }),
-        ],
+        children: [new TextRun({ text: `${TIMBRADO.rodape.email}  |  ${TIMBRADO.rodape.oab}`, font: 'Arial', size: 16, color: '555555' })],
       }),
       new Paragraph({
         alignment: AlignmentType.CENTER,
         children: [
-          new TextRun({ text: 'Pagina ', size: 14, color: '888888' }),
-          new TextRun({ children: [PageNumber.CURRENT], size: 14, color: '888888' }),
-          new TextRun({ text: ' de ', size: 14, color: '888888' }),
-          new TextRun({ children: [PageNumber.TOTAL_PAGES], size: 14, color: '888888' }),
+          new TextRun({ text: 'Página ', font: 'Arial', size: 14, color: '888888' }),
+          new TextRun({ children: [PageNumber.CURRENT], font: 'Arial', size: 14, color: '888888' }),
+          new TextRun({ text: ' de ', font: 'Arial', size: 14, color: '888888' }),
+          new TextRun({ children: [PageNumber.TOTAL_PAGES], font: 'Arial', size: 14, color: '888888' }),
         ],
       }),
     ],
@@ -228,11 +233,12 @@ export async function exportToDocx(html, variables, title) {
   const doc = parser.parseFromString(processed, 'text/html');
   const children = [];
 
+  const state = { pageCount: 0 };
   for (const block of doc.body.children) {
-    processBlock(block, children);
+    processBlock(block, children, state);
   }
 
-  const header = await buildHeader();
+  const header = buildHeader();
   const footer = buildFooter();
 
   const docx = new Document({
@@ -246,10 +252,10 @@ export async function exportToDocx(html, variables, title) {
       properties: {
         page: {
           margin: {
-            top: 1440,
-            right: 1440,
-            bottom: 1440,
-            left: 1440,
+            top: 2438,
+            right: 1701,
+            bottom: 1276,
+            left: 1701,
             header: 708,
             footer: 708,
           },

@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import ToolTraceMessage from '@/components/ToolTraceMessage';
+import DocumentReviewPreview from '@/components/DocumentReviewPreview';
 import { exportToDocx } from '@/lib/exportDocx';
 import { TIPO_DISPENSA_LABELS } from '@/lib/trabalhista/tokens';
 import { formatBRL } from '@/lib/trabalhista/mathUtils';
@@ -389,12 +390,7 @@ export default function GerarPorEntrevista() {
 
           <div className="flex-1 overflow-y-auto p-4 lg:p-8 min-h-0 relative">
             {docHtml ? (
-              <div className="max-w-3xl mx-auto bg-white rounded-lg shadow-sm border border-[#dadce0] px-8 py-10">
-                <div
-                  className={`text-[15px] text-[#202124] leading-relaxed transition-opacity duration-300 [&_h1]:font-semibold [&_h2]:font-semibold [&_h2]:text-base [&_h2]:mt-5 [&_h2]:mb-2 [&_p]:my-2.5 [&_p]:text-justify ${generating ? 'opacity-40' : 'opacity-100'}`}
-                  dangerouslySetInnerHTML={{ __html: docHtml }}
-                />
-              </div>
+              <DocumentReviewPreview html={docHtml} dimmed={generating} />
             ) : (
               <div className="h-full flex flex-col items-center justify-center text-center">
                 <FileText className="w-10 h-10 text-[#dadce0] mb-3" />
