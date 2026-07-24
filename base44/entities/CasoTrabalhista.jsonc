@@ -19,6 +19,10 @@
       "default": "rascunho",
       "title": "Status"
     },
+    "entrevista_texto": {
+      "type": "string",
+      "title": "Texto da Entrevista"
+    },
     "recl_nome": {
       "type": "string",
       "title": "Nome do Reclamante"

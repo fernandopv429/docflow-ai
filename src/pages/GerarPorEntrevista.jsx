@@ -17,10 +17,13 @@ import {
 
 export default function GerarPorEntrevista() {
   const [messages, setMessages] = useState([]);
-  const [input, setInput] = useState('');
+  const [input, setInput] = useState(() => localStorage.getItem('docflow:entrevista-texto') || '');
   const [files, setFiles] = useState([]);
   const [sending, setSending] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [saveStatus, setSaveStatus] = useState('saved');
+  const draftCaseIdRef = useRef(localStorage.getItem('docflow:caso-rascunho-id'));
+  const saveTimerRef = useRef(null);
 
   const [allUrls, setAllUrls] = useState([]);
   const [modeloPadrao, setModeloPadrao] = useState(null);
@@ -39,6 +42,37 @@ export default function GerarPorEntrevista() {
   }, [messages, sending, generating]);
 
   const userText = messages.filter((m) => m.role === 'user').map((m) => m.text).filter(Boolean).join('\n\n');
+
+  useEffect(() => {
+    const textoCompleto = [userText, input.trim()].filter(Boolean).join('\n\n');
+    if (!textoCompleto) return;
+
+    localStorage.setItem('docflow:entrevista-texto', textoCompleto);
+    setSaveStatus('saving');
+    clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(async () => {
+      const payload = {
+        titulo: textoCompleto.slice(0, 80),
+        status: 'rascunho',
+        entrevista_texto: textoCompleto,
+      };
+      try {
+        if (draftCaseIdRef.current) {
+          await base44.entities.CasoTrabalhista.update(draftCaseIdRef.current, payload);
+        } else {
+          const caso = await base44.entities.CasoTrabalhista.create(payload);
+          draftCaseIdRef.current = caso.id;
+          localStorage.setItem('docflow:caso-rascunho-id', caso.id);
+        }
+        setSaveStatus('saved');
+      } catch (error) {
+        console.error(error);
+        setSaveStatus('local');
+      }
+    }, 700);
+
+    return () => clearTimeout(saveTimerRef.current);
+  }, [input, userText]);
 
   const gerarMinuta = async (opts = {}) => {
     if (!modeloPadrao || generating) return;
@@ -303,6 +337,9 @@ export default function GerarPorEntrevista() {
                 rows={1}
                 className="flex-1 px-1 py-2 text-sm bg-transparent resize-none focus:outline-none max-h-40"
               />
+              <span className="pb-2 text-[10px] text-[#9aa0a6] whitespace-nowrap">
+                {saveStatus === 'saving' ? 'Salvando...' : saveStatus === 'local' ? 'Salvo neste dispositivo' : 'Salvo'}
+              </span>
               <button
                 onClick={handleSend}
                 disabled={sending || generating || (!input.trim() && files.length === 0)}
