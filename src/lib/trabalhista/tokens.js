@@ -58,6 +58,9 @@ export function deriveTokens(caso) {
     FT_QTD_MEDIA: caso.ft_qtd_media != null ? String(caso.ft_qtd_media) : '',
     DANO_FATOS: caso.dano_fatos || '',
     DANO_SUPERVISOR: caso.dano_supervisor || '',
+    // Narrativa dos fatos que fundamentam a modalidade de rescisão (usada dentro
+    // do bloco condicional T_INDIRETA/T_REVERSAO/T_COACAO/T_ACORDO no Modelo Padrão)
+    MOTIVO_RESCISAO_FATOS: caso.motivo_rescisao_fatos || '',
     ACUMULO_FUNCAO: caso.acumulo_funcao || '',
     TIPO_DISPENSA: TIPO_DISPENSA_LABELS[tipo] || '',
     // Flags condicionais consumidas por {{#if T_X}}...{{/if}} no Modelo Padrão
