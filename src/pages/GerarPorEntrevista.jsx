@@ -41,6 +41,7 @@ export default function GerarPorEntrevista() {
   const gerarMinuta = async (opts = {}) => {
     if (!modeloPadrao || generating) return;
     setGenerating(true);
+    setMessages((m) => [...m, { role: 'tool', text: `Usando modelo padrão: ${modeloPadrao.titulo}` }]);
     try {
       const { html, dadosReceita } = await gerarPecaPadrao({
         texto: opts.texto ?? userText,
