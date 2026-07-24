@@ -194,3 +194,12 @@
 .doc-preview em, .doc-preview i { font-style: italic; }
 .doc-preview u { text-decoration: underline; }
 .doc-preview a { color: #1a73e8; text-decoration: underline; }
+
+/* Campos variáveis preenchidos pela IA — revisão obrigatória antes da exportação */
+.ai-filled-field {
+  background: #fff3b0;
+  color: inherit;
+  border-bottom: 2px solid #e0a800;
+  border-radius: 2px;
+  padding: 0 2px;
+}

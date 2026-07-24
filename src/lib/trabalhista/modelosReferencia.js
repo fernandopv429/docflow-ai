@@ -633,6 +633,7 @@ export function buildGeracaoPadraoPrompt({ texto, attrs, modeloHtml, calculos, d
 REGRA PRINCIPAL — ADAPTE O MODELO PADRÃO MANTENDO O ESTILO: abaixo está o MODELO PADRÃO do escritório em HTML (com a formatação, o layout e o texto-padrão corretos, podendo conter marcadores como {{VARIAVEL}}). Sua tarefa é ADAPTAR este HTML ao caso atual:
 - Substitua os marcadores {{...}} e quaisquer dados de exemplo pelos dados REAIS do caso (entrevista/documentos). Onde faltar um dado, deixe um marcador claro entre colchetes, ex.: [SALÁRIO].
 - Ajuste ou REMOVA os tópicos que não se aplicam ao caso; mantenha os tópicos fixos.
+- Todo valor que você preencher ou substituir com dados do caso atual deve ficar envolvido por <mark class="ai-filled-field" data-ai-field="nome_do_campo">valor preenchido</mark>. Marque somente os dados variáveis inseridos por você, nunca o texto jurídico padrão.
 - MANTENHA EXATAMENTE a formatação e a estrutura HTML do modelo (mesmas tags e estilos). NÃO reescreva o texto-padrão nem crie estrutura nova.
 
 === MODELO PADRÃO (HTML — preserve a formatação) ===

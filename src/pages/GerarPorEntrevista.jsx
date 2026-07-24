@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  ArrowLeft, Loader2, Paperclip, Send, X, FileText, Bot, FileDown, Library, RefreshCw,
+  ArrowLeft, Loader2, Paperclip, Send, X, FileText, Bot, FileDown, Library, RefreshCw, CheckCircle2,
 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import ToolTraceMessage from '@/components/ToolTraceMessage';
@@ -21,6 +21,7 @@ export default function GerarPorEntrevista() {
   const [files, setFiles] = useState([]);
   const [sending, setSending] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [reviewConfirmed, setReviewConfirmed] = useState(false);
   const [saveStatus, setSaveStatus] = useState('saved');
   const draftCaseIdRef = useRef(localStorage.getItem('docflow:caso-rascunho-id'));
   const saveTimerRef = useRef(null);
@@ -88,6 +89,7 @@ export default function GerarPorEntrevista() {
         onTool: (msg) => setMessages((m) => [...m, { role: 'tool', text: msg }]),
       });
       setDocHtml(html);
+      setReviewConfirmed(false);
       const retornos = [
         dadosReceita?.length && { role: 'tool_result', title: 'Retorno da Receita Federal (BrasilAPI)', text: JSON.stringify(dadosReceita, null, 2) },
         dadosCep?.length && { role: 'tool_result', title: 'Retorno da consulta de CEP', text: JSON.stringify(dadosCep, null, 2) },
@@ -202,7 +204,7 @@ export default function GerarPorEntrevista() {
   };
 
   const exportar = async () => {
-    if (!docHtml) return;
+    if (!docHtml || !reviewConfirmed) return;
     try {
       await exportToDocx(docHtml, null, 'Minuta - petição inicial');
     } catch (err) {
@@ -362,9 +364,23 @@ export default function GerarPorEntrevista() {
                 <RefreshCw className="w-3 h-3 animate-spin" /> atualizando
               </span>
             )}
+            {docHtml && !reviewConfirmed && (
+              <span className="hidden md:inline text-[11px] text-[#8a5d00]">
+                Confira os campos destacados
+              </span>
+            )}
+            {docHtml && !reviewConfirmed && (
+              <button
+                onClick={() => setReviewConfirmed(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 border border-[#1a73e8] text-[#1a73e8] rounded-lg text-xs font-medium hover:bg-[#e8f0fe] transition-colors"
+              >
+                <CheckCircle2 className="w-3.5 h-3.5" /> Confirmar revisão
+              </button>
+            )}
             <button
               onClick={exportar}
-              disabled={!docHtml}
+              disabled={!docHtml || !reviewConfirmed}
+              title={!reviewConfirmed ? 'Confirme a revisão antes de exportar' : 'Exportar DOCX'}
               className="flex items-center gap-1.5 px-3 py-1.5 bg-[#1a73e8] text-white rounded-lg text-xs font-medium hover:bg-[#1557b0] transition-colors disabled:opacity-40"
             >
               <FileDown className="w-3.5 h-3.5" /> Exportar DOCX
