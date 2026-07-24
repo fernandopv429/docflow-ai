@@ -2,6 +2,8 @@ import { base44 } from '@/api/base44Client';
 import mammoth from 'mammoth';
 import { TIPO_DISPENSA_LABELS } from './tokens';
 import { loadTemplateContent } from '@/lib/templateContent';
+import { extrairCasoDeTexto } from './parserEntrevista';
+import { calcularVerbasCaso } from './mathUtils';
 
 // ============================================================
 // Anonimização (mesma lógica usada no cadastro dos modelos)
@@ -583,8 +585,17 @@ FORMATO DE SAÍDA: retorne APENAS o HTML do corpo da petição (sem <html>, <hea
 <p><em>⚠️ Minuta gerada por IA a partir de modelo de referência — revisão obrigatória pelo advogado responsável.</em></p>`;
 }
 
+// Bloco de cálculos determinísticos para o prompt (mesma lógica da auditoria).
+function blocoCalculos(calculos) {
+  if (!calculos?.length) return '';
+  const linhas = calculos.map(
+    (c) => `- ${c.item}: ${c.valor != null ? `R$ ${c.valor.toFixed(2)}` : '—'} (${c.memoria})`
+  );
+  return `\n\nCÁLCULOS DETERMINÍSTICOS (feitos por código, matematicamente exatos — USE EXATAMENTE estes valores no texto e nos pedidos; NÃO faça aritmética própria nem altere estes números. Some-os para compor o VALOR DA CAUSA, respeitando o teto de R$ 400.000,00):\n${linhas.join('\n')}`;
+}
+
 // Geração adaptando o MODELO PADRÃO (HTML formatado), preservando o estilo.
-export function buildGeracaoPadraoPrompt({ texto, attrs, modeloHtml, dadosReceita, dadosCep, dadosDatajud }) {
+export function buildGeracaoPadraoPrompt({ texto, attrs, modeloHtml, calculos, dadosReceita, dadosCep, dadosDatajud }) {
   return `${PROMPT_SISTEMA_PETICAO}
 
 REGRA PRINCIPAL — ADAPTE O MODELO PADRÃO MANTENDO O ESTILO: abaixo está o MODELO PADRÃO do escritório em HTML (com a formatação, o layout e o texto-padrão corretos, podendo conter marcadores como {{VARIAVEL}}). Sua tarefa é ADAPTAR este HTML ao caso atual:
@@ -600,7 +611,7 @@ ${modeloHtml}
 ${texto || '(ver documentos anexados)'}
 
 Atributos detectados: função=${attrs?.funcao || '-'}, modalidade=${attrs?.tipo_dispensa || '-'}, rito=${attrs?.rito || '-'}, tomadora=${attrs?.tem_tomadora ? 'sim' : 'não'}.
-=== FIM DA ENTREVISTA ===${blocoReceita(dadosReceita)}${blocoCeps(dadosCep)}${blocoDatajud(dadosDatajud)}
+=== FIM DA ENTREVISTA ===${blocoReceita(dadosReceita)}${blocoCeps(dadosCep)}${blocoDatajud(dadosDatajud)}${blocoCalculos(calculos)}
 
 FORMATO DE SAÍDA: retorne APENAS o HTML adaptado do corpo da petição (sem <html>, <head> ou <body>), PRESERVANDO a formatação/estilo do modelo. Ao final, acrescente exatamente:
 <p><em>⚠️ Minuta gerada por IA a partir do modelo padrão — revisão obrigatória pelo advogado responsável.</em></p>`;
@@ -634,17 +645,24 @@ export async function gerarPecaPadrao({ texto, fileUrls, attrs, modeloPadrao, on
     const termos = montarTermosDatajud(attrs);
     if (termos.length) notify(`Consultando DataJud/CNJ (${config.datajud_tribunal || 'trt2'}): ${termos.join(', ')}...`);
   }
-  const [dadosReceita, dadosCep, dadosDatajud] = await Promise.all([
+  // Extração estruturada do caso (parser) para alimentar o cálculo determinístico.
+  if (texto && texto.trim()) notify('Extraindo dados do caso e calculando verbas (determinístico)...');
+  const [dadosReceita, dadosCep, dadosDatajud, caso] = await Promise.all([
     enriquecerCnpjs(cnpjs),
     enriquecerCeps(ceps),
     enriquecerDatajud(attrs, config),
+    texto && texto.trim() ? extrairCasoDeTexto(texto).catch(() => ({})) : Promise.resolve({}),
   ]);
+
+  // Cálculo 100% determinístico (a IA não faz aritmética).
+  const calculos = calcularVerbasCaso(caso || {});
 
   const req = {
     prompt: buildGeracaoPadraoPrompt({
       texto,
       attrs,
       modeloHtml: modeloPadrao?.html || '',
+      calculos,
       dadosReceita,
       dadosCep,
       dadosDatajud,
@@ -659,6 +677,8 @@ export async function gerarPecaPadrao({ texto, fileUrls, attrs, modeloPadrao, on
     dadosReceita,
     dadosCep,
     dadosDatajud,
+    calculos,
+    caso,
   };
 }
 
