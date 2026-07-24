@@ -85,6 +85,20 @@ export async function listarModelosAtivos() {
   return todos.filter((m) => m.ativo !== false);
 }
 
+// Texto integral (anonimizado) do modelo: busca do arquivo hospedado (conteudo_url)
+// e cai para a prévia inline / resumo se não houver.
+export async function carregarTextoModelo(modelo) {
+  if (modelo?.conteudo_url) {
+    try {
+      const r = await fetch(modelo.conteudo_url);
+      if (r.ok) return await r.text();
+    } catch (e) {
+      /* cai para o fallback */
+    }
+  }
+  return modelo?.conteudo || modelo?.resumo || '';
+}
+
 // ============================================================
 // Passo 1: extrair atributos estruturados da entrevista (IA)
 // ============================================================
@@ -514,18 +528,18 @@ REVISÃO FINAL (garantir antes de responder):
 REGRAS DE DADOS:
 - Use SOMENTE dados da entrevista/documentos do caso atual. Onde faltar um dado, insira marcador entre colchetes (ex.: [SALÁRIO], [DATA DE ADMISSÃO]). NÃO invente fatos nem valores. NÃO narre etapas, verificações ou alterações.`;
 
-export function buildGeracaoPrompt({ texto, attrs, modelo, dadosReceita, dadosCep, dadosDatajud }) {
+export function buildGeracaoPrompt({ texto, attrs, modelo, textoModelo, dadosReceita, dadosCep, dadosDatajud }) {
   return `${PROMPT_SISTEMA_PETICAO}
 
-REGRA PRINCIPAL — SIGA O MODELO À RISCA: sua tarefa é PREENCHER o MODELO DE REFERÊNCIA abaixo, NÃO reescrevê-lo. Mantenha EXATAMENTE os mesmos tópicos, na mesma ORDEM, com os MESMOS textos-padrão e a MESMA fundamentação jurídica (súmulas e artigos), reproduzindo o texto fixo do modelo praticamente palavra por palavra. Altere SOMENTE os dados do caso atual (partes, datas, função, salário, valores, fatos concretos) e inclua ou exclua apenas os TÓPICOS CONEXOS conforme o caso exigir. NÃO parafraseie, NÃO resuma e NÃO crie uma redação nova para as partes padrão. Onde o modelo tiver marcadores como [RECLAMANTE], [CPF], [CNPJ], [DATA DE ADMISSÃO], substitua pelos dados do caso; se um dado faltar, mantenha um marcador claro entre colchetes. Os dados pessoais são SEMPRE os do caso atual — nunca reaproveite partes/valores de outro processo do modelo.${modelo.arquivo_url ? '\n\nO DOCUMENTO ORIGINAL DO MODELO ESTÁ ANEXADO a esta requisição — trate-o como o TEXTO-BASE e reproduza-o fielmente, apenas preenchendo os dados do caso.' : ''}
+REGRA PRINCIPAL — SIGA O MODELO À RISCA: sua tarefa é PREENCHER o MODELO DE REFERÊNCIA abaixo, NÃO reescrevê-lo. Mantenha EXATAMENTE os mesmos tópicos, na mesma ORDEM, com os MESMOS textos-padrão e a MESMA fundamentação jurídica (súmulas e artigos), reproduzindo o texto fixo do modelo praticamente palavra por palavra. Altere SOMENTE os dados do caso atual (partes, datas, função, salário, valores, fatos concretos) e inclua ou exclua apenas os TÓPICOS CONEXOS conforme o caso exigir. NÃO parafraseie, NÃO resuma e NÃO crie uma redação nova para as partes padrão. Onde o modelo tiver marcadores como [RECLAMANTE], [CPF], [CNPJ], [DATA DE ADMISSÃO], substitua pelos dados do caso; se um dado faltar, mantenha um marcador claro entre colchetes. Os dados pessoais são SEMPRE os do caso atual — nunca reaproveite partes/valores de outro processo do modelo.
 
 === MODELO DE REFERÊNCIA: ${modelo.titulo} ===
 Rito: ${modelo.rito || '-'} | Modalidade: ${TIPO_DISPENSA_LABELS[modelo.tipo_dispensa] || modelo.tipo_dispensa || '-'} | Comarca: ${modelo.comarca_uf || '-'} (${modelo.regiao_trt || '-'})
 Esqueleto de tópicos (base — ajuste os tópicos conexos ao caso):
 ${(modelo.secoes || []).map((s) => `- ${s}`).join('\n')}
 
-Referência de teses e fundamentos:
-${modelo.conteudo || modelo.resumo || ''}
+TEXTO DO MODELO (anonimizado — reproduza FIELMENTE, preenchendo os marcadores [ ] com os dados do caso atual):
+${textoModelo || modelo.conteudo || modelo.resumo || ''}
 === FIM DO MODELO ===
 
 === ENTREVISTA / CASO ATUAL ===
@@ -550,12 +564,16 @@ export async function gerarPeca({ texto, fileUrls, attrs, modelo }) {
     enriquecerDatajud(attrs, config),
   ]);
 
+  const textoModelo = await carregarTextoModelo(modelo);
+
   const req = {
-    prompt: buildGeracaoPrompt({ texto, attrs, modelo, dadosReceita, dadosCep, dadosDatajud }),
+    prompt: buildGeracaoPrompt({ texto, attrs, modelo, textoModelo, dadosReceita, dadosCep, dadosDatajud }),
     model: 'claude_sonnet_4_6',
   };
+  // Anexa apenas os documentos da ENTREVISTA. O DOCX original do modelo NÃO é
+  // enviado à IA (contém dados pessoais reais de outro processo); usamos o
+  // texto anonimizado (textoModelo) como base.
   const urls = [...(fileUrls || [])];
-  if (modelo.arquivo_url) urls.push(modelo.arquivo_url);
   if (urls.length) req.file_urls = urls;
   const resultado = await base44.integrations.Core.InvokeLLM(req);
   return {
