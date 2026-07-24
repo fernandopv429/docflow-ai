@@ -517,7 +517,7 @@ REGRAS DE DADOS:
 export function buildGeracaoPrompt({ texto, attrs, modelo, dadosReceita, dadosCep, dadosDatajud }) {
   return `${PROMPT_SISTEMA_PETICAO}
 
-Use o MODELO DE REFERÊNCIA abaixo (uma peça correta já aprovada pelo escritório) como guia de ESTRUTURA, ORDEM DOS TÓPICOS, TESES e FUNDAMENTAÇÃO JURÍDICA (súmulas e artigos). NÃO copie dados pessoais, nomes de partes, CPF, endereços ou valores do modelo — ele é de OUTRO processo e serve apenas como forma e argumentação.
+REGRA PRINCIPAL — SIGA O MODELO À RISCA: sua tarefa é PREENCHER o MODELO DE REFERÊNCIA abaixo, NÃO reescrevê-lo. Mantenha EXATAMENTE os mesmos tópicos, na mesma ORDEM, com os MESMOS textos-padrão e a MESMA fundamentação jurídica (súmulas e artigos), reproduzindo o texto fixo do modelo praticamente palavra por palavra. Altere SOMENTE os dados do caso atual (partes, datas, função, salário, valores, fatos concretos) e inclua ou exclua apenas os TÓPICOS CONEXOS conforme o caso exigir. NÃO parafraseie, NÃO resuma e NÃO crie uma redação nova para as partes padrão. Onde o modelo tiver marcadores como [RECLAMANTE], [CPF], [CNPJ], [DATA DE ADMISSÃO], substitua pelos dados do caso; se um dado faltar, mantenha um marcador claro entre colchetes. Os dados pessoais são SEMPRE os do caso atual — nunca reaproveite partes/valores de outro processo do modelo.${modelo.arquivo_url ? '\n\nO DOCUMENTO ORIGINAL DO MODELO ESTÁ ANEXADO a esta requisição — trate-o como o TEXTO-BASE e reproduza-o fielmente, apenas preenchendo os dados do caso.' : ''}
 
 === MODELO DE REFERÊNCIA: ${modelo.titulo} ===
 Rito: ${modelo.rito || '-'} | Modalidade: ${TIPO_DISPENSA_LABELS[modelo.tipo_dispensa] || modelo.tipo_dispensa || '-'} | Comarca: ${modelo.comarca_uf || '-'} (${modelo.regiao_trt || '-'})
@@ -534,7 +534,7 @@ ${texto || '(ver documentos anexados)'}
 Atributos detectados: função=${attrs?.funcao || '-'}, modalidade=${attrs?.tipo_dispensa || '-'}, rito=${attrs?.rito || '-'}, tomadora=${attrs?.tem_tomadora ? 'sim' : 'não'}.
 === FIM DA ENTREVISTA ===${blocoReceita(dadosReceita)}${blocoCeps(dadosCep)}${blocoDatajud(dadosDatajud)}
 
-FORMATO DE SAÍDA: retorne APENAS o HTML do corpo da petição (sem <html>, <head> ou <body>), pronto para formatação. Use <h2> para o título de cada tópico (ex.: <h2>DAS HORAS EXTRAS</h2>) e <p style="text-align: justify"> para os parágrafos. Comece direto pelo endereçamento ao Juízo (sem nome/letreiro do escritório antes). Inclua a qualificação das partes, os fatos, o direito (um tópico por tese cabível, seguindo a ordem), os cálculos/valor da causa e o fecho com a assinatura do Dr. Fernando Andrade Vieira — OAB/SP nº 320.825. Ao final, acrescente exatamente:
+FORMATO DE SAÍDA: retorne APENAS o HTML do corpo da petição (sem <html>, <head> ou <body>), pronto para formatação. Use <h2> para o título de cada tópico (ex.: <h2>DAS HORAS EXTRAS</h2>) e <p style="text-align: justify"> para os parágrafos. Comece direto pelo endereçamento ao Juízo (sem nome/letreiro do escritório antes). Inclua a qualificação das partes, os fatos, o direito (um tópico por tese cabível, seguindo a ordem e reproduzindo o texto-padrão do modelo), os cálculos/valor da causa e o fecho com a assinatura do Dr. Fernando Andrade Vieira — OAB/SP nº 320.825. Ao final, acrescente exatamente:
 <p><em>⚠️ Minuta gerada por IA a partir de modelo de referência — revisão obrigatória pelo advogado responsável.</em></p>`;
 }
 
