@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { ArrowLeft, Loader2, Upload, Library, CheckCircle2, AlertCircle, FileText, SlidersHorizontal } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { TIPO_DISPENSA_LABELS } from '@/lib/trabalhista/tokens';
-import { extrairTextoDocx, classificarTextoModelo } from '@/lib/trabalhista/modelosReferencia';
+import { extrairTextoDocx, classificarTextoModelo, resumirDiferencial } from '@/lib/trabalhista/modelosReferencia';
 
 const RITO_LABEL = { ordinario: 'Ordinário', sumarissimo: 'Sumaríssimo' };
 
@@ -65,20 +65,15 @@ export default function ModelosReferencia() {
       const atuais = await base44.entities.ModeloReferencia.list('-updated_date', 100);
       for (const file of files) {
         const textoAnon = await extrairTextoDocx(file); // texto já anonimizado
-        // Texto integral vai para arquivo hospedado (o campo da entidade tem limite de tamanho).
-        const anonFile = new File(
-          [textoAnon],
-          `${file.name.replace(/\.docx$/i, '')}-anon.txt`,
-          { type: 'text/plain' }
-        );
-        const [anon, orig] = await Promise.all([
-          base44.integrations.Core.UploadFile({ file: anonFile }),
+        // Distila só o DIFERENCIAL (o que é particular) — o texto padrão comum não é guardado.
+        const [{ file_url: docxUrl }, diferencial] = await Promise.all([
           base44.integrations.Core.UploadFile({ file }),
+          resumirDiferencial(textoAnon).catch(() => ''),
         ]);
         const dados = {
-          conteudo_url: anon.file_url,        // texto integral anonimizado (usado na geração)
-          arquivo_url: orig.file_url,         // DOCX original (arquivo/referência; não vai à IA)
-          conteudo: (textoAnon || '').slice(0, 1500), // prévia curta
+          arquivo_url: docxUrl,               // DOCX original (arquivo/referência; não vai à IA)
+          diferencial,                        // o que é PARTICULAR deste modelo (usado na geração)
+          conteudo: (textoAnon || '').slice(0, 1500), // prévia curta (anonimizada)
           resumo: '',                         // remove o resumo antigo
         };
         const match = atuais.find((m) => norm(m.arquivo_nome) === norm(file.name));
@@ -144,8 +139,9 @@ export default function ModelosReferencia() {
 
         <div className="bg-[#e8f0fe] border border-[#c6dafc] rounded-xl p-4 text-xs text-[#3c4043]">
           Você pode enviar <strong>vários .docx de uma vez</strong>. O texto é <strong>anonimizado</strong> automaticamente
-          (nomes, CPF, RG, PIS, endereços) e vira o texto-base do modelo. Arquivos com o mesmo nome de um modelo existente
-          o <strong>atualizam</strong> (removendo o resumo antigo); os demais <strong>criam novos modelos</strong>.
+          (nomes, CPF, RG, PIS, endereços) e o sistema guarda apenas o <strong>diferencial</strong> — o que é particular de
+          cada peça — usado para orientar a IA quando um caso semelhante aparece. Arquivos com o mesmo nome de um modelo
+          existente o <strong>atualizam</strong>; os demais <strong>criam novos modelos</strong>.
         </div>
 
         {config && (
