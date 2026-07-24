@@ -33,7 +33,14 @@ export function extractVariables(content) {
 
 export function highlightVariablesInHtml(html, values) {
   if (!html) return '';
-  let result = html;
+  const flags = {};
+  for (const [k, v] of Object.entries(values || {})) {
+    if (typeof v === 'boolean') flags[k] = v;
+  }
+  // Resolve blocos condicionais ANTES de destacar tokens — evita mostrar
+  // "{{#if T_X}}" cru quando o template tem blocos condicionais (ex.: o
+  // Modelo Padrão trabalhista, que varia conforme a modalidade de rescisão).
+  let result = applyConditionals(html, flags);
   const regex = /\{\{([A-Z0-9_]+)\}\}/g;
   result = result.replace(regex, (match, name) => {
     const value = values?.[name];
