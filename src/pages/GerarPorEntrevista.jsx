@@ -6,6 +6,7 @@ import {
 import { base44 } from '@/api/base44Client';
 import { exportToDocx } from '@/lib/exportDocx';
 import { TIPO_DISPENSA_LABELS } from '@/lib/trabalhista/tokens';
+import { formatBRL } from '@/lib/trabalhista/mathUtils';
 import {
   carregarModeloPadrao,
   conversarEntrevista,
@@ -43,7 +44,7 @@ export default function GerarPorEntrevista() {
     setGenerating(true);
     setMessages((m) => [...m, { role: 'tool', text: `Usando modelo padrão: ${modeloPadrao.titulo}` }]);
     try {
-      const { html, dadosReceita } = await gerarPecaPadrao({
+      const { html, dadosReceita, calculos } = await gerarPecaPadrao({
         texto: opts.texto ?? userText,
         fileUrls: opts.urls ?? allUrls,
         attrs: opts.attrs ?? attrs,
@@ -57,6 +58,10 @@ export default function GerarPorEntrevista() {
         : 'Minuta gerada com base no modelo padrão. Veja o documento ao lado.';
       if (verificados.length) {
         nota += ` CNPJ(s) confirmado(s) na Receita: ${verificados.map((d) => `${d.razao_social} (${d.cnpj})`).join('; ')}.`;
+      }
+      const comValor = (calculos || []).filter((c) => c.valor != null);
+      if (comValor.length) {
+        nota += `\n\nCálculos determinísticos (por código, sem IA):\n${comValor.map((c) => `• ${c.item}: ${formatBRL(c.valor)}`).join('\n')}`;
       }
       setMessages((m) => [...m, { role: 'assistant', text: nota }]);
     } catch (err) {
