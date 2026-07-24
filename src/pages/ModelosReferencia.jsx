@@ -73,7 +73,9 @@ export default function ModelosReferencia() {
         const { file_url } = await base44.integrations.Core.UploadFile({ file });
         await base44.entities.ModeloReferencia.update(match.id, {
           arquivo_url: file_url,
-          conteudo: conteudo || match.conteudo,
+          // Texto integral anonimizado substitui o resumo; limitado para caber na entidade.
+          // A fidelidade total é garantida pelo DOCX anexado (arquivo_url), lido pela IA.
+          conteudo: (conteudo || match.conteudo || '').slice(0, 45000),
         });
         anexados++;
       }
