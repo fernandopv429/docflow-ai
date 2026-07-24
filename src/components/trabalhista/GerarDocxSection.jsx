@@ -33,12 +33,15 @@ export default function GerarDocxSection({ caso, onGerado }) {
       const derived = deriveTokens(caso);
       const values = { ...(caso.analise_json?.tokens || {}) };
       for (const [k, v] of Object.entries(derived)) {
-        if (typeof v === 'boolean') continue;
+        // Flags booleanas (T_DISPENSA, T_INDIRETA, T_COACAO, T_REVERSAO, T_ACORDO, tem_ft,
+        // tem_dano_moral) SEMPRE vêm da derivação determinística (nunca da IA) e alimentam
+        // os blocos {{#if}} do Modelo Padrão — não podem ser descartadas.
+        if (typeof v === 'boolean') { values[k] = v; continue; }
         if (v) values[k] = v;
       }
-      // Sanitização: rejeita valores inválidos ("SIM", "N/A", etc.)
+      // Sanitização: rejeita valores inválidos ("SIM", "N/A", etc.) apenas em campos de texto
       for (const k of Object.keys(values)) {
-        if (typeof values[k] === 'boolean') { delete values[k]; continue; }
+        if (typeof values[k] === 'boolean') continue; // preservada para os condicionais
         values[k] = String(values[k] ?? '');
         if (valorInvalido(values[k])) values[k] = '';
       }
