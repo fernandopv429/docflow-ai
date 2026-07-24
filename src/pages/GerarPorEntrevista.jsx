@@ -24,7 +24,6 @@ export default function GerarPorEntrevista() {
   const [allUrls, setAllUrls] = useState([]);
   const [modeloPadrao, setModeloPadrao] = useState(null);
   const [attrs, setAttrs] = useState(null);
-  const [comTimbrado, setComTimbrado] = useState(true);
 
   // Documento vivo (painel à direita)
   const [docHtml, setDocHtml] = useState('');
@@ -143,7 +142,7 @@ export default function GerarPorEntrevista() {
   const exportar = async () => {
     if (!docHtml) return;
     try {
-      await exportToDocx(docHtml, null, 'Minuta - petição inicial', { comTimbrado });
+      await exportToDocx(docHtml, null, 'Minuta - petição inicial');
     } catch (err) {
       console.error(err);
     }
@@ -303,10 +302,6 @@ export default function GerarPorEntrevista() {
                 <RefreshCw className="w-3 h-3 animate-spin" /> atualizando
               </span>
             )}
-            <label className="flex items-center gap-1.5 text-xs text-[#3c4043] cursor-pointer select-none ml-2">
-              <input type="checkbox" checked={comTimbrado} onChange={(e) => setComTimbrado(e.target.checked)} className="w-4 h-4 accent-[#1a73e8]" />
-              Timbrado
-            </label>
             <button
               onClick={exportar}
               disabled={!docHtml}
