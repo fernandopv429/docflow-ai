@@ -178,11 +178,11 @@ async function carregarLogoInternaBytes() {
   return new Uint8Array(await response.arrayBuffer());
 }
 
-function buildHeader(logoBytes, width, height) {
+function buildHeader(logoBytes, width, height, alignment = AlignmentType.CENTER) {
   return new Header({
     children: [
       new Paragraph({
-        alignment: AlignmentType.CENTER,
+        alignment,
         children: logoBytes ? [new ImageRun({ data: logoBytes, transformation: { width, height }, type: 'png' })] : [new TextRun({ text: TIMBRADO.escritorio, bold: true, font: 'Arial', size: 20 })],
       }),
       new Paragraph({ children: [], border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: '000000', space: 4 } } }),
@@ -248,7 +248,7 @@ export async function exportToDocx(html, variables, title) {
   const logoPrimeiraPagina = carregarLogoBytes();
   const logoPaginasInternas = await carregarLogoInternaBytes();
   const firstHeader = buildHeader(logoPrimeiraPagina, 220, 44);
-  const defaultHeader = buildHeader(logoPaginasInternas, 100, 86);
+  const defaultHeader = buildHeader(logoPaginasInternas, 100, 86, AlignmentType.RIGHT);
   const footer = buildFooter();
 
   const docx = new Document({

@@ -241,6 +241,7 @@
   top: 12px;
   height: 104px;
   background-image: url('https://media.base44.com/images/public/6a5a44d24aa52c9fbdd61b1a/fec36cb66_image.png');
+  background-position: right top;
   background-size: 100px 86px;
 }
 .legal-document-review section.docx::after {
