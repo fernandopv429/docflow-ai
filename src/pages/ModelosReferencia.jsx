@@ -166,15 +166,15 @@ export default function ModelosReferencia() {
         </div>
 
         <div className="bg-white border border-[#dadce0] rounded-xl p-4">
-          <h2 className="text-sm font-semibold text-[#202124] mb-1">Modelo padrão da minuta</h2>
-          <p className="text-xs text-[#5f6368] mb-3">Este modelo será usado como estrutura principal em todas as novas gerações.</p>
+          <h2 className="text-sm font-semibold text-[#202124] mb-1">Template principal da minuta</h2>
+          <p className="text-xs text-[#5f6368] mb-3">Define a estrutura principal. O modelo de referência mais aderente continua sendo selecionado automaticamente para cada caso.</p>
           {templates.length ? (
             <select
               value={templates.find((template) => template.is_default)?.id || ''}
               onChange={(e) => salvarModeloPadrao(e.target.value)}
               className="w-full rounded-lg border border-[#dadce0] bg-white px-3 py-2 text-sm text-[#202124] focus:border-[#1a73e8] focus:outline-none"
             >
-              <option value="" disabled>Selecione o modelo padrão</option>
+              <option value="" disabled>Selecione o template principal</option>
               {templates.map((template) => (
                 <option key={template.id} value={template.id}>{template.title}</option>
               ))}

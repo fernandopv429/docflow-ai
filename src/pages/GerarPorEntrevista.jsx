@@ -84,7 +84,7 @@ export default function GerarPorEntrevista() {
   const gerarMinuta = async (opts = {}) => {
     if (!modeloPadrao || generating) return;
     setGenerating(true);
-    setMessages((m) => [...m, { role: 'tool', text: `Usando modelo padrão: ${modeloPadrao.titulo}` }]);
+    setMessages((m) => [...m, { role: 'tool', text: `Usando template principal: ${modeloPadrao.titulo}` }]);
     try {
       const geracaoTexto = opts.texto ?? userText;
       const { html, dadosReceita, dadosCep, dadosDatajud, calculos, caso, modeloSemelhante } = await gerarPecaPadrao({
@@ -254,7 +254,7 @@ export default function GerarPorEntrevista() {
 
       {/* Barra do modelo padrão */}
       <div className="flex flex-wrap items-center gap-2 px-6 py-2 border-b border-[#f1f3f4] bg-white flex-shrink-0">
-        <span className="text-xs text-[#5f6368]">Modelo padrão:</span>
+        <span className="text-xs text-[#5f6368]">Template principal:</span>
         <span className="text-xs font-medium text-[#202124] truncate max-w-[420px]">
           {modeloPadrao?.titulo || 'carregando...'}
         </span>
