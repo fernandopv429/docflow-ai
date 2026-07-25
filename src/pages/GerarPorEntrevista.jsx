@@ -255,7 +255,12 @@ export default function GerarPorEntrevista() {
     if (!docHtml || !reviewConfirmed || exporting) return;
     setExporting(true);
     try {
-      await exportToDocx(docHtml, null, 'Minuta - petição inicial');
+      const validacao = await exportToDocx(docHtml, null, 'Minuta - petição inicial');
+      setMessages((m) => [...m, {
+        role: 'tool_result',
+        title: 'Validação da exportação DOCX',
+        text: JSON.stringify(validacao, null, 2),
+      }]);
     } catch (err) {
       console.error(err);
       window.alert(`Não foi possível exportar o documento: ${err?.message || 'erro desconhecido'}`);

@@ -23,15 +23,26 @@ import { sessionTrace } from './sessionTrace';
 // ---------- Utilitarios de parsing HTML -> docx ----------
 
 function getAlignment(el) {
-  const style = (el.getAttribute && el.getAttribute('style')) || '';
-  if (style.includes('text-align: center')) return AlignmentType.CENTER;
-  if (style.includes('text-align: right')) return AlignmentType.RIGHT;
-  if (style.includes('text-align: justify')) return AlignmentType.JUSTIFIED;
+  const alignment = cssValues(el)['text-align'];
+  if (alignment === 'center') return AlignmentType.CENTER;
+  if (alignment === 'right' || alignment === 'end') return AlignmentType.RIGHT;
+  if (alignment === 'justify') return AlignmentType.JUSTIFIED;
   return AlignmentType.LEFT;
 }
 
+const COMPUTED_STYLE_KEYS = [
+  'font-family', 'font-size', 'font-weight', 'font-style', 'color', 'text-decoration',
+  'text-align', 'text-indent', 'margin-left', 'margin-right', 'margin-top', 'margin-bottom',
+  'line-height', 'page-break-before', 'page-break-after', 'break-before', 'break-after',
+  'vertical-align',
+];
+
 function cssValues(el) {
   const values = {};
+  if (el?.isConnected && typeof window !== 'undefined') {
+    const computed = window.getComputedStyle(el);
+    COMPUTED_STYLE_KEYS.forEach((key) => { values[key] = computed.getPropertyValue(key); });
+  }
   const raw = (el?.getAttribute && el.getAttribute('style')) || '';
   raw.split(';').forEach((part) => {
     const index = part.indexOf(':');
@@ -40,9 +51,26 @@ function cssValues(el) {
   return values;
 }
 
-function pt(value) {
+function cssNumber(value) {
   const match = String(value || '').match(/-?[\d.]+/);
   return match ? Number(match[0]) : undefined;
+}
+
+function toTwips(value) {
+  const number = cssNumber(value);
+  if (!Number.isFinite(number)) return undefined;
+  const unit = String(value || '').toLowerCase();
+  if (unit.includes('px')) return Math.round(number * 15);
+  if (unit.includes('cm')) return Math.round(number * 567);
+  if (unit.includes('mm')) return Math.round(number * 56.7);
+  if (unit.includes('in')) return Math.round(number * 1440);
+  return Math.round(number * 20);
+}
+
+function toHalfPoints(value) {
+  const number = cssNumber(value);
+  if (!Number.isFinite(number)) return undefined;
+  return Math.round(number * (String(value || '').toLowerCase().includes('px') ? 1.5 : 2));
 }
 
 function docxColor(value, fallback) {
@@ -58,14 +86,18 @@ function docxColor(value, fallback) {
 
 function inlineStyle(el, inherited = {}) {
   const css = cssValues(el);
-  const size = pt(css['font-size']);
+  const decoration = css['text-decoration'] || '';
+  const verticalAlign = css['vertical-align'];
   return {
     ...inherited,
     font: css['font-family']?.replace(/["']/g, '').split(',')[0] || inherited.font || 'Arial',
-    size: size ? Math.round(size * 2) : inherited.size || 24,
+    size: toHalfPoints(css['font-size']) || inherited.size || 24,
     bold: /bold|[6-9]00/.test(css['font-weight'] || '') || inherited.bold || false,
     italics: css['font-style'] === 'italic' || inherited.italics || false,
-    underline: (css['text-decoration'] || '').includes('underline') || inherited.underline || false,
+    underline: decoration.includes('underline') || inherited.underline || false,
+    strike: decoration.includes('line-through') || inherited.strike || false,
+    subScript: verticalAlign === 'sub' || inherited.subScript || false,
+    superScript: verticalAlign === 'super' || inherited.superScript || false,
     color: docxColor(css.color, inherited.color),
   };
 }
@@ -81,6 +113,9 @@ function processInlineNodes(node, style = {}) {
         bold: style.bold || false,
         italics: style.italics || false,
         color: style.color,
+        strike: style.strike || false,
+        subScript: style.subScript || false,
+        superScript: style.superScript || false,
         underline: style.underline ? { type: UnderlineType.SINGLE } : undefined,
       }));
     } else if (child.nodeType === Node.ELEMENT_NODE) {
@@ -89,6 +124,9 @@ function processInlineNodes(node, style = {}) {
       if (tag === 'strong' || tag === 'b') next.bold = true;
       if (tag === 'em' || tag === 'i') next.italics = true;
       if (tag === 'u') next.underline = true;
+      if (tag === 's' || tag === 'strike' || tag === 'del') next.strike = true;
+      if (tag === 'sub') next.subScript = true;
+      if (tag === 'sup') next.superScript = true;
       if (tag === 'br') { runs.push(new TextRun({ break: 1 })); continue; }
       runs.push(...processInlineNodes(child, next));
     }
@@ -128,12 +166,15 @@ function buildTable(tableEl) {
 }
 
 function isPageBreak(el) {
-  const style = (el.getAttribute && el.getAttribute('style')) || '';
-  return style.includes('page-break-after') || style.includes('page-break-before');
+  const css = cssValues(el);
+  return ['always', 'page'].includes(css['page-break-before']) ||
+    ['always', 'page'].includes(css['page-break-after']) ||
+    css['break-before'] === 'page' || css['break-after'] === 'page';
 }
 
 function processBlock(block, out, state) {
   const tag = block.tagName ? block.tagName.toLowerCase() : '';
+  if (!tag || ['style', 'script', 'meta', 'link'].includes(tag)) return;
   const css = cssValues(block);
 
   if (tag === 'section' && block.classList?.contains('docx')) {
@@ -164,19 +205,29 @@ function processBlock(block, out, state) {
 
   const heading = ['h1', 'h2', 'h3'].includes(tag);
   const runs = processInlineNodes(block, inlineStyle(block, { bold: heading }));
-  const firstLine = pt(css['text-indent']);
-  const left = pt(css['margin-left']);
-  const right = pt(css['margin-right']);
-  const lineHeight = Number.parseFloat(css['line-height']);
+  const firstLine = toTwips(css['text-indent']);
+  const left = toTwips(css['margin-left']);
+  const right = toTwips(css['margin-right']);
+  const before = toTwips(css['margin-top']);
+  const after = toTwips(css['margin-bottom']);
+  const lineHeight = cssNumber(css['line-height']);
+  const fontSize = cssNumber(css['font-size']);
+  const lineRatio = lineHeight && fontSize ? lineHeight / fontSize : undefined;
+  const alignment = getAlignment(block);
   out.push(new Paragraph({
     children: runs,
-    alignment: getAlignment(block) === AlignmentType.LEFT ? AlignmentType.JUSTIFIED : getAlignment(block),
+    alignment: alignment === AlignmentType.LEFT ? AlignmentType.JUSTIFIED : alignment,
+    keepNext: heading,
     indent: {
-      ...(firstLine ? { firstLine: Math.round(firstLine * 20) } : {}),
-      ...(left ? { left: Math.round(left * 20) } : {}),
-      ...(right ? { right: Math.round(right * 20) } : {}),
+      ...(firstLine ? { firstLine } : {}),
+      ...(left ? { left } : {}),
+      ...(right ? { right } : {}),
     },
-    spacing: { after: 0, ...(lineHeight ? { line: Math.round(lineHeight * 240) } : {}) },
+    spacing: {
+      before: before || 0,
+      after: after || 0,
+      ...(lineRatio ? { line: Math.round(lineRatio * 240) } : {}),
+    },
   }));
 }
 
@@ -224,7 +275,21 @@ function buildFooter() {
   });
 }
 
-// ---------- Export principal ----------
+// ---------- Validação e exportação principal ----------
+
+async function validarDocx(blob) {
+  if (!(blob instanceof Blob) || blob.size < 1000) throw new Error('O arquivo DOCX gerado está vazio ou incompleto.');
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  const zipValido = bytes[0] === 0x50 && bytes[1] === 0x4b && bytes[2] === 0x03 && bytes[3] === 0x04;
+  if (!zipValido) throw new Error('O arquivo gerado não possui uma estrutura DOCX válida.');
+  const conteudoBinario = new TextDecoder('latin1').decode(bytes);
+  if (!conteudoBinario.includes('[Content_Types].xml') || !conteudoBinario.includes('word/document.xml')) {
+    throw new Error('O pacote DOCX não contém os componentes obrigatórios do documento.');
+  }
+  const possuiDiretorioCentral = conteudoBinario.includes('PK\u0001\u0002') && conteudoBinario.includes('PK\u0005\u0006');
+  if (!possuiDiretorioCentral) throw new Error('O pacote DOCX foi criado de forma incompleta.');
+  return { valido: true, tamanho_bytes: blob.size, estrutura: 'DOCX/ZIP íntegra' };
+}
 
 export async function exportToDocx(html, variables, title) {
   let processed = html || '';
@@ -249,14 +314,21 @@ export async function exportToDocx(html, variables, title) {
     });
   }
 
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(processed, 'text/html');
-  const children = [];
+  const renderedRoot = document.createElement('div');
+  renderedRoot.className = 'doc-preview';
+  renderedRoot.setAttribute('aria-hidden', 'true');
+  renderedRoot.style.cssText = 'position:fixed;left:-100000px;top:0;width:794px;visibility:hidden;pointer-events:none;';
+  renderedRoot.innerHTML = processed;
+  document.body.appendChild(renderedRoot);
 
+  const children = [];
   const state = { pageCount: 0 };
-  for (const block of doc.body.children) {
-    processBlock(block, children, state);
+  try {
+    for (const block of renderedRoot.children) processBlock(block, children, state);
+  } finally {
+    renderedRoot.remove();
   }
+  if (!children.length) throw new Error('O documento não possui conteúdo exportável.');
 
   const logos = await Promise.allSettled([
     carregarImagemBytes(LOGO_PRIMEIRA_PAGINA),
@@ -303,12 +375,19 @@ export async function exportToDocx(html, variables, title) {
   });
 
   const blob = await Packer.toBlob(docx);
+  const validacao = await validarDocx(blob);
+  sessionTrace({
+    level: 'info', category: 'Exportação', status: 'VALIDADO',
+    title: 'DOCX criado e validado antes do download', details: validacao,
+  });
+
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `${title || 'documento'}.docx`;
+  a.download = `${String(title || 'documento').replace(/[\\/:*?"<>|]/g, '-')}.docx`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  return validacao;
 }
