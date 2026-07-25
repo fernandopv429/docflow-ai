@@ -57,6 +57,22 @@ export default function ModelosReferencia() {
     }
   };
 
+  const handleTemplateUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImportando(true); setErro(null); setMsg(null);
+    try {
+      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      await salvarConfig({ template_docx_url: file_url, template_docx_nome: file.name });
+      setMsg(`Template oficial atualizado: ${file.name}`);
+    } catch (err) {
+      console.error(err);
+      setErro('Erro ao enviar o template .docx.');
+    }
+    setImportando(false);
+    e.target.value = '';
+  };
+
   const salvarModeloPadrao = async (templateId) => {
     const anteriores = templates;
     const atualizados = templates.map((template) => ({
@@ -225,6 +241,28 @@ export default function ModelosReferencia() {
                 <span className="text-[11px] text-[#9aa0a6]">ex.: trt2 (SP), trt1 (RJ), trt3 (MG), trt15 (Campinas)</span>
               </div>
             )}
+          </div>
+        )}
+
+        {config && (
+          <div className="bg-white border border-[#dadce0] rounded-xl p-4">
+            <h2 className="text-sm font-semibold text-[#202124] mb-1 flex items-center gap-2">
+              <FileText className="w-4 h-4 text-[#1a73e8]" /> Template Word oficial (.docx)
+            </h2>
+            <p className="text-xs text-[#5f6368] mb-3">
+              Modelo .docx com campos {'{{ }}'} e flags {'{{# }}'} — usado no “Exportar fiel ao modelo”, preservando 100% da formatação.
+            </p>
+            <div className="flex items-center gap-3 flex-wrap">
+              <input type="file" accept=".docx" onChange={handleTemplateUpload} className="hidden" id="tmpl-docx" />
+              <label htmlFor="tmpl-docx" className="flex items-center gap-2 px-4 py-2 border border-[#1a73e8] text-[#1a73e8] rounded-lg text-sm font-medium hover:bg-[#e8f0fe] cursor-pointer">
+                <Upload className="w-4 h-4" /> {config.template_docx_url ? 'Trocar template' : 'Enviar template'}
+              </label>
+              {config.template_docx_url ? (
+                <span className="text-xs text-green-700 flex items-center gap-1"><CheckCircle2 className="w-3.5 h-3.5" /> {config.template_docx_nome || 'template enviado'}</span>
+              ) : (
+                <span className="text-xs text-[#8a5d00]">Nenhum template enviado ainda</span>
+              )}
+            </div>
           </div>
         )}
 
