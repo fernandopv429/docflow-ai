@@ -1,14 +1,16 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  ArrowLeft, Loader2, Paperclip, Send, X, FileText, Bot, FileDown, Library, RefreshCw, CheckCircle2,
+  ArrowLeft, Loader2, Paperclip, Send, X, FileText, Bot, FileDown, Library, RefreshCw, CheckCircle2, ScrollText,
 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import ToolTraceMessage from '@/components/ToolTraceMessage';
+import SessionLogsModal from '@/components/SessionLogsModal';
 import DocumentReviewPreview from '@/components/DocumentReviewPreview';
 import { exportToDocx } from '@/lib/exportDocx';
 import { TIPO_DISPENSA_LABELS } from '@/lib/trabalhista/tokens';
 import { formatBRL } from '@/lib/trabalhista/mathUtils';
+import useConsoleLogs from '@/hooks/useConsoleLogs';
 import {
   carregarModeloPadrao,
   conversarEntrevista,
@@ -18,6 +20,8 @@ import {
 
 export default function GerarPorEntrevista() {
   const [messages, setMessages] = useState([]);
+  const [logsOpen, setLogsOpen] = useState(false);
+  const consoleLogs = useConsoleLogs();
   const [input, setInput] = useState(() => localStorage.getItem('docflow:entrevista-texto') || '');
   const [files, setFiles] = useState([]);
   const [sending, setSending] = useState(false);
@@ -231,6 +235,13 @@ export default function GerarPorEntrevista() {
             Converse à esquerda; a minuta aparece e se atualiza à direita.
           </p>
         </div>
+        <button
+          onClick={() => setLogsOpen(true)}
+          className="p-2 text-[#5f6368] hover:text-[#202124] hover:bg-[#f1f3f4] rounded-full"
+          title="Ver logs da sessão"
+        >
+          <ScrollText className="w-4 h-4" />
+        </button>
         <Link to="/modelos" className="flex items-center gap-1.5 text-xs text-[#1a73e8] hover:underline whitespace-nowrap">
           <Library className="w-3.5 h-3.5" /> Configurações
         </Link>
@@ -414,6 +425,7 @@ export default function GerarPorEntrevista() {
           </div>
         </div>
       </div>
+      <SessionLogsModal open={logsOpen} onOpenChange={setLogsOpen} messages={[...messages, ...consoleLogs]} />
     </div>
   );
 }
