@@ -210,9 +210,23 @@ function processBlock(block, out, state) {
   const right = toTwips(css['margin-right']);
   const before = toTwips(css['margin-top']);
   const after = toTwips(css['margin-bottom']);
-  const lineHeight = cssNumber(css['line-height']);
-  const fontSize = cssNumber(css['font-size']);
-  const lineRatio = lineHeight && fontSize ? lineHeight / fontSize : undefined;
+  const lineRatio = (() => {
+    const raw = css['line-height'];
+    const numero = cssNumber(raw);
+    if (!Number.isFinite(numero) || numero <= 0) return undefined;
+    let ratio;
+    if (/px|pt|cm|mm|in/i.test(String(raw))) {
+      const lhTwips = toTwips(raw);
+      const fsTwips = toTwips(css['font-size']);
+      if (!lhTwips || !fsTwips) return undefined;
+      ratio = lhTwips / fsTwips;
+    } else if (/%/.test(String(raw))) {
+      ratio = numero / 100;
+    } else {
+      ratio = numero; // multiplicador sem unidade (ex.: 1.5)
+    }
+    return Math.min(3, Math.max(1, ratio));
+  })();
   const alignment = getAlignment(block);
   out.push(new Paragraph({
     children: runs,
