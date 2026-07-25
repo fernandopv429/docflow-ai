@@ -689,7 +689,7 @@ export function limparHtmlIA(html) {
   return removeTextLetterhead(t.trim());
 }
 
-export async function gerarPecaPadrao({ texto, fileUrls, attrs, modeloPadrao, onTool, force = false }) {
+export async function gerarPecaPadrao({ texto, fileUrls, attrs, modeloPadrao, onTool }) {
   const notify = (msg) => {
     try {
       onTool?.(msg);
@@ -759,7 +759,7 @@ export async function gerarPecaPadrao({ texto, fileUrls, attrs, modeloPadrao, on
     'geracao-minuta',
     runtimeCacheKey({ prompt: req.prompt, fileUrls: urls }),
     () => traceAiCall('Geração da minuta', req, () => base44.integrations.Core.InvokeLLM(req)),
-    { onHit: () => notify('Reutilizando geração idêntica em cache...'), force }
+    { onHit: () => notify('Reutilizando geração idêntica em cache...') }
   );
   return {
     html: limparHtmlIA(resultado),

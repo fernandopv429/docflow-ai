@@ -2,14 +2,6 @@ import { sessionTrace } from '@/lib/sessionTrace';
 
 const buckets = new Map();
 
-// Invalida um namespace inteiro (sem key) ou uma chave específica.
-export function invalidateRuntimeCache(namespace, key) {
-  const bucket = buckets.get(namespace);
-  if (!bucket) return;
-  if (key === undefined) bucket.clear();
-  else bucket.delete(key);
-}
-
 export function runtimeCacheKey(value) {
   const text = typeof value === 'string' ? value : JSON.stringify(value);
   let hash = 2166136261;
@@ -21,12 +13,12 @@ export function runtimeCacheKey(value) {
 }
 
 export async function withRuntimeCache(namespace, key, loader, options = {}) {
-  const { ttlMs = 10 * 60 * 1000, onHit, force = false } = options;
+  const { ttlMs = 10 * 60 * 1000, onHit } = options;
   if (!buckets.has(namespace)) buckets.set(namespace, new Map());
   const bucket = buckets.get(namespace);
   const cached = bucket.get(key);
 
-  if (!force && cached && Date.now() - cached.createdAt < ttlMs) {
+  if (cached && Date.now() - cached.createdAt < ttlMs) {
     onHit?.();
     sessionTrace({
       category: 'Cache', title: `Cache reutilizado: ${namespace}`, status: 'HIT', durationMs: 0,
