@@ -8,6 +8,8 @@ import ToolTraceMessage from '@/components/ToolTraceMessage';
 import SessionLogsModal from '@/components/SessionLogsModal';
 import DocumentReviewPreview from '@/components/DocumentReviewPreview';
 import { exportToDocx } from '@/lib/exportDocx';
+import { exportarDocxTemplate } from '@/lib/preencherDocxTemplate';
+import { montarDadosTemplate } from '@/lib/trabalhista/dadosTemplate';
 import { TIPO_DISPENSA_LABELS } from '@/lib/trabalhista/tokens';
 import { formatBRL } from '@/lib/trabalhista/mathUtils';
 import { fontesAuditoria, fontesEntrevista, fontesGeracao } from '@/lib/trabalhista/fontesAnalise';
@@ -37,6 +39,8 @@ export default function GerarPorEntrevista() {
   const [documentSources, setDocumentSources] = useState([]);
   const [modeloPadrao, setModeloPadrao] = useState(null);
   const [attrs, setAttrs] = useState(null);
+  const [config, setConfig] = useState(null);
+  const [ultimaGeracao, setUltimaGeracao] = useState(null);
 
   // Documento vivo (painel à direita)
   const [docHtml, setDocHtml] = useState('');
@@ -44,6 +48,10 @@ export default function GerarPorEntrevista() {
 
   useEffect(() => {
     carregarModeloPadrao().then(setModeloPadrao).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    base44.entities.IntegracaoConfig.list('-updated_date', 1).then((l) => setConfig(l?.[0] || null)).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -98,6 +106,7 @@ export default function GerarPorEntrevista() {
         onTool: (msg) => setMessages((m) => [...m, { role: 'tool', text: msg }]),
       });
       setDocHtml(html);
+      setUltimaGeracao({ caso, calculos, dadosReceita });
       setReviewConfirmed(false);
       const retornos = [
         dadosReceita?.length && { role: 'tool_result', title: 'Retorno da Receita Federal (BrasilAPI)', text: JSON.stringify(dadosReceita, null, 2) },
@@ -250,6 +259,19 @@ export default function GerarPorEntrevista() {
       e.preventDefault();
       handleSend();
     }
+  };
+
+  const exportarFiel = async () => {
+    if (!config?.template_docx_url || !ultimaGeracao || exporting) return;
+    setExporting(true);
+    try {
+      const dados = montarDadosTemplate({ ...ultimaGeracao, attrs });
+      await exportarDocxTemplate(config.template_docx_url, dados, 'Petição inicial');
+    } catch (err) {
+      console.error(err);
+      setMessages((m) => [...m, { role: 'assistant', text: `Erro ao exportar fiel ao modelo: ${err.message || 'verifique o template .docx e as tags.'}` }]);
+    }
+    setExporting(false);
   };
 
   const exportar = async () => {
@@ -450,6 +472,16 @@ export default function GerarPorEntrevista() {
                 className="flex items-center gap-1.5 px-3 py-1.5 border border-[#1a73e8] text-[#1a73e8] rounded-lg text-xs font-medium hover:bg-[#e8f0fe] transition-colors"
               >
                 <CheckCircle2 className="w-3.5 h-3.5" /> Confirmar revisão
+              </button>
+            )}
+            {config?.template_docx_url && (
+              <button
+                onClick={exportarFiel}
+                disabled={!docHtml || !ultimaGeracao || exporting}
+                title="Preenche o template .docx oficial — formatação 100% fiel"
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-[#0b8043] text-white rounded-lg text-xs font-medium hover:bg-[#0a7038] transition-colors disabled:opacity-40"
+              >
+                <FileDown className="w-3.5 h-3.5" /> Exportar fiel ao modelo
               </button>
             )}
             <button
