@@ -18,6 +18,7 @@ import {
 import { applyConditionals } from './variables';
 import { removeTextLetterhead } from './removeTextLetterhead';
 import { TIMBRADO } from './timbrado';
+import { sessionTrace } from './sessionTrace';
 
 // ---------- Utilitarios de parsing HTML -> docx ----------
 
@@ -173,24 +174,10 @@ function processBlock(block, out, state) {
 const LOGO_PRIMEIRA_PAGINA = 'https://media.base44.com/images/public/6a5a44d24aa52c9fbdd61b1a/4f1847ac3_image.png';
 const LOGO_PAGINAS_INTERNAS = 'https://media.base44.com/images/public/6a5a44d24aa52c9fbdd61b1a/fec36cb66_image.png';
 
-function carregarImagemBytes(url, width, height) {
-  return new Promise((resolve, reject) => {
-    const image = new window.Image();
-    image.crossOrigin = 'anonymous';
-    image.onload = () => {
-      const canvas = document.createElement('canvas');
-      canvas.width = width;
-      canvas.height = height;
-      const context = canvas.getContext('2d');
-      context.drawImage(image, 0, 0, width, height);
-      canvas.toBlob(async (blob) => {
-        if (!blob) return reject(new Error('Não foi possível preparar o timbrado.'));
-        resolve(new Uint8Array(await blob.arrayBuffer()));
-      }, 'image/png');
-    };
-    image.onerror = () => reject(new Error('Não foi possível carregar o timbrado.'));
-    image.src = url;
-  });
+async function carregarImagemBytes(url) {
+  const response = await fetch(url, { cache: 'force-cache' });
+  if (!response.ok) throw new Error(`Falha ao carregar timbrado: HTTP ${response.status}`);
+  return new Uint8Array(await response.arrayBuffer());
 }
 
 function buildHeader(logoBytes, width, height, alignment = AlignmentType.CENTER) {
@@ -260,10 +247,19 @@ export async function exportToDocx(html, variables, title) {
     processBlock(block, children, state);
   }
 
-  const [logoPrimeiraPagina, logoPaginasInternas] = await Promise.all([
-    carregarImagemBytes(LOGO_PRIMEIRA_PAGINA, 440, 88),
-    carregarImagemBytes(LOGO_PAGINAS_INTERNAS, 200, 171),
+  const logos = await Promise.allSettled([
+    carregarImagemBytes(LOGO_PRIMEIRA_PAGINA),
+    carregarImagemBytes(LOGO_PAGINAS_INTERNAS),
   ]);
+  const logoPrimeiraPagina = logos[0].status === 'fulfilled' ? logos[0].value : null;
+  const logoPaginasInternas = logos[1].status === 'fulfilled' ? logos[1].value : null;
+  logos.forEach((result, index) => {
+    if (result.status === 'rejected') sessionTrace({
+      level: 'warn', category: 'Exportação', status: 'AVISO',
+      title: `Logomarca ${index + 1} indisponível — usando cabeçalho textual`,
+      details: { mensagem: result.reason?.message || String(result.reason) },
+    });
+  });
   const firstHeader = buildHeader(logoPrimeiraPagina, 220, 44);
   const defaultHeader = buildHeader(logoPaginasInternas, 100, 86, AlignmentType.RIGHT);
   const footer = buildFooter();
