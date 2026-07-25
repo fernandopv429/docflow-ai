@@ -166,10 +166,15 @@ export default function GerarPorEntrevista() {
       }
 
       const transcript = novasMsgs
-        .filter((m) => m.role !== 'tool')
+        .filter((m) => m.role === 'user' || m.role === 'assistant')
         .map((m) => ({ role: m.role, text: m.text || '' }));
       const modelosCtx = modeloPadrao ? [{ titulo: modeloPadrao.titulo, teses: [] }] : [];
-      const res = await conversarEntrevista({ transcript, fileUrls: urls, modelos: modelosCtx });
+      const res = await conversarEntrevista({
+        transcript,
+        fileUrls: urls,
+        modelos: modelosCtx,
+        attrsAtuais: attrs || {},
+      });
 
       const novoAttrs = { ...(attrs || {}), ...(res?.atributos || {}) };
       setAttrs(novoAttrs);

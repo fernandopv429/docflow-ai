@@ -177,7 +177,7 @@ function formatarTranscript(transcript) {
     .join('\n\n');
 }
 
-export function buildChatPrompt({ transcript, modelos }) {
+export function buildChatPrompt({ transcript, modelos, attrsAtuais }) {
   return `Você é um assistente jurídico trabalhista que conversa com um advogado para reunir as informações de uma ENTREVISTA e, ao final, gerar uma petição inicial a partir de um modelo de referência.
 
 CONVERSE em português, de forma objetiva e cordial (estilo chat). Seu papel AGORA é entender o caso e coletar o que falta — NÃO redija a petição nesta etapa (o sistema cuida da redação quando você sinalizar).
@@ -188,6 +188,9 @@ Extraia em "atributos" TUDO o que já for possível inferir da conversa. Nunca d
 
 MODELOS DE REFERÊNCIA DISPONÍVEIS (o sistema escolherá automaticamente o mais aderente aos atributos):
 ${resumoModelos(modelos)}
+
+ATRIBUTOS JÁ CONFIRMADOS EM ETAPAS ANTERIORES:
+${JSON.stringify(attrsAtuais || {})}
 
 CONVERSA ATÉ AGORA:
 ${formatarTranscript(transcript)}
@@ -262,14 +265,33 @@ function inferirAtributosEntrevista(transcript) {
   };
 }
 
-export async function conversarEntrevista({ transcript, fileUrls, modelos }) {
+function compactarTranscript(transcript) {
+  const mensagens = (transcript || []).filter((m) =>
+    (m.role === 'user' || m.role === 'assistant') && m.text?.trim()
+  );
+  if (mensagens.length <= 10) return mensagens;
+
+  const recentes = mensagens.slice(-8);
+  const fatosAnteriores = mensagens
+    .slice(0, -8)
+    .filter((m) => m.role === 'user')
+    .map((m) => m.text.trim())
+    .join('\n\n');
+
+  return fatosAnteriores
+    ? [{ role: 'user', text: `INFORMAÇÕES ANTERIORES FORNECIDAS PELO ADVOGADO:\n${fatosAnteriores}` }, ...recentes]
+    : recentes;
+}
+
+export async function conversarEntrevista({ transcript, fileUrls, modelos, attrsAtuais }) {
+  const transcriptCompacto = compactarTranscript(transcript);
   const req = {
-    prompt: buildChatPrompt({ transcript, modelos }),
+    prompt: buildChatPrompt({ transcript: transcriptCompacto, modelos, attrsAtuais }),
     model: 'claude_sonnet_4_6',
     response_json_schema: CHAT_SCHEMA,
   };
   if (fileUrls?.length) req.file_urls = fileUrls;
-  const key = runtimeCacheKey({ version: 4, transcript, fileUrls, modelos });
+  const key = runtimeCacheKey({ version: 5, transcript: transcriptCompacto, fileUrls, modelos, attrsAtuais });
   const resposta = await withRuntimeCache('entrevista-ia', key, () =>
     traceAiCall('Análise da entrevista', req, () => base44.integrations.Core.InvokeLLM(req))
   );
