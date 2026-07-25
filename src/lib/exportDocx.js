@@ -17,7 +17,7 @@ import {
 } from 'docx';
 import { applyConditionals } from './variables';
 import { removeTextLetterhead } from './removeTextLetterhead';
-import { TIMBRADO, carregarLogoBytes } from './timbrado';
+import { TIMBRADO } from './timbrado';
 
 // ---------- Utilitarios de parsing HTML -> docx ----------
 
@@ -170,12 +170,27 @@ function processBlock(block, out, state) {
 
 // ---------- Timbrado: cabecalho e rodape ----------
 
+const LOGO_PRIMEIRA_PAGINA = 'https://media.base44.com/images/public/6a5a44d24aa52c9fbdd61b1a/4f1847ac3_image.png';
 const LOGO_PAGINAS_INTERNAS = 'https://media.base44.com/images/public/6a5a44d24aa52c9fbdd61b1a/fec36cb66_image.png';
 
-async function carregarLogoInternaBytes() {
-  const response = await fetch(LOGO_PAGINAS_INTERNAS);
-  if (!response.ok) throw new Error('Não foi possível carregar a logo das páginas internas.');
-  return new Uint8Array(await response.arrayBuffer());
+function carregarImagemBytes(url, width, height) {
+  return new Promise((resolve, reject) => {
+    const image = new window.Image();
+    image.crossOrigin = 'anonymous';
+    image.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const context = canvas.getContext('2d');
+      context.drawImage(image, 0, 0, width, height);
+      canvas.toBlob(async (blob) => {
+        if (!blob) return reject(new Error('Não foi possível preparar o timbrado.'));
+        resolve(new Uint8Array(await blob.arrayBuffer()));
+      }, 'image/png');
+    };
+    image.onerror = () => reject(new Error('Não foi possível carregar o timbrado.'));
+    image.src = url;
+  });
 }
 
 function buildHeader(logoBytes, width, height, alignment = AlignmentType.CENTER) {
@@ -245,8 +260,10 @@ export async function exportToDocx(html, variables, title) {
     processBlock(block, children, state);
   }
 
-  const logoPrimeiraPagina = carregarLogoBytes();
-  const logoPaginasInternas = await carregarLogoInternaBytes();
+  const [logoPrimeiraPagina, logoPaginasInternas] = await Promise.all([
+    carregarImagemBytes(LOGO_PRIMEIRA_PAGINA, 440, 88),
+    carregarImagemBytes(LOGO_PAGINAS_INTERNAS, 200, 171),
+  ]);
   const firstHeader = buildHeader(logoPrimeiraPagina, 220, 44);
   const defaultHeader = buildHeader(logoPaginasInternas, 100, 86, AlignmentType.RIGHT);
   const footer = buildFooter();
