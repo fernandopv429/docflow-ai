@@ -94,6 +94,7 @@ export default function GerarPorEntrevista() {
         fileUrls: opts.urls ?? allUrls,
         attrs: opts.attrs ?? attrs,
         modeloPadrao,
+        force: opts.force,
         onTool: (msg) => setMessages((m) => [...m, { role: 'tool', text: msg }]),
       });
       setDocHtml(html);
@@ -427,6 +428,16 @@ export default function GerarPorEntrevista() {
               <span className="flex items-center gap-1 text-[11px] text-[#1a73e8]">
                 <RefreshCw className="w-3 h-3 animate-spin" /> atualizando
               </span>
+            )}
+            {docHtml && (
+              <button
+                onClick={() => gerarMinuta({ force: true })}
+                disabled={generating}
+                title="Gerar uma nova versão (ignora o cache)"
+                className="flex items-center gap-1.5 px-3 py-1.5 border border-[#dadce0] text-[#3c4043] rounded-lg text-xs font-medium hover:bg-[#f1f3f4] transition-colors disabled:opacity-40"
+              >
+                <RefreshCw className="w-3.5 h-3.5" /> Regerar
+              </button>
             )}
             {docHtml && !reviewConfirmed && (
               <span className="hidden md:inline text-[11px] text-[#8a5d00]">
