@@ -676,8 +676,7 @@ ${texto || '(ver documentos anexados)'}
 Atributos detectados: função=${attrs?.funcao || '-'}, modalidade=${attrs?.tipo_dispensa || '-'}, rito=${attrs?.rito || '-'}, tomadora=${attrs?.tem_tomadora ? 'sim' : 'não'}.
 === FIM DA ENTREVISTA ===${blocoReceita(dadosReceita)}${blocoCeps(dadosCep)}${blocoDatajud(dadosDatajud)}${blocoCalculos(calculos)}
 
-FORMATO DE SAÍDA: retorne APENAS o HTML adaptado do corpo da petição (sem <html>, <head> ou <body>), PRESERVANDO a formatação/estilo do modelo. Ao final, acrescente exatamente:
-<p><em>⚠️ Minuta gerada por IA a partir do modelo padrão — revisão obrigatória pelo advogado responsável.</em></p>`;
+FORMATO DE SAÍDA: retorne APENAS o HTML adaptado do corpo da petição (sem <html>, <head> ou <body>), PRESERVANDO a formatação/estilo do modelo. NÃO acrescente avisos, notas ou observações ao final.`;
 }
 
 // Limpa a saída da IA: remove cercas de código markdown (```html) e tags de
@@ -686,6 +685,7 @@ export function limparHtmlIA(html) {
   let t = typeof html === 'string' ? html : String(html || '');
   t = t.replace(/```[a-z]*\n?/gi, '');
   t = t.replace(/<\/?(?:html|head|body|!doctype)[^>]*>/gi, '');
+  t = t.replace(/<p>\s*<em>\s*⚠️[^<]*<\/em>\s*<\/p>/gi, '');
   return removeTextLetterhead(t.trim());
 }
 
