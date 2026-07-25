@@ -45,6 +45,17 @@ function pt(value) {
   return match ? Number(match[0]) : undefined;
 }
 
+function docxColor(value, fallback) {
+  const raw = String(value || '').trim();
+  const hex = raw.match(/^#([0-9a-f]{6})$/i);
+  if (hex) return hex[1].toUpperCase();
+  const shortHex = raw.match(/^#([0-9a-f]{3})$/i);
+  if (shortHex) return shortHex[1].split('').map((char) => char + char).join('').toUpperCase();
+  const rgb = raw.match(/^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
+  if (rgb) return rgb.slice(1, 4).map((part) => Math.min(255, Number(part)).toString(16).padStart(2, '0')).join('').toUpperCase();
+  return fallback;
+}
+
 function inlineStyle(el, inherited = {}) {
   const css = cssValues(el);
   const size = pt(css['font-size']);
@@ -55,7 +66,7 @@ function inlineStyle(el, inherited = {}) {
     bold: /bold|[6-9]00/.test(css['font-weight'] || '') || inherited.bold || false,
     italics: css['font-style'] === 'italic' || inherited.italics || false,
     underline: (css['text-decoration'] || '').includes('underline') || inherited.underline || false,
-    color: css.color?.replace('#', '') || inherited.color,
+    color: docxColor(css.color, inherited.color),
   };
 }
 

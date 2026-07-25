@@ -216,7 +216,7 @@ export default function GerarPorEntrevista() {
       await exportToDocx(docHtml, null, 'Minuta - petição inicial');
     } catch (err) {
       console.error(err);
-      window.alert('Não foi possível exportar o documento. Tente novamente.');
+      window.alert(`Não foi possível exportar o documento: ${err?.message || 'erro desconhecido'}`);
     } finally {
       setExporting(false);
     }
