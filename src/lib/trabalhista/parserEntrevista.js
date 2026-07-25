@@ -1,4 +1,5 @@
 import { base44 } from '@/api/base44Client';
+import { traceAiCall } from '@/lib/sessionTrace';
 
 // Agente extrator: converte o texto livre da entrevista diretamente nos
 // campos da entidade CasoTrabalhista, usando um modelo rápido/barato.
@@ -43,7 +44,7 @@ const CASO_SCHEMA = {
 };
 
 export async function extrairCasoDeTexto(texto) {
-  const dados = await base44.integrations.Core.InvokeLLM({
+  const request = {
     prompt: `Você é um extrator de dados de entrevistas trabalhistas. Leia o texto livre abaixo (resumo da entrevista feito pelo advogado) e preencha os campos do caso.
 
 TEXTO:
@@ -62,7 +63,10 @@ Regras:
 Responda APENAS com o objeto JSON.`,
     model: 'gemini_3_flash',
     response_json_schema: CASO_SCHEMA,
-  });
+  };
+  const dados = await traceAiCall('Extração estruturada do caso', request, () =>
+    base44.integrations.Core.InvokeLLM(request)
+  );
 
   // Remove valores vazios para não sobrescrever campos com lixo
   const limpo = {};

@@ -27,9 +27,14 @@ export default function SessionLogsModal({ open, onOpenChange, messages }) {
             <p className="py-8 text-center text-sm text-muted-foreground">Nenhum log registrado nesta sessão.</p>
           ) : messages.map((message, index) => (
             <div key={index} className="rounded-lg border bg-muted/40 p-3">
-              <div className="mb-1 flex items-center justify-between gap-3">
-                <span className="text-xs font-semibold text-foreground">{message.title || LABELS[message.role] || message.role}</span>
-                <span className="text-[10px] text-muted-foreground">{message.timestamp || `#${index + 1}`}</span>
+              <div className="mb-1 flex items-start justify-between gap-3">
+                <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                  <span className="text-xs font-semibold text-foreground">{message.title || LABELS[message.role] || message.role}</span>
+                  {message.category && <span className="rounded bg-secondary px-1.5 py-0.5 text-[10px] font-medium">{message.category}</span>}
+                  {message.status && <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">{message.status}</span>}
+                  {Number.isFinite(message.durationMs) && <span className="text-[10px] text-muted-foreground">{message.durationMs} ms</span>}
+                </div>
+                <span className="shrink-0 text-[10px] text-muted-foreground">{message.timestamp || `#${index + 1}`}</span>
               </div>
               {message.files?.length > 0 && <p className="mb-1 text-xs text-muted-foreground">Arquivos: {message.files.join(', ')}</p>}
               <pre className="whitespace-pre-wrap break-words font-mono text-xs text-foreground">{message.text || '(sem conteúdo)'}</pre>

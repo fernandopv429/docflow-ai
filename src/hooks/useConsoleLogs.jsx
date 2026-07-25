@@ -15,11 +15,20 @@ export default function useConsoleLogs() {
     methods.forEach((method) => {
       console[method] = (...args) => {
         originals[method](...args);
-        setLogs((current) => [...current, {
+        const trace = args.length === 1 && args[0]?.__docflowTrace ? args[0] : null;
+        setLogs((current) => [...current, trace ? {
+          role: `console_${method}`,
+          title: trace.title,
+          text: formatValue(trace.details),
+          category: trace.category,
+          status: trace.status,
+          durationMs: trace.durationMs,
+          timestamp: new Date().toLocaleTimeString('pt-BR', { fractionalSecondDigits: 3 }),
+        } : {
           role: `console_${method}`,
           title: `Console ${method}`,
           text: args.map(formatValue).join(' '),
-          timestamp: new Date().toLocaleTimeString('pt-BR'),
+          timestamp: new Date().toLocaleTimeString('pt-BR', { fractionalSecondDigits: 3 }),
         }]);
       };
     });

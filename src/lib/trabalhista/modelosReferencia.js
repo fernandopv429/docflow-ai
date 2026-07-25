@@ -6,6 +6,7 @@ import { extrairCasoDeTexto } from './parserEntrevista';
 import { calcularVerbasCaso } from './mathUtils';
 import { runtimeCacheKey, withRuntimeCache } from './runtimeCache';
 import { removeTextLetterhead } from '@/lib/removeTextLetterhead';
+import { traceAiCall } from '@/lib/sessionTrace';
 
 // ============================================================
 // Anonimização (mesma lógica usada no cadastro dos modelos)
@@ -108,7 +109,10 @@ ${(textoDocx || '').slice(0, 40000)}
 """
 
 Responda em português, apenas o resumo do diferencial.`;
-  const r = await base44.integrations.Core.InvokeLLM({ prompt, model: 'gemini_3_flash' });
+  const request = { prompt, model: 'gemini_3_flash' };
+  const r = await traceAiCall('Resumo do diferencial', request, () =>
+    base44.integrations.Core.InvokeLLM(request)
+  );
   return typeof r === 'string' ? r : String(r || '');
 }
 
@@ -266,7 +270,9 @@ export async function conversarEntrevista({ transcript, fileUrls, modelos }) {
   };
   if (fileUrls?.length) req.file_urls = fileUrls;
   const key = runtimeCacheKey({ version: 4, transcript, fileUrls, modelos });
-  const resposta = await withRuntimeCache('entrevista-ia', key, () => base44.integrations.Core.InvokeLLM(req));
+  const resposta = await withRuntimeCache('entrevista-ia', key, () =>
+    traceAiCall('Análise da entrevista', req, () => base44.integrations.Core.InvokeLLM(req))
+  );
   const inferido = inferirAtributosEntrevista(transcript);
   const ia = resposta?.atributos || {};
   const atributos = {
@@ -728,7 +734,7 @@ export async function gerarPecaPadrao({ texto, fileUrls, attrs, modeloPadrao, on
   const resultado = await withRuntimeCache(
     'geracao-minuta',
     runtimeCacheKey({ prompt: req.prompt, fileUrls: urls }),
-    () => base44.integrations.Core.InvokeLLM(req),
+    () => traceAiCall('Geração da minuta', req, () => base44.integrations.Core.InvokeLLM(req)),
     { onHit: () => notify('Reutilizando geração idêntica em cache...') }
   );
   return {
@@ -780,12 +786,13 @@ RELATO/ENTREVISTA: """${texto || ''}"""
 MINUTA GERADA (HTML): """${html || ''}"""
 
 Responda APENAS com o objeto JSON.`;
+  const request = {
+    prompt,
+    model: 'claude_sonnet_4_6',
+    response_json_schema: COERENCIA_SCHEMA,
+  };
   return withRuntimeCache('auditoria-coerencia', runtimeCacheKey(prompt), () =>
-    base44.integrations.Core.InvokeLLM({
-      prompt,
-      model: 'claude_sonnet_4_6',
-      response_json_schema: COERENCIA_SCHEMA,
-    })
+    traceAiCall('Auditoria de coerência', request, () => base44.integrations.Core.InvokeLLM(request))
   );
 }
 

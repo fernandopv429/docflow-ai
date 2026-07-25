@@ -1,3 +1,5 @@
+import { sessionTrace } from '@/lib/sessionTrace';
+
 const buckets = new Map();
 
 export function runtimeCacheKey(value) {
@@ -18,15 +20,33 @@ export async function withRuntimeCache(namespace, key, loader, options = {}) {
 
   if (cached && Date.now() - cached.createdAt < ttlMs) {
     onHit?.();
+    sessionTrace({
+      category: 'Cache', title: `Cache reutilizado: ${namespace}`, status: 'HIT', durationMs: 0,
+      details: { chave: key, idade_ms: Date.now() - cached.createdAt, validade_ms: ttlMs },
+    });
     return cached.value;
   }
 
+  const startedAt = Date.now();
+  sessionTrace({
+    category: 'Cache', title: `Nova execução: ${namespace}`, status: 'MISS',
+    details: { chave: key, validade_ms: ttlMs },
+  });
   const value = Promise.resolve().then(loader);
   bucket.set(key, { createdAt: Date.now(), value });
   try {
-    return await value;
+    const result = await value;
+    sessionTrace({
+      category: 'Cache', title: `Resultado armazenado: ${namespace}`, status: 'SALVO',
+      durationMs: Date.now() - startedAt, details: { chave: key },
+    });
+    return result;
   } catch (error) {
     bucket.delete(key);
+    sessionTrace({
+      level: 'error', category: 'Cache', title: `Falha removida do cache: ${namespace}`, status: 'ERRO',
+      durationMs: Date.now() - startedAt, details: { chave: key, mensagem: error.message, stack: error.stack },
+    });
     throw error;
   }
 }
