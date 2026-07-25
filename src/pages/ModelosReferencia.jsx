@@ -4,6 +4,7 @@ import { ArrowLeft, Loader2, Upload, Library, CheckCircle2, AlertCircle, FileTex
 import { base44 } from '@/api/base44Client';
 import { TIPO_DISPENSA_LABELS } from '@/lib/trabalhista/tokens';
 import { extrairTextoDocx, classificarTextoModelo, resumirDiferencial } from '@/lib/trabalhista/modelosReferencia';
+import { invalidateRuntimeCache } from '@/lib/trabalhista/runtimeCache';
 
 const RITO_LABEL = { ordinario: 'Ordinário', sumarissimo: 'Sumaríssimo' };
 
@@ -50,6 +51,7 @@ export default function ModelosReferencia() {
     setConfig(novo);
     try {
       await base44.entities.IntegracaoConfig.update(config.id, patch);
+      invalidateRuntimeCache('config-integracoes'); // muda a geração na hora (sem esperar o TTL)
     } catch (e) {
       setErro('Erro ao salvar a configuração das integrações.');
     }
@@ -113,6 +115,7 @@ export default function ModelosReferencia() {
           criados++;
         }
       }
+      invalidateRuntimeCache('modelos-ativos'); // novo(s) modelo(s) entram no matching imediatamente
       setMsg(`Importação concluída: ${anexados} atualizado(s), ${criados} novo(s).`);
       await load();
     } catch (err) {
