@@ -237,6 +237,12 @@
   border-bottom: 1px solid #202124;
   background: url('https://media.base44.com/images/public/6a5a44d24aa52c9fbdd61b1a/4f1847ac3_image.png') center top / 220px 44px no-repeat;
 }
+.legal-document-review section.docx:not(:first-of-type)::before {
+  top: 12px;
+  height: 104px;
+  background-image: url('https://media.base44.com/images/public/6a5a44d24aa52c9fbdd61b1a/fec36cb66_image.png');
+  background-size: 100px 86px;
+}
 .legal-document-review section.docx::after {
   content: 'juridico@favadvogados.com.br  |  OAB/SP 320.825';
   position: absolute;

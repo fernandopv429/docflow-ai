@@ -23,6 +23,7 @@ export default function GerarPorEntrevista() {
   const [sending, setSending] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [reviewConfirmed, setReviewConfirmed] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [saveStatus, setSaveStatus] = useState('saved');
   const draftCaseIdRef = useRef(localStorage.getItem('docflow:caso-rascunho-id'));
   const saveTimerRef = useRef(null);
@@ -205,11 +206,15 @@ export default function GerarPorEntrevista() {
   };
 
   const exportar = async () => {
-    if (!docHtml || !reviewConfirmed) return;
+    if (!docHtml || !reviewConfirmed || exporting) return;
+    setExporting(true);
     try {
       await exportToDocx(docHtml, null, 'Minuta - petição inicial');
     } catch (err) {
       console.error(err);
+      window.alert('Não foi possível exportar o documento. Tente novamente.');
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -380,11 +385,12 @@ export default function GerarPorEntrevista() {
             )}
             <button
               onClick={exportar}
-              disabled={!docHtml || !reviewConfirmed}
+              disabled={!docHtml || !reviewConfirmed || exporting}
               title={!reviewConfirmed ? 'Confirme a revisão antes de exportar' : 'Exportar DOCX'}
               className="flex items-center gap-1.5 px-3 py-1.5 bg-[#1a73e8] text-white rounded-lg text-xs font-medium hover:bg-[#1557b0] transition-colors disabled:opacity-40"
             >
-              <FileDown className="w-3.5 h-3.5" /> Exportar DOCX
+              {exporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileDown className="w-3.5 h-3.5" />}
+              {exporting ? 'Exportando...' : 'Exportar DOCX'}
             </button>
           </div>
 

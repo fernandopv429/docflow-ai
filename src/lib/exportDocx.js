@@ -170,13 +170,20 @@ function processBlock(block, out, state) {
 
 // ---------- Timbrado: cabecalho e rodape ----------
 
-function buildHeader() {
-  const logoBytes = carregarLogoBytes();
+const LOGO_PAGINAS_INTERNAS = 'https://media.base44.com/images/public/6a5a44d24aa52c9fbdd61b1a/fec36cb66_image.png';
+
+async function carregarLogoInternaBytes() {
+  const response = await fetch(LOGO_PAGINAS_INTERNAS);
+  if (!response.ok) throw new Error('Não foi possível carregar a logo das páginas internas.');
+  return new Uint8Array(await response.arrayBuffer());
+}
+
+function buildHeader(logoBytes, width, height) {
   return new Header({
     children: [
       new Paragraph({
         alignment: AlignmentType.CENTER,
-        children: logoBytes ? [new ImageRun({ data: logoBytes, transformation: { width: 220, height: 44 }, type: 'png' })] : [new TextRun({ text: TIMBRADO.escritorio, bold: true, font: 'Arial', size: 20 })],
+        children: logoBytes ? [new ImageRun({ data: logoBytes, transformation: { width, height }, type: 'png' })] : [new TextRun({ text: TIMBRADO.escritorio, bold: true, font: 'Arial', size: 20 })],
       }),
       new Paragraph({ children: [], border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: '000000', space: 4 } } }),
     ],
@@ -238,7 +245,10 @@ export async function exportToDocx(html, variables, title) {
     processBlock(block, children, state);
   }
 
-  const header = buildHeader();
+  const logoPrimeiraPagina = carregarLogoBytes();
+  const logoPaginasInternas = await carregarLogoInternaBytes();
+  const firstHeader = buildHeader(logoPrimeiraPagina, 220, 44);
+  const defaultHeader = buildHeader(logoPaginasInternas, 100, 86);
   const footer = buildFooter();
 
   const docx = new Document({
@@ -250,6 +260,7 @@ export async function exportToDocx(html, variables, title) {
     },
     sections: [{
       properties: {
+        titlePage: true,
         page: {
           margin: {
             top: 2438,
@@ -261,8 +272,8 @@ export async function exportToDocx(html, variables, title) {
           },
         },
       },
-      headers: { default: header },
-      footers: { default: footer },
+      headers: { first: firstHeader, default: defaultHeader },
+      footers: { first: footer, default: footer },
       children,
     }],
   });
