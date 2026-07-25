@@ -10,6 +10,7 @@ import DocumentReviewPreview from '@/components/DocumentReviewPreview';
 import { exportToDocx } from '@/lib/exportDocx';
 import { TIPO_DISPENSA_LABELS } from '@/lib/trabalhista/tokens';
 import { formatBRL } from '@/lib/trabalhista/mathUtils';
+import { fontesAuditoria, fontesEntrevista, fontesGeracao } from '@/lib/trabalhista/fontesAnalise';
 import useConsoleLogs from '@/hooks/useConsoleLogs';
 import {
   carregarModeloPadrao,
@@ -33,6 +34,7 @@ export default function GerarPorEntrevista() {
   const saveTimerRef = useRef(null);
 
   const [allUrls, setAllUrls] = useState([]);
+  const [documentSources, setDocumentSources] = useState([]);
   const [modeloPadrao, setModeloPadrao] = useState(null);
   const [attrs, setAttrs] = useState(null);
 
@@ -103,6 +105,19 @@ export default function GerarPorEntrevista() {
         caso && Object.keys(caso).length && { role: 'tool_result', title: 'Dados analisados e extraídos pela IA', text: JSON.stringify(caso, null, 2) },
         calculos?.length && { role: 'tool_result', title: 'Retorno dos cálculos determinísticos', text: JSON.stringify(calculos, null, 2) },
         modeloSemelhante && { role: 'tool_result', title: 'Modelo de referência selecionado', text: JSON.stringify(modeloSemelhante, null, 2) },
+        {
+          role: 'tool_result',
+          title: 'Fontes consultadas nesta geração',
+          text: JSON.stringify(fontesGeracao({
+            texto: geracaoTexto,
+            documentos: opts.sources ?? documentSources,
+            template: modeloPadrao,
+            referencia: modeloSemelhante,
+            dadosReceita,
+            dadosCep,
+            dadosDatajud,
+          }), null, 2),
+        },
       ].filter(Boolean);
       if (retornos.length) setMessages((m) => [...m, ...retornos]);
 
@@ -132,6 +147,15 @@ export default function GerarPorEntrevista() {
         setMessages((m) => [
           ...m,
           { role: 'tool_result', title: 'Retorno da auditoria de coerência (IA)', text: JSON.stringify(verif, null, 2) },
+          {
+            role: 'tool_result',
+            title: 'Fontes consultadas nesta auditoria',
+            text: JSON.stringify(fontesAuditoria({
+              texto: geracaoTexto,
+              template: modeloPadrao,
+              referencia: modeloSemelhante,
+            }), null, 2),
+          },
           { role: 'assistant', text: cabecalho + corpo },
         ]);
       } catch (e) {
@@ -155,14 +179,19 @@ export default function GerarPorEntrevista() {
     setSending(true);
     try {
       let urls = allUrls;
+      let fontesAtuais = documentSources;
       if (attached.length) {
         const novos = [];
+        const novasFontes = [];
         for (const file of attached) {
           const { file_url } = await base44.integrations.Core.UploadFile({ file });
           novos.push(file_url);
+          novasFontes.push({ nome: file.name, url: file_url });
         }
         urls = [...allUrls, ...novos];
+        fontesAtuais = [...documentSources, ...novasFontes];
         setAllUrls(urls);
+        setDocumentSources(fontesAtuais);
       }
 
       const transcript = novasMsgs
@@ -189,6 +218,14 @@ export default function GerarPorEntrevista() {
             pronto_para_gerar: res?.pronto_para_gerar ?? false,
           }, null, 2),
         },
+        {
+          role: 'tool_result',
+          title: 'Fontes consultadas nesta análise',
+          text: JSON.stringify(fontesEntrevista({
+            texto: transcript.filter((message) => message.role === 'user').map((message) => message.text).join('\n\n'),
+            documentos: fontesAtuais,
+          }), null, 2),
+        },
       ]);
 
       // Inicia a geração/atualização da minuta automaticamente após cada envio
@@ -198,7 +235,7 @@ export default function GerarPorEntrevista() {
         .filter(Boolean)
         .join('\n\n');
       if (res?.pronto_para_gerar || docHtml) {
-        await gerarMinuta({ texto: textoCompleto, urls, attrs: novoAttrs });
+        await gerarMinuta({ texto: textoCompleto, urls, attrs: novoAttrs, sources: fontesAtuais });
       }
     } catch (err) {
       console.error(err);
