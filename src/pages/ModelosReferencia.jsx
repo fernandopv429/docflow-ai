@@ -11,6 +11,7 @@ const norm = (s) => (s || '').toString().trim().toLowerCase();
 
 export default function ModelosReferencia() {
   const [modelos, setModelos] = useState([]);
+  const [templates, setTemplates] = useState([]);
   const [loading, setLoading] = useState(true);
   const [importando, setImportando] = useState(false);
   const [msg, setMsg] = useState(null);
@@ -18,10 +19,11 @@ export default function ModelosReferencia() {
   const [config, setConfig] = useState(null);
 
   const load = () =>
-    base44.entities.ModeloReferencia
-      .list('-updated_date', 100)
-      .then(setModelos)
-      .catch(() => {})
+    Promise.all([
+      base44.entities.ModeloReferencia.list('-updated_date', 100).then(setModelos),
+      base44.entities.Template.list('-updated_date', 100).then(setTemplates),
+    ])
+      .catch(() => setErro('Erro ao carregar os modelos.'))
       .finally(() => setLoading(false));
 
   useEffect(() => { load(); }, []);
@@ -50,6 +52,25 @@ export default function ModelosReferencia() {
       await base44.entities.IntegracaoConfig.update(config.id, patch);
     } catch (e) {
       setErro('Erro ao salvar a configuração das integrações.');
+    }
+  };
+
+  const salvarModeloPadrao = async (templateId) => {
+    const anteriores = templates;
+    const atualizados = templates.map((template) => ({
+      ...template,
+      is_default: template.id === templateId,
+    }));
+    setTemplates(atualizados);
+    setErro(null);
+    try {
+      await base44.entities.Template.bulkUpdate(
+        atualizados.map((template) => ({ id: template.id, is_default: template.is_default }))
+      );
+      setMsg('Modelo padrão atualizado.');
+    } catch (e) {
+      setTemplates(anteriores);
+      setErro('Erro ao definir o modelo padrão.');
     }
   };
 
@@ -142,6 +163,25 @@ export default function ModelosReferencia() {
           (nomes, CPF, RG, PIS, endereços) e o sistema guarda apenas o <strong>diferencial</strong> — o que é particular de
           cada peça — usado para orientar a IA quando um caso semelhante aparece. Arquivos com o mesmo nome de um modelo
           existente o <strong>atualizam</strong>; os demais <strong>criam novos modelos</strong>.
+        </div>
+
+        <div className="bg-white border border-[#dadce0] rounded-xl p-4">
+          <h2 className="text-sm font-semibold text-[#202124] mb-1">Modelo padrão da minuta</h2>
+          <p className="text-xs text-[#5f6368] mb-3">Este modelo será usado como estrutura principal em todas as novas gerações.</p>
+          {templates.length ? (
+            <select
+              value={templates.find((template) => template.is_default)?.id || ''}
+              onChange={(e) => salvarModeloPadrao(e.target.value)}
+              className="w-full rounded-lg border border-[#dadce0] bg-white px-3 py-2 text-sm text-[#202124] focus:border-[#1a73e8] focus:outline-none"
+            >
+              <option value="" disabled>Selecione o modelo padrão</option>
+              {templates.map((template) => (
+                <option key={template.id} value={template.id}>{template.title}</option>
+              ))}
+            </select>
+          ) : (
+            <p className="text-xs text-amber-700">Nenhum template principal disponível.</p>
+          )}
         </div>
 
         {config && (

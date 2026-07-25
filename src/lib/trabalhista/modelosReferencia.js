@@ -92,7 +92,9 @@ export async function listarModelosAtivos() {
 export async function carregarModeloPadrao() {
   const templates = await base44.entities.Template.list('-updated_date', 100);
   const padrao =
-    templates.find((t) => /modelo\s*padr[aã]o/i.test(t.title || '')) || templates[0];
+    templates.find((t) => t.is_default === true) ||
+    templates.find((t) => /modelo\s*padr[aã]o/i.test(t.title || '')) ||
+    templates[0];
   if (!padrao) return null;
   const html = await loadTemplateContent(padrao);
   return { id: padrao.id, titulo: padrao.title, html: html || '' };
