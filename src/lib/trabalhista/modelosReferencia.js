@@ -730,6 +730,24 @@ O QUE MUDA (variáveis a preencher caso a caso):
 - O MOTIVO DA SAÍDA determina o "capítulo especial" da peça: justa causa → "Da Reversão da Dispensa por Justa Causa"; rescisão indireta (art. 483) → "Da Rescisão Indireta / Da Falta Grave do Empregador"; pedido de demissão sob coação → narrativa de coação/ameaça; sem justa causa → NENHUM capítulo de reversão/rescisão indireta (peça mais curta).
 - Teses "avulsas" ligadas ao caso concreto (ex.: periculosidade, doença ocupacional, estabilidade provisória, pensão vitalícia) entram APENAS quando houver suporte no relato.
 
+PADRÕES VALIDADOS DO ESCRITÓRIO (extraídos de peças-modelo aprovadas — siga como convenção, mas só inclua o que tiver suporte no relato):
+1. MODALIDADE DE RESCISÃO → puxa UM capítulo especial logo após "Do Contrato de Trabalho":
+   - sem justa causa → nenhum capítulo de reversão/rescisão; peça mais enxuta.
+   - rescisão indireta (art. 483, "b"/"d") → "Da Rescisão Indireta / Da Falta Grave do Empregador" com rol de descumprimentos; a Multa do art. 477 vem em caráter SUBSIDIÁRIO ("caso não reconhecida a rescisão indireta").
+   - nulidade do pedido de demissão (coação) → narrar a coação já em "Do Contrato de Trabalho" (art. 171, II, CC c/c art. 9º CLT) e pedir a NULIDADE/convolação em dispensa sem justa causa; incluir pedido expresso de "DECRETAÇÃO DA NULIDADE DO PEDIDO DE DEMISSÃO".
+   - reversão da justa causa → "Da Reversão da Dispensa por Justa Causa" (art. 482 CLT; ônus do empregador art. 818 CLT c/c 373,II CPC; proporcionalidade/gradação de penalidades; jurisprudência).
+2. RESPONSABILIDADE SUBSIDIÁRIA (Súmula 331 TST): incluir SOMENTE quando houver 2ª reclamada TOMADORA. Se houver uma única reclamada, NÃO inserir o capítulo nem os pedidos correlatos.
+3. FUNÇÃO/CATEGORIA:
+   - Vigilante/vigilante patrimonial (CCT de vigilância, ex.: SEEVISSP×SESVESP): adicional de HE convencional de 60%; adicional de periculosidade que INCIDE sobre horas extras e adicional noturno (Súm. 132/OJ 259); multa convencional de 3% sobre o salário normativo por cláusula; "10 minutos de descanso sentado" (cláusula ~33ª); "gratificação de função" de 10% quando for CONDUTOR de veículo (cláusula 3ª).
+   - Porteiro/asseio-conservação/terceirizados (ex.: SINDEEPRES, SIEMACO×SEAC): usar as cláusulas e o percentual de multa dessa CCT (ex.: 20% do salário-mínimo/normativo por cláusula) — NÃO copiar percentuais da CCT de vigilância.
+4. ESCALA: capítulo "Da Descaracterização da Jornada 12x36" (com as 2 jurisprudências e a Súm. 85/OJ 220) SÓ quando a escala for 12x36. Em 5x2/6x1/outra, pleitear horas extras comuns acima da 8ª diária/44ª semanal, SEM o capítulo de descaracterização.
+5. DESVIO × ACÚMULO: "desvio de função" quando executa tarefas de OUTRO cargo (multa normativa, ex.: 50%/mês — cláusula ~64ª); "acúmulo de função" quando soma atribuições de dois cargos (ex.: multa 20%/mês — cláusula ~12ª). Não confundir com a "gratificação de função" do condutor.
+6. JORNADA NOTURNA: se a jornada abrange o período noturno (ex.: 12x36 das 18h30 às 7h30), incluir "Do Adicional Noturno e Hora Noturna Reduzida" (20%, hora reduzida de 52min30s, art. 73 CLT, Súm. 60 e 91 TST).
+7. FOLGAS TRABALHADAS (FT) e "pagamento por fora": quando houver labor em folgas/feriados pago por fora (dinheiro/PIX), pedir adicional de 100% (Súm. 444) + integração dos valores extra-folha + reflexos; e ausência de VT e de auxílio-alimentação nesses dias.
+8. QUALIFICAÇÃO DO RECLAMANTE: manter a ordem nacionalidade, estado civil, função, RG, CPF, PIS, CTPS/Série, nascimento, filiação, endereço — omitindo com marcador [ ] apenas o que faltar.
+9. HONORÁRIOS: no capítulo próprio e no rol de pedidos, usar 15%; no parágrafo de fecho ("julgada procedente..."), pode constar 20% (Súm. 425/427 TST) — reproduzir conforme o modelo.
+10. FECHO: "Pede deferimento. São Paulo, [data]. FERNANDO ANDRADE VIEIRA – OAB/SP 320.825". Valor da causa = somatório ESTIMATIVO dos pedidos (teto R$ 400.000,00), por extenso.
+
 Em resumo: cerca de 80–85% do texto é modelo fixo — o que varia é a qualificação das partes, datas/salário, o motivo da rescisão (que puxa o capítulo correspondente) e os valores.`;
 
 // Bloco de cálculos determinísticos para o prompt (mesma lógica da auditoria).
