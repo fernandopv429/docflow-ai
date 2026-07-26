@@ -209,6 +209,12 @@ export default function ModelosReferencia() {
                 checked={!!config.datajud_ativo}
                 onChange={() => salvarConfig({ datajud_ativo: !config.datajud_ativo })}
               />
+              <Toggle
+                label="Consulta de CCT (base de convenções)"
+                desc="Cláusulas reais da convenção coletiva vigente — requer a função de backend 'cct' publicada e o secret CCT_API_KEY"
+                checked={!!config.cct_ativo}
+                onChange={() => salvarConfig({ cct_ativo: !config.cct_ativo })}
+              />
             </div>
             {config.datajud_ativo && (
               <div className="mt-3 flex items-center gap-2 flex-wrap">
@@ -220,6 +226,19 @@ export default function ModelosReferencia() {
                   className="text-xs border border-[#dadce0] rounded-md px-2 py-1 w-24 focus:outline-none focus:border-[#1a73e8]"
                 />
                 <span className="text-[11px] text-[#9aa0a6]">ex.: trt2 (SP), trt1 (RJ), trt3 (MG), trt15 (Campinas)</span>
+              </div>
+            )}
+            {config.cct_ativo && (
+              <div className="mt-3 flex items-center gap-2 flex-wrap">
+                <label className="text-xs text-[#5f6368]">Categoria da CCT:</label>
+                <input
+                  value={config.cct_categoria || ''}
+                  onChange={(e) => setConfig({ ...config, cct_categoria: e.target.value })}
+                  onBlur={(e) => salvarConfig({ cct_categoria: e.target.value.trim() })}
+                  placeholder="auto (pela função)"
+                  className="text-xs border border-[#dadce0] rounded-md px-2 py-1 w-52 focus:outline-none focus:border-[#1a73e8]"
+                />
+                <span className="text-[11px] text-[#9aa0a6]">vazio = detecta pela função (vigilancia / asseio_conservacao / terceirizados)</span>
               </div>
             )}
           </div>
