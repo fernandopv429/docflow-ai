@@ -498,6 +498,8 @@ export const CONFIG_INTEGRACOES_PADRAO = {
   datajud_ativo: false,
   datajud_tribunal: 'trt2',
   datajud_size: 5,
+  cct_ativo: false,
+  cct_categoria: '',
 };
 
 export async function carregarConfigIntegracoes() {
@@ -563,6 +565,89 @@ function blocoDatajud(resultados) {
     return `- Tema "${r.termo}": ${exemplos.join('; ')}`;
   });
   return `\n\nCONTEXTO JURISPRUDENCIAL (DataJud/CNJ — mostra que o tema é recorrente no tribunal; use só como reforço argumentativo, NÃO cite números de processo específicos sem conferência humana):\n${linhas.join('\n')}`;
+}
+
+// ============================================================
+// Consulta de Convenções Coletivas (CCT) — cct-api / pgvector.
+// Vai por FUNÇÃO DE BACKEND (base44.functions.invoke('cct')), pois a
+// API externa não libera CORS e a chave fica em SECRET (CCT_API_KEY) no
+// servidor. Fornece CLÁUSULAS REAIS como contexto para a IA — a IA nunca
+// inventa cláusula; usa só o que a base retornar.
+// ============================================================
+export function categoriaCct(caso = {}, attrs = {}) {
+  const t = `${caso.funcao || attrs.funcao || ''} ${caso.sindicato || ''}`.toLowerCase();
+  if (/vigilante|seevissp|sesvesp|segurança/.test(t)) return 'vigilancia';
+  if (/asseio|limpeza|conserva|siemaco|seac/.test(t)) return 'asseio_conservacao';
+  return 'terceirizados'; // porteiro / controlador de acesso / SINDEEPRES (padrão)
+}
+
+export async function consultarCct({ pergunta, categoria, data_fato, limite = 4 }) {
+  try {
+    const resp = await base44.functions.invoke('cct', { pergunta, categoria, data_fato, limite });
+    const data = resp?.data ?? resp;
+    return { pergunta, resultados: Array.isArray(data?.resultados) ? data.resultados : [], erro: data?.erro };
+  } catch (e) {
+    return { pergunta, resultados: [], erro: 'indisponível' };
+  }
+}
+
+const CCT_PERGUNTAS = [
+  'adicional noturno e hora noturna reduzida',
+  'auxílio alimentação / refeição e vale-transporte',
+  'multa convencional por descumprimento de cláusula',
+  'adicional de horas extras e intervalo intrajornada',
+];
+
+export async function enriquecerCct(caso, attrs, config) {
+  if (!config?.cct_ativo) return null;
+  const categoria = config.cct_categoria || categoriaCct(caso, attrs);
+  const data_fato = caso?.data_rescisao || caso?.data_admissao || undefined;
+  const key = runtimeCacheKey({ categoria, data_fato });
+  return withRuntimeCache('cct', key, async () => {
+    const buscas = await Promise.all(
+      CCT_PERGUNTAS.map((pergunta) => consultarCct({ pergunta, categoria, data_fato, limite: 3 }))
+    );
+    // dedup por cláusula (título da CCT + referência da cláusula)
+    const vistos = new Set();
+    const clausulas = [];
+    for (const b of buscas) {
+      for (const r of b.resultados) {
+        const id = `${r.titulo}||${r.clausula_ref}`;
+        if (vistos.has(id)) continue;
+        vistos.add(id);
+        clausulas.push(r);
+      }
+    }
+    const top = clausulas[0] || null;
+    return {
+      categoria,
+      data_fato,
+      clausulas,
+      meta: top ? {
+        titulo: top.titulo,
+        ano_base: top.ano_base,
+        vigencia_inicio: top.vigencia_inicio,
+        vigencia_fim: top.vigencia_fim,
+        sindicato_laboral: top.sindicato_laboral,
+        fonte_url: top.fonte_url,
+      } : null,
+    };
+  }, { ttlMs: 30 * 60 * 1000 });
+}
+
+function blocoCct(dadosCct) {
+  if (!dadosCct?.clausulas?.length) return '';
+  const m = dadosCct.meta;
+  const cab = m
+    ? `CONVENÇÃO COLETIVA APLICÁVEL — ${m.titulo || 'CCT'}${m.ano_base ? `, ano-base ${m.ano_base}` : ''}${m.vigencia_inicio ? ` (vigência ${m.vigencia_inicio}${m.vigencia_fim ? ` a ${m.vigencia_fim}` : ''})` : ''}${m.sindicato_laboral ? `; sindicato profissional: ${m.sindicato_laboral}` : ''}`
+    : 'CLÁUSULAS DE CONVENÇÃO COLETIVA (CCT) APLICÁVEIS';
+  const linhas = dadosCct.clausulas.slice(0, 8).map((c) => {
+    const ref = c.clausula_ref ? `Cláusula ${c.clausula_ref}` : '•';
+    const texto = (c.texto || c.conteudo || c.trecho || c.clausula_texto || c.resumo || '')
+      .toString().trim().replace(/\s+/g, ' ').slice(0, 600);
+    return `- ${ref}: ${texto}`;
+  });
+  return `\n\n${cab}\nUSE as cláusulas REAIS abaixo (fonte: base de CCTs do escritório) para fundamentar os tópicos de convenção coletiva (adicional noturno, auxílio-alimentação/refeição, vale-transporte, multa convencional, intervalo, horas extras). Cite a cláusula pelo número quando disponível. NÃO invente cláusulas que não constem aqui:\n${linhas.join('\n')}`;
 }
 
 // ============================================================
@@ -657,7 +742,7 @@ function blocoCalculos(calculos) {
 }
 
 // Geração adaptando o MODELO PADRÃO (HTML formatado), preservando o estilo.
-export function buildGeracaoPadraoPrompt({ texto, attrs, modeloHtml, calculos, diferencial, modeloSemelhanteTitulo, dadosReceita, dadosCep, dadosDatajud }) {
+export function buildGeracaoPadraoPrompt({ texto, attrs, modeloHtml, calculos, diferencial, modeloSemelhanteTitulo, dadosReceita, dadosCep, dadosDatajud, dadosCct }) {
   return `${PROMPT_SISTEMA_PETICAO}
 
 REGRA PRINCIPAL — ADAPTE O MODELO PADRÃO MANTENDO O ESTILO: abaixo está o MODELO PADRÃO do escritório em HTML (com a formatação, o layout e o texto-padrão corretos, podendo conter marcadores como {{VARIAVEL}}). Sua tarefa é ADAPTAR este HTML ao caso atual:
@@ -674,7 +759,7 @@ ${diferencial ? `\n=== CASO SEMELHANTE NA BASE${modeloSemelhanteTitulo ? ` (${mo
 ${texto || '(ver documentos anexados)'}
 
 Atributos detectados: função=${attrs?.funcao || '-'}, modalidade=${attrs?.tipo_dispensa || '-'}, rito=${attrs?.rito || '-'}, tomadora=${attrs?.tem_tomadora ? 'sim' : 'não'}.
-=== FIM DA ENTREVISTA ===${blocoReceita(dadosReceita)}${blocoCeps(dadosCep)}${blocoDatajud(dadosDatajud)}${blocoCalculos(calculos)}
+=== FIM DA ENTREVISTA ===${blocoReceita(dadosReceita)}${blocoCeps(dadosCep)}${blocoDatajud(dadosDatajud)}${blocoCct(dadosCct)}${blocoCalculos(calculos)}
 
 FORMATO DE SAÍDA: retorne APENAS o HTML adaptado do corpo da petição (sem <html>, <head> ou <body>), PRESERVANDO a formatação/estilo do modelo. NÃO acrescente avisos, notas ou observações ao final.`;
 }
@@ -715,11 +800,19 @@ export async function gerarPecaPadrao({ texto, fileUrls, attrs, modeloPadrao, on
     enriquecerCeps(ceps),
     enriquecerDatajud(attrs, config),
     texto && texto.trim()
-      ? withRuntimeCache('extracao-caso', runtimeCacheKey(texto), () => extrairCasoDeTexto(texto), {
+      ? withRuntimeCache('extracao-caso', runtimeCacheKey({ texto, fileUrls: fileUrls || [] }), () => extrairCasoDeTexto(texto, fileUrls), {
           onHit: () => notify('Reutilizando análise estruturada da entrevista em cache...'),
         }).catch(() => ({}))
       : Promise.resolve({}),
   ]);
+
+  // Convenção coletiva (CCT) vigente na data do fato — cláusulas reais como contexto para a IA.
+  let dadosCct = null;
+  if (config.cct_ativo) {
+    notify('Consultando a CCT vigente (categoria/vigência)...');
+    dadosCct = await enriquecerCct(caso, attrs, config).catch(() => null);
+    if (dadosCct?.meta?.titulo) notify(`CCT aplicável: ${dadosCct.meta.titulo}`);
+  }
 
   // Cálculo 100% determinístico (a IA não faz aritmética).
   const calculos = calcularVerbasCaso(caso || {});
@@ -750,6 +843,7 @@ export async function gerarPecaPadrao({ texto, fileUrls, attrs, modeloPadrao, on
       dadosReceita,
       dadosCep,
       dadosDatajud,
+      dadosCct,
     }),
     model: 'claude_sonnet_4_6',
   };
@@ -766,6 +860,7 @@ export async function gerarPecaPadrao({ texto, fileUrls, attrs, modeloPadrao, on
     dadosReceita,
     dadosCep,
     dadosDatajud,
+    dadosCct,
     calculos,
     caso,
     modeloSemelhante: modeloSemelhante ? { titulo: modeloSemelhante.titulo } : null,
