@@ -747,6 +747,8 @@ PADRÕES VALIDADOS DO ESCRITÓRIO (extraídos de peças-modelo aprovadas — sig
 8. QUALIFICAÇÃO DO RECLAMANTE: manter a ordem nacionalidade, estado civil, função, RG, CPF, PIS, CTPS/Série, nascimento, filiação, endereço — omitindo com marcador [ ] apenas o que faltar.
 9. HONORÁRIOS: no capítulo próprio e no rol de pedidos, usar 15%; no parágrafo de fecho ("julgada procedente..."), pode constar 20% (Súm. 425/427 TST) — reproduzir conforme o modelo.
 10. FECHO: "Pede deferimento. São Paulo, [data]. FERNANDO ANDRADE VIEIRA – OAB/SP 320.825". Valor da causa = somatório ESTIMATIVO dos pedidos (teto R$ 400.000,00), por extenso.
+11. CONCORDÂNCIA DE GÊNERO: adapte TODOS os pronomes e a concordância nominal ao gênero do reclamante (o/a reclamante, obreiro/obreira, submetido/submetida, contratado/contratada etc.).
+12. CCT — CLÁUSULAS TÍPICAS a citar quando houver cláusulas reais disponíveis (referência da base de vigilância): 12ª (horas extras/adicional), 15ª (integração do adicional de periculosidade), 17ª (auxílio-alimentação/refeição), 19ª (vale-transporte), 33ª (10 minutos de descanso sentado), 40ª/41ª (intervalo intrajornada), 64ª (desvio de função), 71ª/72ª (multa convencional). Ajuste os números à CCT efetivamente aplicável — NÃO fixe cláusulas sem base.
 
 Em resumo: cerca de 80–85% do texto é modelo fixo — o que varia é a qualificação das partes, datas/salário, o motivo da rescisão (que puxa o capítulo correspondente) e os valores.`;
 
