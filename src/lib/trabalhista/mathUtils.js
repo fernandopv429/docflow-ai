@@ -96,8 +96,21 @@ export function calcularVerbasCaso(caso = {}) {
     itens.push({ item: 'Folgas trabalhadas (informado)', memoria: 'valor do caso', valor: round2(Number(caso.val_ft)) });
     if (dsr) itens.push({ item: 'Reflexo DSR sobre FT (1/6)', memoria: 'Súm. 172 TST', valor: dsr });
   }
-  if (caso.tem_dano_moral && salario) {
-    itens.push({ item: 'Dano moral (10x remuneração)', memoria: 'padrão do escritório', valor: danoMoral10x(salario) });
+  if (caso.tem_dano_moral && (salario || caso.maior_remuneracao)) {
+    const baseDM = Number(caso.maior_remuneracao) || salario;
+    itens.push({ item: 'Dano moral (10x remuneração)', memoria: 'padrão do escritório (10x a maior remuneração na função)', valor: danoMoral10x(baseDM) });
+  }
+  // Verbas conexas adicionais (padrões FAV — aditivas; só entram com dado/flag de suporte)
+  const funcNorm = (caso.funcao || '').toLowerCase();
+  if (/condutor|motorizad/.test(funcNorm) && salario && meses) {
+    itens.push({ item: 'Gratificação de função (10%)', memoria: '10% × salário × meses (cláusula 3ª CCT — condutor)', valor: round2(salario * 0.1 * meses) });
+  }
+  if (caso.tem_acumulo && salario && meses) {
+    itens.push({ item: 'Acúmulo de função (20%/mês)', memoria: '20% × salário × meses (multa normativa)', valor: round2(salario * 0.2 * meses) });
+  }
+  const assidMensal = Number(caso.assiduidade_prometido || caso.assiduidade_diferenca) || null;
+  if (assidMensal && meses) {
+    itens.push({ item: 'Prêmio assiduidade (suprimido)', memoria: 'valor mensal × meses (estimativa)', valor: round2(assidMensal * meses) });
   }
   return itens;
 }
