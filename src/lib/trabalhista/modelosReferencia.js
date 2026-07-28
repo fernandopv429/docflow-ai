@@ -187,6 +187,8 @@ CONVERSE em português, de forma objetiva e cordial (estilo chat). Seu papel AGO
 
 Peça, quando ainda não informado, os dados NECESSÁRIOS para uma petição completa: qualificação do reclamante (nome, nacionalidade, estado civil, RG, CPF, PIS, CTPS/Série, data de nascimento, filiação, endereço); reclamada(s) com razão social e CNPJ (e a tomadora, se houver); local de prestação dos serviços (define a competência); função e sindicato/CCT aplicável; datas de admissão e rescisão; salário e a maior remuneração na função (para dano moral e cálculos); jornada/escala; modalidade de rescisão; e as verbas/teses pretendidas. Faça poucas perguntas por vez e sinalize claramente o que ainda falta.
 
+ATENÇÃO AO FORMATO DAS ENTREVISTAS: o advogado costuma escrever em lista de rótulos. A DATA DE SAÍDA aparece frequentemente rotulada pela própria modalidade da rescisão — ex.: "Sem JUSTA CAUSA: 07/12/2025", "Rescisão indireta: 10/03/2025", "Pedido de demissão: 01/02/2025". Nesses casos, a data é a DATA DE RESCISÃO e o rótulo indica o tipo_dispensa. Nunca diga que a data de rescisão está faltando quando ela aparece nesse formato. Da mesma forma, "Jornada: 12x36 18:30 as 07:30" é a jornada/escala e "Salário: 2148,22" é o salário.
+
 Extraia em "atributos" TUDO o que já for possível inferir da conversa. Nunca devolva "atributos" vazio quando o relato contiver função, CNPJ, CEP, tomadora, rito ou teses. Considere como teses fatos como dano moral, intervalo reduzido, folgas trabalhadas e jornada extraordinária. Defina "pronto_para_gerar" como true quando o advogado pedir a minuta OU quando já houver identificação do reclamante, função, reclamada, datas do contrato, salário, jornada e fatos essenciais. Não invente dados.
 
 MODELOS DE REFERÊNCIA DISPONÍVEIS (o sistema escolherá automaticamente o mais aderente aos atributos):
@@ -200,6 +202,18 @@ ${formatarTranscript(transcript)}
 
 Responda APENAS com o objeto JSON.`;
 }
+
+// Rótulos usados na prática para a data de saída. Inclui a modalidade como
+// rótulo ("Sem justa causa: 07/12/2025"), formato comum nas entrevistas.
+const RESCISAO_RE = /(?:demiss[aã]o|rescis[aã]o|dispensa|desligamento|sa[íi]da|t[eé]rmino|(?:sem\s+)?justa\s+causa|pedido\s+de\s+demiss[aã]o|acordo)\s*:?\s*(?:em\s*)?(\d{2}\/\d{2}\/\d{4})/i;
+
+const MODALIDADE_RE = [
+  [/rescis[aã]o\s+indireta|art\.?\s*483/i, 'rescisao_indireta'],
+  [/revers[aã]o\s+da\s+(?:justa\s+causa|dispensa)/i, 'reversao_justa_causa'],
+  [/nulidade\s+do\s+pedido\s+de\s+demiss[aã]o|coa[çc][aã]o/i, 'nulidade_pedido_demissao'],
+  [/sem\s+justa\s+causa/i, 'sem_justa_causa'],
+  [/acordo\s*(?:art\.?\s*484|:)/i, 'acordo'],
+];
 
 function inferirAtributosEntrevista(transcript) {
   const userMessages = (transcript || []).filter((m) => m.role === 'user').map((m) => m.text || '');
@@ -244,8 +258,10 @@ function inferirAtributosEntrevista(transcript) {
   if (/intrajornada|intervalo/i.test(texto)) teses.push('Intervalo intrajornada (art. 71 CLT)');
   if (/folga[s]? trabalhada/i.test(texto)) teses.push('Folgas trabalhadas/DSR');
 
+  const modalidade = MODALIDADE_RE.find(([re]) => re.test(texto))?.[1];
   const atributos = {
     ...(funcao && { funcao }),
+    ...(modalidade && { tipo_dispensa: modalidade }),
     cnpjs: extrairCnpjs(texto),
     ceps: extrairCeps(texto),
     tem_tomadora: /2[ªa]\s*reclamada|tomadora/i.test(texto),
@@ -256,7 +272,7 @@ function inferirAtributosEntrevista(transcript) {
   if (!atributos.cnpjs.length) faltando.push('CNPJ da(s) reclamada(s)');
   if (!/\b\d{3}\.?\d{3}\.?\d{3}-?\d{2}\b/.test(texto)) faltando.push('CPF do reclamante');
   if (!/admiss[aã]o\s*:?\s*\d{2}\/\d{2}\/\d{4}/i.test(texto)) faltando.push('Data de admissão');
-  if (!/(?:demiss[aã]o|rescis[aã]o|dispensa)\s*:?\s*\d{2}\/\d{2}\/\d{4}/i.test(texto)) faltando.push('Data de rescisão/demissão');
+  if (!RESCISAO_RE.test(texto)) faltando.push('Data de rescisão/demissão');
   if (!/sal[aá]rio\s*:?\s*(?:r\$\s*)?[\d.,]+/i.test(texto)) faltando.push('Salário');
   if (!/(?:escala|hor[aá]rio|jornada)\s*:?/i.test(texto)) faltando.push('Jornada/escala de trabalho');
   const essenciais = !faltando.length;
@@ -291,11 +307,11 @@ export async function conversarEntrevista({ transcript, fileUrls, modelos, attrs
   const transcriptCompacto = compactarTranscript(transcript);
   const req = {
     prompt: buildChatPrompt({ transcript: transcriptCompacto, modelos, attrsAtuais }),
-    model: 'claude_sonnet_4_6',
+    model: 'claude_opus_4_6',
     response_json_schema: CHAT_SCHEMA,
   };
   if (fileUrls?.length) req.file_urls = fileUrls;
-  const key = runtimeCacheKey({ version: 5, transcript: transcriptCompacto, fileUrls, modelos, attrsAtuais });
+  const key = runtimeCacheKey({ version: 6, transcript: transcriptCompacto, fileUrls, modelos, attrsAtuais });
   const resposta = await withRuntimeCache('entrevista-ia', key, () =>
     traceAiCall('Análise da entrevista', req, () => base44.integrations.Core.InvokeLLM(req))
   );
@@ -895,7 +911,7 @@ export async function gerarPecaPadrao({ texto, fileUrls, attrs, modeloPadrao, on
       dadosDatajud,
       dadosCct,
     }),
-    model: 'claude_sonnet_4_6',
+    model: 'claude_opus_4_6',
   };
   const urls = [...(fileUrls || [])];
   if (urls.length) req.file_urls = urls;
