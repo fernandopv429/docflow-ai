@@ -250,18 +250,19 @@ function inferirAtributosEntrevista(transcript) {
     tem_tomadora: /2[ªa]\s*reclamada|tomadora/i.test(texto),
     teses,
   };
-  const essenciais = Boolean(
-    funcao &&
-    atributos.cnpjs.length &&
-    /\b\d{3}\.?\d{3}\.?\d{3}-?\d{2}\b/.test(texto) &&
-    /admiss[aã]o\s*:?\s*\d{2}\/\d{2}\/\d{4}/i.test(texto) &&
-    /(?:demiss[aã]o|rescis[aã]o|dispensa)\s*:?\s*\d{2}\/\d{2}\/\d{4}/i.test(texto) &&
-    /sal[aá]rio\s*:?\s*(?:r\$\s*)?[\d.,]+/i.test(texto) &&
-    /(?:escala|hor[aá]rio|jornada)\s*:?/i.test(texto)
-  );
+  const faltando = [];
+  if (!funcao) faltando.push('Função do reclamante');
+  if (!atributos.cnpjs.length) faltando.push('CNPJ da(s) reclamada(s)');
+  if (!/\b\d{3}\.?\d{3}\.?\d{3}-?\d{2}\b/.test(texto)) faltando.push('CPF do reclamante');
+  if (!/admiss[aã]o\s*:?\s*\d{2}\/\d{2}\/\d{4}/i.test(texto)) faltando.push('Data de admissão');
+  if (!/(?:demiss[aã]o|rescis[aã]o|dispensa)\s*:?\s*\d{2}\/\d{2}\/\d{4}/i.test(texto)) faltando.push('Data de rescisão/demissão');
+  if (!/sal[aá]rio\s*:?\s*(?:r\$\s*)?[\d.,]+/i.test(texto)) faltando.push('Salário');
+  if (!/(?:escala|hor[aá]rio|jornada)\s*:?/i.test(texto)) faltando.push('Jornada/escala de trabalho');
+  const essenciais = !faltando.length;
   return {
     atributos,
     essenciais,
+    faltando,
     pendencias: [...new Set(pendencias)],
     cepsIncompletosComCnpj,
   };
@@ -334,7 +335,7 @@ export async function conversarEntrevista({ transcript, fileUrls, modelos, attrs
   } else if (pronto && /^certo[.!]?$/i.test(reply.trim())) {
     reply = 'Dados essenciais identificados. Vou gerar a minuta com as informações fornecidas.';
   }
-  return { ...resposta, reply, atributos, pronto_para_gerar: pronto };
+  return { ...resposta, reply, atributos, pronto_para_gerar: pronto, faltando: inferido.faltando || [] };
 }
 
 // ============================================================

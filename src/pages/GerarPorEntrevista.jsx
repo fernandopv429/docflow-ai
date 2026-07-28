@@ -7,6 +7,7 @@ import { base44 } from '@/api/base44Client';
 import ToolTraceMessage from '@/components/ToolTraceMessage';
 import SessionLogsModal from '@/components/SessionLogsModal';
 import DocumentReviewPreview from '@/components/DocumentReviewPreview';
+import GenerationApprovalMessage from '@/components/GenerationApprovalMessage';
 import { exportToDocx } from '@/lib/exportDocx';
 import { TIPO_DISPENSA_LABELS } from '@/lib/trabalhista/tokens';
 import { formatBRL } from '@/lib/trabalhista/mathUtils';
@@ -37,6 +38,7 @@ export default function GerarPorEntrevista() {
   const [documentSources, setDocumentSources] = useState([]);
   const [modeloPadrao, setModeloPadrao] = useState(null);
   const [attrs, setAttrs] = useState(null);
+  const [pendingGeneration, setPendingGeneration] = useState(null);
 
   // Documento vivo (painel à direita)
   const [docHtml, setDocHtml] = useState('');
@@ -236,7 +238,14 @@ export default function GerarPorEntrevista() {
         .map((m) => m.text)
         .filter(Boolean)
         .join('\n\n');
-      if (res?.pronto_para_gerar || docHtml) {
+      const faltando = res?.faltando || [];
+      if (res?.pronto_para_gerar) {
+        await gerarMinuta({ texto: textoCompleto, urls, attrs: novoAttrs, sources: fontesAtuais });
+      } else if (faltando.length) {
+        // Avisa o que falta e pede aprovação antes de gerar com marcadores
+        setPendingGeneration({ texto: textoCompleto, urls, attrs: novoAttrs, sources: fontesAtuais });
+        setMessages((m) => [...m, { role: 'approval', faltando }]);
+      } else if (docHtml) {
         await gerarMinuta({ texto: textoCompleto, urls, attrs: novoAttrs, sources: fontesAtuais });
       }
     } catch (err) {
@@ -244,6 +253,17 @@ export default function GerarPorEntrevista() {
       setMessages((m) => [...m, { role: 'assistant', text: 'Erro ao processar. Tente novamente.' }]);
     }
     setSending(false);
+  };
+
+  const decidirGeracao = async (idx, aprovado) => {
+    setMessages((m) => m.map((msg, i) => (i === idx ? { ...msg, decided: aprovado ? 'sim' : 'nao' } : msg)));
+    const pend = pendingGeneration;
+    setPendingGeneration(null);
+    if (aprovado && pend) {
+      await gerarMinuta(pend);
+    } else if (!aprovado) {
+      setMessages((m) => [...m, { role: 'assistant', text: 'Certo, aguardo as informações que faltam antes de gerar a minuta.' }]);
+    }
   };
 
   const handleKeyDown = (e) => {
@@ -330,7 +350,14 @@ export default function GerarPorEntrevista() {
                 </div>
               )}
               {messages.map((m, i) =>
-                m.role === 'tool' || m.role === 'tool_result' ? (
+                m.role === 'approval' ? (
+                  <GenerationApprovalMessage
+                    key={i}
+                    faltando={m.faltando}
+                    decided={m.decided}
+                    onDecide={(aprovado) => decidirGeracao(i, aprovado)}
+                  />
+                ) : m.role === 'tool' || m.role === 'tool_result' ? (
                   <ToolTraceMessage key={i} message={m} />
                 ) : (
                   <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
