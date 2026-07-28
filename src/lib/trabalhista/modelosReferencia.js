@@ -619,9 +619,9 @@ export function categoriaCct(caso = {}, attrs = {}) {
   return 'terceirizados'; // porteiro / controlador de acesso / SINDEEPRES (padrão)
 }
 
-export async function consultarCct({ pergunta, categoria, data_fato, limite = 4 }) {
+export async function consultarCct({ pergunta, categoria, data_fato, municipio, uf, limite = 4 }) {
   try {
-    const resp = await base44.functions.invoke('cct', { pergunta, categoria, data_fato, limite });
+    const resp = await base44.functions.invoke('cct', { pergunta, categoria, data_fato, municipio, uf, limite });
     const data = resp?.data ?? resp;
     return { pergunta, resultados: Array.isArray(data?.resultados) ? data.resultados : [], erro: data?.erro };
   } catch (e) {
@@ -629,21 +629,60 @@ export async function consultarCct({ pergunta, categoria, data_fato, limite = 4 
   }
 }
 
-const CCT_PERGUNTAS = [
+// Perguntas sempre feitas (temas presentes em praticamente toda petição)
+const CCT_PERGUNTAS_BASE = [
   'adicional noturno e hora noturna reduzida',
   'auxílio alimentação / refeição e vale-transporte',
   'multa convencional por descumprimento de cláusula',
   'adicional de horas extras e intervalo intrajornada',
 ];
 
-export async function enriquecerCct(caso, attrs, config) {
+// Perguntas condicionais: só entram quando a tese existe no caso, para trazer
+// cláusula REAL da base (antes essas teses ficavam sem fundamento convencional).
+const CCT_PERGUNTAS_CONDICIONAIS = [
+  [/desvio de fun/i, 'desvio de função e a multa convencional correspondente'],
+  [/ac[uú]mulo de fun/i, 'acúmulo de função e a multa convencional correspondente'],
+  [/periculos/i, 'adicional de periculosidade e sua integração nas horas extras'],
+  [/insalubr/i, 'adicional de insalubridade'],
+  [/10 minutos|descanso sentad/i, 'os 10 minutos de descanso sentado durante a jornada'],
+  [/12x36|escala|jornada|hora[s]? extra/i, 'compensação de jornada, escala 12x36 e prorrogação'],
+  [/folga|dsr|descanso semanal|feriado/i, 'trabalho em folgas, feriados e descanso semanal remunerado'],
+  [/dano moral|ass[eé]dio/i, 'garantias e direitos do trabalhador previstos na convenção'],
+  [/gratifica[çc][aã]o|condutor|motorista/i, 'gratificação de função do condutor de veículo'],
+  [/sal[aá]rio normativo|piso/i, 'piso salarial / salário normativo da categoria'],
+];
+
+export function perguntasCct(caso = {}, attrs = {}) {
+  const contexto = [
+    ...(attrs.teses || []),
+    caso.acumulo_funcao,
+    caso.funcao,
+    caso.jornada_horario,
+    caso.tem_desvio && 'desvio de função',
+    caso.tem_acumulo && 'acúmulo de função',
+    caso.tem_periculosidade && 'periculosidade',
+    caso.tem_insalubridade && 'insalubridade',
+    caso.tem_adic_noturno && 'adicional noturno',
+    caso.tem_ft && 'folgas trabalhadas',
+    caso.tem_dano_moral && 'dano moral',
+  ]
+    .filter(Boolean)
+    .join(' ');
+  const condicionais = CCT_PERGUNTAS_CONDICIONAIS.filter(([re]) => re.test(contexto)).map(([, p]) => p);
+  return [...new Set([...CCT_PERGUNTAS_BASE, ...condicionais])];
+}
+
+export async function enriquecerCct(caso, attrs, config, local = {}) {
   if (!config?.cct_ativo) return null;
   const categoria = config.cct_categoria || categoriaCct(caso, attrs);
   const data_fato = caso?.data_rescisao || caso?.data_admissao || undefined;
-  const key = runtimeCacheKey({ categoria, data_fato });
+  const municipio = local.municipio || undefined;
+  const uf = local.uf || undefined;
+  const perguntas = perguntasCct(caso, attrs);
+  const key = runtimeCacheKey({ categoria, data_fato, municipio, uf, perguntas });
   return withRuntimeCache('cct', key, async () => {
     const buscas = await Promise.all(
-      CCT_PERGUNTAS.map((pergunta) => consultarCct({ pergunta, categoria, data_fato, limite: 3 }))
+      perguntas.map((pergunta) => consultarCct({ pergunta, categoria, data_fato, municipio, uf, limite: 3 }))
     );
     // dedup por cláusula (título da CCT + referência da cláusula)
     const vistos = new Set();
@@ -660,6 +699,9 @@ export async function enriquecerCct(caso, attrs, config) {
     return {
       categoria,
       data_fato,
+      municipio,
+      uf,
+      perguntas,
       clausulas,
       meta: top ? {
         titulo: top.titulo,
@@ -676,8 +718,9 @@ export async function enriquecerCct(caso, attrs, config) {
 function blocoCct(dadosCct) {
   if (!dadosCct?.clausulas?.length) return '';
   const m = dadosCct.meta;
+  const local = dadosCct.municipio ? ` — base territorial: ${dadosCct.municipio}/${dadosCct.uf || ''}` : '';
   const cab = m
-    ? `CONVENÇÃO COLETIVA APLICÁVEL — ${m.titulo || 'CCT'}${m.ano_base ? `, ano-base ${m.ano_base}` : ''}${m.vigencia_inicio ? ` (vigência ${m.vigencia_inicio}${m.vigencia_fim ? ` a ${m.vigencia_fim}` : ''})` : ''}${m.sindicato_laboral ? `; sindicato profissional: ${m.sindicato_laboral}` : ''}`
+    ? `CONVENÇÃO COLETIVA APLICÁVEL${local} — ${m.titulo || 'CCT'}${m.ano_base ? `, ano-base ${m.ano_base}` : ''}${m.vigencia_inicio ? ` (vigência ${m.vigencia_inicio}${m.vigencia_fim ? ` a ${m.vigencia_fim}` : ''})` : ''}${m.sindicato_laboral ? `; sindicato profissional: ${m.sindicato_laboral}` : ''}`
     : 'CLÁUSULAS DE CONVENÇÃO COLETIVA (CCT) APLICÁVEIS';
   const linhas = dadosCct.clausulas.slice(0, 8).map((c) => {
     const ref = c.clausula_ref ? `Cláusula ${c.clausula_ref}` : '•';
@@ -875,8 +918,16 @@ export async function gerarPecaPadrao({ texto, fileUrls, attrs, modeloPadrao, on
   // Convenção coletiva (CCT) vigente na data do fato — cláusulas reais como contexto para a IA.
   let dadosCct = null;
   if (config.cct_ativo) {
-    notify('Consultando a CCT vigente (categoria/vigência)...');
-    dadosCct = await enriquecerCct(caso, attrs, config).catch(() => null);
+    // Base territorial: usa o município/UF verificado por CEP (local de prestação).
+    const localCep = (dadosCep || []).find((d) => !d.erro && d.municipio) || {};
+    notify(
+      `Consultando a CCT vigente (categoria/vigência${localCep.municipio ? ` / base territorial: ${localCep.municipio}/${localCep.uf}` : ''})...`
+    );
+    dadosCct = await enriquecerCct(caso, attrs, config, {
+      municipio: localCep.municipio,
+      uf: localCep.uf,
+    }).catch(() => null);
+    if (dadosCct?.perguntas?.length) notify(`Temas buscados na base de CCT: ${dadosCct.perguntas.join('; ')}`);
     if (dadosCct?.meta?.titulo) notify(`CCT aplicável: ${dadosCct.meta.titulo}`);
   }
 

@@ -11,12 +11,14 @@ Deno.serve(async (req) => {
     const apiKey = Deno.env.get('CCT_API_KEY');
     if (!apiKey) return Response.json({ resultados: [], erro: 'CCT_API_KEY não configurada no servidor' });
 
-    const { pergunta, categoria, data_fato, limite = 6 } = await req.json();
+    const { pergunta, categoria, data_fato, municipio, uf, limite = 6 } = await req.json();
     if (!pergunta) return Response.json({ resultados: [], erro: 'Parâmetro "pergunta" é obrigatório' });
 
     const body: Record<string, unknown> = { pergunta, limite };
     if (categoria) body.categoria = categoria;
     if (data_fato) body.data_fato = data_fato;
+    if (municipio) body.municipio = municipio;
+    if (uf) body.uf = uf;
 
     let res;
     for (let attempt = 0; attempt <= 2; attempt++) {
