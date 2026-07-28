@@ -38,6 +38,12 @@ E) CÁLCULO E ROL DE PEDIDOS:
 - O valor da causa deve ser exatamente a soma dos itens do rol de pedidos.
 - Honorários sucumbenciais: 15% de forma uniforme no tópico, no rol e no fecho.
 
+G) TRAVAS ADICIONAIS (verificação final antes de entregar):
+- AVISO PRÉVIO: em dispensa sem justa causa com data de saída definida, o aviso prévio é INDENIZADO (Lei 12.506/11). É PROIBIDO afirmar que o reclamante "cumpriu aviso prévio trabalhado" ou pedir a redução de 2 horas diárias quando a dispensa foi imotivada e imediata.
+- PLACEHOLDERS: nenhum marcador entre colchetes ("[VALOR...]", "[CONFIRMAR]") e nenhum "R$ 0,00" pode constar da peça final. Todo item do rol de pedidos precisa de valor numérico estimado a partir do salário do reclamante e dos meses de contrato.
+- VALE-TRANSPORTE: quando o valor não for informado na entrevista, adote o padrão de R$ 10,00 por dia (duas conduções de R$ 5,00) e explicite essa base de cálculo.
+- FOLGAS PAGAS POR FORA (FTS): requeira o reconhecimento da natureza salarial do montante recebido em dinheiro/PIX e seus reflexos em DSR, aviso prévio, férias + 1/3, 13º e FGTS + 40%, sem duplicar a cobrança da verba principal.
+
 F) ENTREGA:
 - Comece direto em "AO MM. JUÍZO DA VARA DO TRABALHO DE ...". Sem comentários, introduções ou narração de etapas.
 - Garanta a concordância de gênero em todo o texto conforme o reclamante.

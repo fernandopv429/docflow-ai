@@ -1023,6 +1023,7 @@ Checagens obrigatórias:
 - Enquadramento funcional errado: vigilante em prevenção de perdas/conferência de cargas deve gerar DESVIO de função (50%/mês); vigilante conduzindo veículo, GRATIFICAÇÃO de 10%; porteiro em rondas, ACÚMULO de 20% — cumular esses pedidos sobre os mesmos fatos é BLOQUEANTE.
 - Dano moral em valor diferente de 10x o último salário, ou sem a narrativa concreta dos fatos do caso.
 - Pedido com "[VALOR A APURAR]", "R$ 0,00" ou colchete de rascunho no rol de pedidos — BLOQUEANTE.
+- Menção a aviso prévio "trabalhado" ou à redução de 2 horas diárias quando a dispensa foi sem justa causa e imediata (deve ser aviso prévio INDENIZADO) — BLOQUEANTE.
 - Ausência de tópico obrigatório (ex.: responsabilidade subsidiária quando há tomadora).
 
 Classifique cada alerta: BLOQUEANTE (erro grave), ATENCAO (revisar) ou INFO. Defina "status": "bloqueado" se houver BLOQUEANTE; "revisar" se houver ATENCAO; senão "aprovado".
