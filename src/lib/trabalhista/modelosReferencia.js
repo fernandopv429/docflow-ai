@@ -6,6 +6,7 @@ import { extrairCasoDeTexto } from './parserEntrevista';
 import { calcularVerbasCaso } from './mathUtils';
 import { runtimeCacheKey, withRuntimeCache } from './runtimeCache';
 import { removeTextLetterhead } from '@/lib/removeTextLetterhead';
+import { blocoRegrasCriticas, regiaoTrtPorMunicipio } from './regrasCriticas';
 import { traceAiCall } from '@/lib/sessionTrace';
 
 // ============================================================
@@ -784,7 +785,9 @@ function blocoCalculos(calculos) {
 
 // Geração adaptando o MODELO PADRÃO (HTML formatado), preservando o estilo.
 export function buildGeracaoPadraoPrompt({ texto, attrs, modeloHtml, calculos, diferencial, modeloSemelhanteTitulo, dadosReceita, dadosCep, dadosDatajud, dadosCct }) {
-  return `${PROMPT_SISTEMA_PETICAO}
+  const municipios = [...new Set((dadosCep || []).map((d) => d.municipio).filter(Boolean))];
+  const dataHoje = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
+  return `${PROMPT_SISTEMA_PETICAO}${blocoRegrasCriticas({ municipios, dataHoje })}
 
 REGRA PRINCIPAL — ADAPTE O MODELO PADRÃO MANTENDO O ESTILO: abaixo está o MODELO PADRÃO do escritório em HTML (com a formatação, o layout e o texto-padrão corretos, podendo conter marcadores como {{VARIAVEL}}). Sua tarefa é ADAPTAR este HTML ao caso atual:
 - Substitua os marcadores {{...}} e quaisquer dados de exemplo pelos dados REAIS do caso (entrevista/documentos). Onde faltar um dado, deixe um marcador claro entre colchetes, ex.: [SALÁRIO].
@@ -799,7 +802,13 @@ ${diferencial ? `\n=== CASO SEMELHANTE NA BASE${modeloSemelhanteTitulo ? ` (${mo
 === ENTREVISTA / CASO ATUAL ===
 ${texto || '(ver documentos anexados)'}
 
-Atributos detectados: função=${attrs?.funcao || '-'}, modalidade=${attrs?.tipo_dispensa || '-'}, rito=${attrs?.rito || '-'}, tomadora=${attrs?.tem_tomadora ? 'sim' : 'não'}.
+Atributos detectados: função=${attrs?.funcao || '-'}, modalidade=${attrs?.tipo_dispensa || '-'}, rito=${attrs?.rito || '-'}, tomadora=${attrs?.tem_tomadora ? 'sim' : 'não'}.${
+    municipios.length
+      ? `\nCompetência calculada por código: ${municipios
+          .map((m) => `${m} → ${regiaoTrtPorMunicipio(m) || 'região a confirmar'}`)
+          .join('; ')}. USE esta região; não a recalcule.`
+      : ''
+  }
 === FIM DA ENTREVISTA ===${blocoReceita(dadosReceita)}${blocoCeps(dadosCep)}${blocoDatajud(dadosDatajud)}${blocoCct(dadosCct)}${blocoCalculos(calculos)}
 
 FORMATO DE SAÍDA: retorne APENAS o HTML adaptado do corpo da petição (sem <html>, <head> ou <body>), PRESERVANDO a formatação/estilo do modelo. NÃO acrescente avisos, notas ou observações ao final.`;
@@ -933,6 +942,12 @@ export async function verificarCoerencia({ texto, caso, html }) {
 
 Checagens obrigatórias:
 - Tese/pedido SEM suporte no relato (ex.: adicional noturno sem jornada noturna; periculosidade/insalubridade sem exposição relatada; horas extras sem alegação de sobrejornada).
+- COMPETÊNCIA/TRT errado para o município de prestação (Grande São Paulo/Baixada/Litoral = TRT 2ª Região; interior/Campinas = TRT 15ª Região). Divergência é BLOQUEANTE.
+- Tópico ou quadro sobre ESCALA DIFERENTE da relatada (ex.: 4x2 quando o caso é 12x36) — BLOQUEANTE.
+- DESVIO e ACÚMULO de função pedidos cumulativamente sobre os mesmos fatos — BLOQUEANTE.
+- Percentual de HONORÁRIOS divergente entre o tópico, os pedidos e o fecho.
+- Valores estimados redondos/genéricos sem base de cálculo, ou valor da causa desproporcional ao salário e ao período contratual.
+- Data do fecho ainda como "[data]".
 - Verba pedida em DUPLICIDADE.
 - Marcadores entre colchetes [ ] ainda pendentes (dados que faltam preencher).
 - Modalidade de rescisão incompatível com os pedidos.
