@@ -7,6 +7,7 @@ import { calcularVerbasCaso } from './mathUtils';
 import { runtimeCacheKey, withRuntimeCache } from './runtimeCache';
 import { removeTextLetterhead } from '@/lib/removeTextLetterhead';
 import { blocoRegrasCriticas, regiaoTrtPorMunicipio } from './regrasCriticas';
+import { BLOCO_ENGENHARIA_JURIDICA } from './engenhariaJuridica';
 import { traceAiCall } from '@/lib/sessionTrace';
 
 // ============================================================
@@ -826,7 +827,7 @@ PADRÕES VALIDADOS DO ESCRITÓRIO (extraídos de peças-modelo aprovadas — sig
 6. JORNADA NOTURNA: se a jornada abrange o período noturno (ex.: 12x36 das 18h30 às 7h30), incluir "Do Adicional Noturno e Hora Noturna Reduzida" (20%, hora reduzida de 52min30s, art. 73 CLT, Súm. 60 e 91 TST).
 7. FOLGAS TRABALHADAS (FT) e "pagamento por fora": quando houver labor em folgas/feriados pago por fora (dinheiro/PIX), pedir adicional de 100% (Súm. 444) + integração dos valores extra-folha + reflexos; e ausência de VT e de auxílio-alimentação nesses dias.
 8. QUALIFICAÇÃO DO RECLAMANTE: manter a ordem nacionalidade, estado civil, função, RG, CPF, PIS, CTPS/Série, nascimento, filiação, endereço — omitindo com marcador [ ] apenas o que faltar.
-9. HONORÁRIOS: no capítulo próprio e no rol de pedidos, usar 15%; no parágrafo de fecho ("julgada procedente..."), pode constar 20% (Súm. 425/427 TST) — reproduzir conforme o modelo.
+9. HONORÁRIOS: usar 15% de forma UNIFORME no capítulo próprio, no rol de pedidos e no parágrafo de fecho ("julgada procedente...", Súm. 425/427 TST). Nunca misturar 15% e 20% na mesma peça.
 10. FECHO: "Pede deferimento. São Paulo, [data]. FERNANDO ANDRADE VIEIRA – OAB/SP 320.825". Valor da causa = somatório ESTIMATIVO dos pedidos (teto R$ 400.000,00), por extenso.
 11. CONCORDÂNCIA DE GÊNERO: adapte TODOS os pronomes e a concordância nominal ao gênero do reclamante (o/a reclamante, obreiro/obreira, submetido/submetida, contratado/contratada etc.).
 12. CCT — CLÁUSULAS TÍPICAS a citar quando houver cláusulas reais disponíveis (referência da base de vigilância): 12ª (horas extras/adicional), 15ª (integração do adicional de periculosidade), 17ª (auxílio-alimentação/refeição), 19ª (vale-transporte), 33ª (10 minutos de descanso sentado), 40ª/41ª (intervalo intrajornada), 64ª (desvio de função), 71ª/72ª (multa convencional). Ajuste os números à CCT efetivamente aplicável — NÃO fixe cláusulas sem base.
@@ -846,7 +847,7 @@ function blocoCalculos(calculos) {
 export function buildGeracaoPadraoPrompt({ texto, attrs, modeloHtml, calculos, diferencial, modeloSemelhanteTitulo, dadosReceita, dadosCep, dadosDatajud, dadosCct }) {
   const municipios = [...new Set((dadosCep || []).map((d) => d.municipio).filter(Boolean))];
   const dataHoje = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
-  return `${PROMPT_SISTEMA_PETICAO}${blocoRegrasCriticas({ municipios, dataHoje })}
+  return `${PROMPT_SISTEMA_PETICAO}${BLOCO_ENGENHARIA_JURIDICA}${blocoRegrasCriticas({ municipios, dataHoje })}
 
 REGRA PRINCIPAL — ADAPTE O MODELO PADRÃO MANTENDO O ESTILO: abaixo está o MODELO PADRÃO do escritório em HTML (com a formatação, o layout e o texto-padrão corretos, podendo conter marcadores como {{VARIAVEL}}). Sua tarefa é ADAPTAR este HTML ao caso atual:
 - Substitua os marcadores {{...}} e quaisquer dados de exemplo pelos dados REAIS do caso (entrevista/documentos). Onde faltar um dado, deixe um marcador claro entre colchetes, ex.: [SALÁRIO].
@@ -1018,7 +1019,10 @@ Checagens obrigatórias:
 - Verba pedida em DUPLICIDADE.
 - Marcadores entre colchetes [ ] ainda pendentes (dados que faltam preencher).
 - Modalidade de rescisão incompatível com os pedidos.
-- Valor da causa acima de R$ 400.000,00.
+- Valor da causa acima de R$ 400.000,00, ou diferente da soma dos itens do rol de pedidos.
+- Enquadramento funcional errado: vigilante em prevenção de perdas/conferência de cargas deve gerar DESVIO de função (50%/mês); vigilante conduzindo veículo, GRATIFICAÇÃO de 10%; porteiro em rondas, ACÚMULO de 20% — cumular esses pedidos sobre os mesmos fatos é BLOQUEANTE.
+- Dano moral em valor diferente de 10x o último salário, ou sem a narrativa concreta dos fatos do caso.
+- Pedido com "[VALOR A APURAR]", "R$ 0,00" ou colchete de rascunho no rol de pedidos — BLOQUEANTE.
 - Ausência de tópico obrigatório (ex.: responsabilidade subsidiária quando há tomadora).
 
 Classifique cada alerta: BLOQUEANTE (erro grave), ATENCAO (revisar) ou INFO. Defina "status": "bloqueado" se houver BLOQUEANTE; "revisar" se houver ATENCAO; senão "aprovado".
