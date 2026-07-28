@@ -213,6 +213,12 @@ export default function GerarPorEntrevista() {
       setAttrs(novoAttrs);
       setMessages((m) => [
         ...m,
+        ...(res?.dadosReceita?.length
+          ? [
+              { role: 'tool', text: `Consultando ${res.dadosReceita.length} CNPJ(s) na Receita Federal (BrasilAPI)...` },
+              { role: 'tool_result', title: 'Retorno da Receita Federal (BrasilAPI)', text: JSON.stringify(res.dadosReceita, null, 2) },
+            ]
+          : []),
         { role: 'assistant', text: res?.reply || 'Certo.' },
         {
           role: 'tool_result',

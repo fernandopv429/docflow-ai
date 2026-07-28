@@ -326,6 +326,17 @@ export async function conversarEntrevista({ transcript, fileUrls, modelos, attrs
     }
   }
 
+  // Consulta SEMPRE os CNPJs na Receita — os dados oficiais completam
+  // endereço/CEP das reclamadas e são exibidos no chat.
+  const dadosReceita = (atributos.cnpjs || []).length
+    ? await enriquecerCnpjs(atributos.cnpjs)
+    : [];
+  const verificados = dadosReceita.filter((d) => !d.erro);
+  for (const d of verificados) {
+    const cepOficial = (d.cep || '').replace(/\D/g, '');
+    if (cepOficial.length === 8) atributos.ceps = [...new Set([...(atributos.ceps || []), cepOficial])];
+  }
+
   const pronto = Boolean(resposta?.pronto_para_gerar || inferido.essenciais) && !inferido.pendencias.length;
   let reply = resposta?.reply || 'Dados recebidos e analisados.';
   if (inferido.pendencias.length) {
@@ -335,7 +346,16 @@ export async function conversarEntrevista({ transcript, fileUrls, modelos, attrs
   } else if (pronto && /^certo[.!]?$/i.test(reply.trim())) {
     reply = 'Dados essenciais identificados. Vou gerar a minuta com as informações fornecidas.';
   }
-  return { ...resposta, reply, atributos, pronto_para_gerar: pronto, faltando: inferido.faltando || [] };
+  if (verificados.length) {
+    reply += `\n\nDados oficiais da Receita Federal:\n${verificados
+      .map((d) => `• ${d.razao_social} — CNPJ ${d.cnpj}, ${d.endereco}, CEP ${d.cep}`)
+      .join('\n')}`;
+  }
+  const faltando = inferido.faltando || [];
+  if (faltando.length && !inferido.pendencias.length) {
+    reply += `\n\nAinda falta: ${faltando.join('; ')}.`;
+  }
+  return { ...resposta, reply, atributos, pronto_para_gerar: pronto, faltando, dadosReceita };
 }
 
 // ============================================================
