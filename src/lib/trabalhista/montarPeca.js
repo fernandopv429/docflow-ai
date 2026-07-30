@@ -193,6 +193,23 @@ export function montarPeca(html, ctx = {}) {
   // Se nenhuma modalidade foi identificada, assume dispensa sem justa causa (peça mais enxuta).
   if (!Object.values(flags).some(Boolean)) flags.T_DISPENSA = true;
   let out = applyConditionals(html, flags);
+
+  // Poda também os ITENS DE PEDIDO (no rol "DOS PEDIDOS") das verbas que não se
+  // aplicam ao caso — o capítulo de mérito já foi removido por podarPorFlags, mas
+  // a linha correspondente do rol precisa sair junto (senão fica [preencher]).
+  const fs = flagsSecoes(ctx.caso || {}, ctx.attrs || {});
+  const PEDIDO_POR_FLAG = {
+    tem_gratificacao: ['VALOR_GRATIFICACAO'],
+    tem_acumulo: ['VALOR_ACUMULO'],
+    tem_assiduidade: ['VALOR_ASSIDUIDADE', 'VAL_ASSIDUIDADE_MENSAL', 'ASSIDUIDADE_DESDE'],
+  };
+  for (const [flag, toks] of Object.entries(PEDIDO_POR_FLAG)) {
+    if (fs[flag]) continue;
+    for (const tk of toks) {
+      out = out.replace(new RegExp(`<p\\b[^>]*>(?:(?!</p>)[\\s\\S])*?\\{\\{${tk}\\}\\}(?:(?!</p>)[\\s\\S])*?</p>`, 'g'), '');
+    }
+  }
+
   const dados = tokensDaPeca(ctx);
   out = out.replace(/\{\{\s*([A-Z0-9_]+)\s*\}\}/g, (m, k) => {
     if (dados[k] !== undefined && dados[k] !== '') {
