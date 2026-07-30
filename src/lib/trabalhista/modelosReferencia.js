@@ -13,6 +13,7 @@ import { blocoRegrasCriticas, regiaoTrtPorMunicipio } from './regrasCriticas';
 import { BLOCO_ENGENHARIA_JURIDICA } from './engenhariaJuridica';
 import { traceAiCall } from '@/lib/sessionTrace';
 import { dividirSecoes, resumoSecoes, aplicarPlano, podarPorFlags, PLANO_SCHEMA } from './montagemSecoes';
+import { obterBlocoRegrasAprendidas } from './regrasAprendidas';
 
 // ============================================================
 // Anonimização (mesma lógica usada no cadastro dos modelos)
@@ -868,10 +869,10 @@ function blocoCalculos(calculos) {
 // Prompt do PLANO de adaptação: a IA NÃO reescreve a peça; ela só indica o
 // que muda. Todo o texto-padrão (formatação, jurisprudência, boilerplate)
 // permanece fixo no modelo, aplicado por código.
-export function buildPlanoPrompt({ texto, attrs, resumo, calculos, diferencial, modeloSemelhanteTitulo, dadosReceita, dadosCep, dadosDatajud, dadosCct }) {
+export function buildPlanoPrompt({ texto, attrs, resumo, calculos, diferencial, modeloSemelhanteTitulo, dadosReceita, dadosCep, dadosDatajud, dadosCct, regrasAprendidas }) {
   const municipios = [...new Set((dadosCep || []).map((d) => d.municipio).filter(Boolean))];
   const dataHoje = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
-  return `${PROMPT_SISTEMA_PETICAO}${BLOCO_ENGENHARIA_JURIDICA}${blocoRegrasCriticas({ municipios, dataHoje })}
+  return `${PROMPT_SISTEMA_PETICAO}${BLOCO_ENGENHARIA_JURIDICA}${blocoRegrasCriticas({ municipios, dataHoje })}${regrasAprendidas || ''}
 
 SUA TAREFA AGORA NÃO É REDIGIR A PETIÇÃO INTEIRA. O modelo padrão do escritório já está montado, formatado e com todo o texto-padrão correto. Você deve devolver apenas o PLANO DE ADAPTAÇÃO deste modelo ao caso atual:
 1. "substituicoes": para cada DADO textual que muda no modelo (qualificação das partes, CNPJ/endereços, comarca/região, datas, função, escala e a FREQUÊNCIA de folgas/eventos — ex.: "10 a 12" → "5 a 7" —, concordância de gênero, data do fecho), copie em "de" o trecho EXATO do modelo (curto e único) e em "para" o valor do caso. Para os VALORES já calculados por código (abaixo) NÃO crie substituição — o sistema os insere sozinho.
@@ -1029,6 +1030,8 @@ export async function gerarPecaPadrao({ texto, fileUrls, attrs, modeloPadrao, on
 
   const { secoes } = dividirSecoes(modeloPadrao?.html || '');
   notify(`Modelo padrão dividido em ${secoes.length} seções — o texto-padrão fica fixo; a IA só adapta o que muda.`);
+  const regrasAprendidas = await obterBlocoRegrasAprendidas();
+  if (regrasAprendidas) notify('Aplicando as regras e preferências aprendidas do escritório...');
   const req = {
     prompt: buildPlanoPrompt({
       texto,
@@ -1041,6 +1044,7 @@ export async function gerarPecaPadrao({ texto, fileUrls, attrs, modeloPadrao, on
       dadosCep,
       dadosDatajud,
       dadosCct,
+      regrasAprendidas,
     }),
     model: 'claude_sonnet_4_6',
     response_json_schema: PLANO_SCHEMA,

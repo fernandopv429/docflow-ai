@@ -20,6 +20,7 @@ import {
   gerarPecaPadrao,
   verificarCoerencia,
 } from '@/lib/trabalhista/modelosReferencia';
+import { classificarCorrecao, salvarRegraAprendida } from '@/lib/trabalhista/regrasAprendidas';
 
 export default function GerarPorEntrevista() {
   const [messages, setMessages] = useState([]);
@@ -189,6 +190,25 @@ export default function GerarPorEntrevista() {
     setFiles([]);
     setSending(true);
     try {
+      // Detecta se a mensagem é uma correção/regra de estilo ou de direito
+      // (aprendizado do escritório) — se for, salva e reaplica na minuta.
+      if (text && !attached.length) {
+        const classificacao = await classificarCorrecao(text);
+        if (classificacao?.eh_correcao && classificacao.regra_extraida) {
+          await salvarRegraAprendida(classificacao, text);
+          setMessages((m) => [
+            ...m,
+            { role: 'tool', text: 'Correção identificada — registrando regra aprendida no sistema...' },
+            { role: 'tool_result', title: 'Regra aprendida registrada', text: JSON.stringify(classificacao, null, 2) },
+            { role: 'assistant', text: classificacao.resposta_chat || 'Entendido! Registrei esta preferência/correção no sistema e ela será aplicada nas próximas gerações.' },
+          ]);
+          setSending(false);
+          if (docHtml) {
+            await gerarMinuta({ texto: userText || undefined });
+          }
+          return;
+        }
+      }
       let urls = allUrls;
       let fontesAtuais = documentSources;
       let textosAtuais = docTexts;
