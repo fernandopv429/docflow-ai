@@ -1,6 +1,6 @@
 import { applyConditionals } from '@/lib/variables';
 import { formatBRL } from './mathUtils';
-import { UF_TRT_MAP } from './tokens';
+import { regiaoTrtCanonica } from './regrasCriticas';
 
 // Formata dinheiro só quando há valor POSITIVO; 0/ausente/inválido → undefined
 // (vira marcador [preencher]) para nunca emitir "R$ 0,00" na peça.
@@ -126,7 +126,7 @@ export function tokensDaPeca({ caso = {}, calculos = [], dadosReceita = [], dado
   // Competência / partes
   set('COMARCA', caso.comarca || (municipioCep && municipioCep.municipio) || '');
   set('COMARCA_UF', uf);
-  set('REGIAO_TRT', UF_TRT_MAP[uf] || '');
+  set('REGIAO_TRT', regiaoTrtCanonica(caso.comarca || (municipioCep && municipioCep.municipio), caso.comarca_uf));
   set('LOCAL_PRESTACAO', caso.local_prestacao || '');
   set('RITO', attrs.rito === 'sumarissimo' ? 'sumaríssimo' : 'ordinário');
   set('RECL_NOME', caso.recl_nome);
