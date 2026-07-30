@@ -3,7 +3,8 @@ import mammoth from 'mammoth';
 import { TIPO_DISPENSA_LABELS } from './tokens';
 import { loadTemplateContent } from '@/lib/templateContent';
 import { extrairCasoDeTexto } from './parserEntrevista';
-import { montarPeca, flagsSecoes } from './montarPeca';
+import { montarPeca, flagsSecoes, assertNoUnreplacedTokens } from './montarPeca';
+import { validarCasoTrabalhista } from './validacaoCaso';
 import { derivarValoresCct } from './derivarValoresCct';
 import { calcularVerbasCaso } from './mathUtils';
 import { runtimeCacheKey, withRuntimeCache } from './runtimeCache';
@@ -822,7 +823,7 @@ O QUE É PADRÃO (boilerplate — reproduza IGUAL, palavra por palavra, do model
 - Bloco de preliminares, SEMPRE nesta ordem: Da Competência Processual → Da Não Limitação ao Valor da Causa (Estimativa) → Do Juízo 100% Digital → Da Extinção do Feito sem Julgamento de Mérito → Da Justiça Gratuita.
 - Teses de mérito genéricas com texto praticamente idêntico ao modelo: Do Dano Moral; Da Súmula 331 (responsabilidade subsidiária da tomadora); Do Acúmulo de Função; Da Jornada; Das Horas Extras; Da Descaracterização da Escala 12x36/4x2; Do Artigo 71 (intervalo); Do Adicional Noturno; Dos Minutos que Antecedem/Sucedem; DSR; Folgas/Feriados 100%; Integração do "pagamento por fora"; Vale-Transporte; Auxílio-Alimentação; Multas Convencionais; FGTS+40%; Aviso Prévio; Verbas Rescisórias; Multa 477; Multa 467; IR; Previdência; Expedição de Ofícios; Atribuição Estimativa; Dos Pedidos.
 - Jurisprudências, citações de doutrina e quadros sinóticos (tabelas de escala) são copiados do modelo sem alteração.
-- Fecho: "Pede deferimento. São Paulo, [data]. FERNANDO ANDRADE VIEIRA – OAB/SP 320.825", com honorários de 20% e Súmulas 425/427 do TST.
+- Fecho: "Pede deferimento. São Paulo, [data]. FERNANDO ANDRADE VIEIRA – OAB/SP 320.825", com honorários de 15% (art. 791-A da CLT) e Súmulas 425/427 do TST.
 
 O QUE MUDA (variáveis a preencher caso a caso):
 - Qualificação do reclamante: nome, RG, CPF, PIS, CTPS, data de nascimento, filiação, endereço e função (ex.: porteiro ou controlador de acesso).
@@ -1002,6 +1003,12 @@ export async function gerarPecaPadrao({ texto, fileUrls, attrs, modeloPadrao, on
     }
   }
 
+  // Validação rígida (datas/valores) ANTES dos cálculos — evita distorções.
+  const validado = validarCasoTrabalhista(caso || {});
+  for (const alerta of validado.alertas) notify(`Validação do caso: ${alerta}`);
+  Object.assign(caso, validado.caso);
+  for (const k of Object.keys(caso)) if (!(k in validado.caso)) delete caso[k];
+
   // Cálculo 100% determinístico (a IA não faz aritmética).
   const calculos = calcularVerbasCaso(caso || {});
 
@@ -1055,8 +1062,14 @@ export async function gerarPecaPadrao({ texto, fileUrls, attrs, modeloPadrao, on
   if (relatorio.faltaram.length) {
     notify(`Trechos não localizados no modelo (revisar manualmente): ${relatorio.faltaram.slice(0, 8).join(' | ')}`);
   }
+  const htmlFinal = limparHtmlIA(html);
+  const pendentes = assertNoUnreplacedTokens(htmlFinal);
+  if (pendentes.length) {
+    notify(`Campos ainda sem valor (marcados em amarelo na minuta — informe no chat para eu recalcular): ${pendentes.join(', ')}`);
+  }
   return {
-    html: limparHtmlIA(html),
+    html: htmlFinal,
+    pendentes,
     plano,
     dadosReceita,
     dadosCep,

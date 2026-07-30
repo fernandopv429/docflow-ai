@@ -186,6 +186,14 @@ export function flagsSecoes(caso = {}, attrs = {}) {
   };
 }
 
+// Validador pré-render: lista os tokens que continuaram sem valor no HTML final.
+export function assertNoUnreplacedTokens(html) {
+  const pendentes = new Set();
+  for (const m of String(html || '').matchAll(/\[preencher:\s*([A-Z0-9_]+)\s*\]/g)) pendentes.add(m[1]);
+  for (const m of String(html || '').matchAll(/\{\{\s*([A-Z0-9_]+)\s*\}\}/g)) pendentes.add(m[1]);
+  return [...pendentes];
+}
+
 // Passo final: resolve condicionais de modalidade + substitui tokens + marca residuais.
 export function montarPeca(html, ctx = {}) {
   if (!html) return html;
