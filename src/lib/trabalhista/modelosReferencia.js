@@ -4,6 +4,7 @@ import { TIPO_DISPENSA_LABELS } from './tokens';
 import { loadTemplateContent } from '@/lib/templateContent';
 import { extrairCasoDeTexto } from './parserEntrevista';
 import { montarPeca } from './montarPeca';
+import { derivarValoresCct } from './derivarValoresCct';
 import { calcularVerbasCaso } from './mathUtils';
 import { runtimeCacheKey, withRuntimeCache } from './runtimeCache';
 import { removeTextLetterhead } from '@/lib/removeTextLetterhead';
@@ -982,6 +983,30 @@ export async function gerarPecaPadrao({ texto, fileUrls, attrs, modeloPadrao, on
     }).catch(() => null);
     if (dadosCct?.perguntas?.length) notify(`Temas buscados na base de CCT: ${dadosCct.perguntas.join('; ')}`);
     if (dadosCct?.meta?.titulo) notify(`CCT aplicável: ${dadosCct.meta.titulo}`);
+  }
+
+  // EXPERTISE: quando faltam dados econômicos na entrevista, derivar da CCT
+  // (piso salarial da função, valores de benefícios, adicionais) — como a
+  // especialista faz. Preenche APENAS lacunas; nunca sobrescreve o que veio.
+  if (dadosCct?.clausulas?.length) {
+    const num = (v) => { const n = Number(v); return Number.isFinite(n) && n > 0 ? n : null; };
+    try {
+      notify('Derivando valores normativos da CCT (piso, benefícios, adicionais)...');
+      const vc = await derivarValoresCct({ caso, attrs, dadosCct });
+      caso.valores_cct = vc;
+      if (!num(caso.salario) && num(vc.piso_salarial)) {
+        caso.salario = num(vc.piso_salarial);
+        caso.salario_origem = 'piso normativo da CCT (estimado — confirmar)';
+        if (!num(caso.maior_remuneracao)) caso.maior_remuneracao = caso.salario;
+        notify(`Salário ausente na entrevista — usando o piso normativo da CCT: R$ ${caso.salario}`);
+      }
+      if (!num(caso.valor_aux_alimentacao) && (num(vc.auxilio_alimentacao_dia) || num(vc.vale_refeicao_dia))) {
+        caso.valor_aux_alimentacao = num(vc.auxilio_alimentacao_dia) || num(vc.vale_refeicao_dia);
+      }
+      if (!num(caso.val_conducao) && num(vc.vale_transporte_dia)) caso.val_conducao = num(vc.vale_transporte_dia);
+    } catch (e) {
+      /* segue sem derivação da CCT */
+    }
   }
 
   // Cálculo 100% determinístico (a IA não faz aritmética).
