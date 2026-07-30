@@ -39,7 +39,11 @@ const CALC_TOKEN = {
   'Dano moral (10x remuneração)': 'VALOR_DANO_MORAL',
   'Gratificação de função (10%)': 'VALOR_GRATIFICACAO',
   'Acúmulo de função (20%/mês)': 'VALOR_ACUMULO',
+  'Desvio de função (50%/mês)': 'VALORES_DESVIO_FUNCAO',
   'Prêmio assiduidade (suprimido)': 'VALOR_ASSIDUIDADE',
+  'Multa do art. 477 da CLT': 'VALOR_MULTA_477',
+  'Multa do art. 467 da CLT': 'VALOR_ART_467',
+  'Integração de valores pagos por fora (FTs)': 'VALORES_FORA_FOLHA',
 };
 
 function montarQualificacao(caso = {}) {
@@ -83,6 +87,21 @@ export function tokensDaPeca({ caso = {}, calculos = [], dadosReceita = [], dado
   if (fgtsDep) set('VALOR_FGTS_DIF', money(fgtsDep.valor));
   if (fgtsMul) set('VALOR_FGTS_MULTA', money(fgtsMul.valor));
   if (fgtsDep && fgtsMul) set('VALOR_FGTS_TOTAL', money((Number(fgtsDep.valor) || 0) + (Number(fgtsMul.valor) || 0)));
+
+  // Detalhe das verbas rescisórias (composição legível a partir dos itens calculados)
+  const acha = (nome) => (calculos || []).find((c) => c.item === nome);
+  const partesResc = [];
+  const sd = acha('Saldo de salário'); if (sd && Number(sd.valor) > 0) partesResc.push(`saldo de salário: ${formatBRL(sd.valor)}`);
+  const av = acha('Aviso prévio indenizado'); if (av && Number(av.valor) > 0) partesResc.push(`aviso prévio indenizado: ${formatBRL(av.valor)}`);
+  const t13 = acha('13º proporcional'); if (t13 && Number(t13.valor) > 0) partesResc.push(`13º proporcional: ${formatBRL(t13.valor)}`);
+  const fer = acha('Férias proporcionais + 1/3'); if (fer && Number(fer.valor) > 0) partesResc.push(`férias proporcionais + 1/3: ${formatBRL(fer.valor)}`);
+  if (fgtsDep && fgtsMul) partesResc.push(`FGTS + 40%: ${formatBRL((Number(fgtsDep.valor) || 0) + (Number(fgtsMul.valor) || 0))}`);
+  if (partesResc.length) set('VERBAS_RESCISORIAS_DETALHE', `${partesResc.join('; ')}.`);
+
+  // Valor da causa (estimativo): soma dos valores determinísticos calculados, teto R$ 400.000
+  let somaCausa = 0;
+  for (const c of calculos || []) { const n = Number(c.valor); if (Number.isFinite(n) && n > 0) somaCausa += n; }
+  if (somaCausa > 0) set('VALOR_CAUSA', formatBRL(Math.min(Math.round((somaCausa + Number.EPSILON) * 100) / 100, 400000)));
 
   // Competência / partes
   set('COMARCA', caso.comarca || (municipioCep && municipioCep.municipio) || '');
