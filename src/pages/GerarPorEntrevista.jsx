@@ -169,7 +169,11 @@ export default function GerarPorEntrevista() {
       }
     } catch (err) {
       console.error(err);
-      setMessages((m) => [...m, { role: 'assistant', text: 'Erro ao gerar a minuta. Tente novamente.' }]);
+      setMessages((m) => [
+        ...m,
+        { role: 'tool_result', title: 'Erro na geração da minuta', text: String(err?.stack || err?.message || err) },
+        { role: 'assistant', text: `Erro ao gerar a minuta: ${err?.message || 'falha desconhecida'}. Tente enviar novamente.` },
+      ]);
     }
     setGenerating(false);
   };
