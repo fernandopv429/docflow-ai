@@ -191,7 +191,7 @@ Peça, quando ainda não informado, os dados NECESSÁRIOS para uma petição com
 
 ATENÇÃO AO FORMATO DAS ENTREVISTAS: o advogado costuma escrever em lista de rótulos. A DATA DE SAÍDA aparece frequentemente rotulada pela própria modalidade da rescisão — ex.: "Sem JUSTA CAUSA: 07/12/2025", "Rescisão indireta: 10/03/2025", "Pedido de demissão: 01/02/2025". Nesses casos, a data é a DATA DE RESCISÃO e o rótulo indica o tipo_dispensa. Nunca diga que a data de rescisão está faltando quando ela aparece nesse formato. Da mesma forma, "Jornada: 12x36 18:30 as 07:30" é a jornada/escala e "Salário: 2148,22" é o salário.
 
-Extraia em "atributos" TUDO o que já for possível inferir da conversa. Nunca devolva "atributos" vazio quando o relato contiver função, CNPJ, CEP, tomadora, rito ou teses. Considere como teses fatos como dano moral, intervalo reduzido, folgas trabalhadas e jornada extraordinária. Defina "pronto_para_gerar" como true quando o advogado pedir a minuta OU quando já houver identificação do reclamante, função, reclamada, datas do contrato, salário, jornada e fatos essenciais. Não invente dados.
+Extraia em "atributos" TUDO o que já for possível inferir da conversa. Nunca devolva "atributos" vazio quando o relato contiver função, CNPJ, CEP, tomadora, rito ou teses. Considere como teses fatos como dano moral, intervalo reduzido, folgas trabalhadas e jornada extraordinária. Defina "pronto_para_gerar" como true quando o advogado pedir a minuta OU quando já houver identificação do reclamante, função, reclamada, datas do contrato, salário, jornada e fatos essenciais. Não invente dados. Se houver um FORMULÁRIO DE ENTREVISTA anexado (padrão do escritório, assinado via ZapSign), LEIA-O e extraia dele os atributos (partes, CNPJ/CEP, função, escala, tipo de dispensa, teses) — os anexos são fonte primária.
 
 MODELOS DE REFERÊNCIA DISPONÍVEIS (o sistema escolherá automaticamente o mais aderente aos atributos):
 ${resumoModelos(modelos)}
@@ -878,8 +878,8 @@ REGRA PRINCIPAL — ADAPTE O MODELO PADRÃO MANTENDO O ESTILO: abaixo está o MO
 ${modeloHtml}
 === FIM DO MODELO PADRÃO ===
 ${diferencial ? `\n=== CASO SEMELHANTE NA BASE${modeloSemelhanteTitulo ? ` (${modeloSemelhanteTitulo})` : ''} — DIFERENCIAL ===\nO sistema selecionou, na base de referências, o caso mais semelhante a esta entrevista. Use os pontos PARTICULARES abaixo como orientação para as teses/capítulos específicos deste tipo de caso (o restante segue o Modelo Padrão). Inclua apenas o que tiver suporte no relato:\n${diferencial}\n=== FIM DO DIFERENCIAL ===\n` : ''}
-=== ENTREVISTA / CASO ATUAL ===
-${texto || '(ver documentos anexados)'}
+=== ENTREVISTA / CASO ATUAL (o texto e/ou o FORMULÁRIO DE ENTREVISTA anexado — padrão do escritório, assinado — são a FONTE PRIMÁRIA dos dados; leia os anexos) ===
+${texto || '(ver o formulário de entrevista e os documentos anexados)'}
 
 Atributos detectados: função=${attrs?.funcao || '-'}, modalidade=${attrs?.tipo_dispensa || '-'}, rito=${attrs?.rito || '-'}, tomadora=${attrs?.tem_tomadora ? 'sim' : 'não'}.${
     municipios.length
@@ -910,8 +910,8 @@ SUA TAREFA AGORA NÃO É REDIGIR A PETIÇÃO INTEIRA. O modelo padrão do escrit
 ${resumo}
 === FIM DAS SEÇÕES ===
 ${diferencial ? `\n=== CASO SEMELHANTE NA BASE${modeloSemelhanteTitulo ? ` (${modeloSemelhanteTitulo})` : ''} — DIFERENCIAL ===\n${diferencial}\n=== FIM DO DIFERENCIAL ===\n` : ''}
-=== ENTREVISTA / CASO ATUAL ===
-${texto || '(ver documentos anexados)'}
+=== ENTREVISTA / CASO ATUAL (o texto e/ou o FORMULÁRIO DE ENTREVISTA anexado — padrão do escritório, assinado — são a FONTE PRIMÁRIA dos dados; leia os anexos) ===
+${texto || '(ver o formulário de entrevista e os documentos anexados)'}
 
 Atributos detectados: função=${attrs?.funcao || '-'}, modalidade=${attrs?.tipo_dispensa || '-'}, rito=${attrs?.rito || '-'}, tomadora=${attrs?.tem_tomadora ? 'sim' : 'não'}.${
     municipios.length
@@ -955,12 +955,12 @@ export async function gerarPecaPadrao({ texto, fileUrls, attrs, modeloPadrao, on
     if (termos.length) notify(`Consultando DataJud/CNJ (${config.datajud_tribunal || 'trt2'}): ${termos.join(', ')}...`);
   }
   // Extração estruturada do caso (parser) para alimentar o cálculo determinístico.
-  if (texto && texto.trim()) notify('Extraindo dados do caso e calculando verbas (determinístico)...');
+  if ((texto && texto.trim()) || (fileUrls && fileUrls.length)) notify('Extraindo dados do caso (entrevista/anexos) e calculando verbas (determinístico)...');
   const [dadosReceita, dadosCep, dadosDatajud, caso] = await Promise.all([
     enriquecerCnpjs(cnpjs),
     enriquecerCeps(ceps),
     enriquecerDatajud(attrs, config),
-    texto && texto.trim()
+    (texto && texto.trim()) || (fileUrls && fileUrls.length)
       ? withRuntimeCache('extracao-caso', runtimeCacheKey({ texto, fileUrls: fileUrls || [] }), () => extrairCasoDeTexto(texto, fileUrls), {
           onHit: () => notify('Reutilizando análise estruturada da entrevista em cache...'),
         }).catch(() => ({}))
