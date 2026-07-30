@@ -2,6 +2,10 @@ import { applyConditionals } from '@/lib/variables';
 import { formatBRL } from './mathUtils';
 import { UF_TRT_MAP } from './tokens';
 
+// Formata dinheiro só quando há valor POSITIVO; 0/ausente/inválido → undefined
+// (vira marcador [preencher]) para nunca emitir "R$ 0,00" na peça.
+const money = (v) => { const n = Number(v); return Number.isFinite(n) && n > 0 ? formatBRL(n) : undefined; };
+
 // ============================================================
 // Montador determinístico da peça (rede de segurança do pipeline).
 // Roda DEPOIS do aplicarPlano(). Garante que:
@@ -72,13 +76,13 @@ export function tokensDaPeca({ caso = {}, calculos = [], dadosReceita = [], dado
   for (const c of calculos || []) {
     if (c.valor == null) continue;
     const tk = CALC_TOKEN[c.item];
-    if (tk) set(tk, formatBRL(c.valor));
+    if (tk) set(tk, money(c.valor));
   }
   const fgtsDep = (calculos || []).find((c) => c.item === 'FGTS do período (8%)');
   const fgtsMul = (calculos || []).find((c) => c.item === 'Multa de 40% do FGTS');
-  if (fgtsDep) set('VALOR_FGTS_DIF', formatBRL(fgtsDep.valor));
-  if (fgtsMul) set('VALOR_FGTS_MULTA', formatBRL(fgtsMul.valor));
-  if (fgtsDep && fgtsMul) set('VALOR_FGTS_TOTAL', formatBRL((Number(fgtsDep.valor) || 0) + (Number(fgtsMul.valor) || 0)));
+  if (fgtsDep) set('VALOR_FGTS_DIF', money(fgtsDep.valor));
+  if (fgtsMul) set('VALOR_FGTS_MULTA', money(fgtsMul.valor));
+  if (fgtsDep && fgtsMul) set('VALOR_FGTS_TOTAL', money((Number(fgtsDep.valor) || 0) + (Number(fgtsMul.valor) || 0)));
 
   // Competência / partes
   set('COMARCA', caso.comarca || (municipioCep && municipioCep.municipio) || '');
@@ -89,8 +93,8 @@ export function tokensDaPeca({ caso = {}, calculos = [], dadosReceita = [], dado
   set('RECL_NOME', caso.recl_nome);
   set('RECL_QUALIFICACAO', montarQualificacao(caso));
   set('FUNCAO', caso.funcao);
-  set('SALARIO', caso.salario != null ? formatBRL(caso.salario) : '');
-  set('SALARIO_EXTENSO', caso.salario != null ? formatBRL(caso.salario) : '');
+  set('SALARIO', money(caso.salario));
+  set('SALARIO_EXTENSO', money(caso.salario));
   set('DATA_ADMISSAO', fmtDataExtenso(caso.data_admissao));
   set('DATA_RESCISAO', fmtDataExtenso(caso.data_rescisao));
   set('RECL1_NOME', (r1 && r1.razao_social) || caso.recl1_nome);
@@ -108,9 +112,9 @@ export function tokensDaPeca({ caso = {}, calculos = [], dadosReceita = [], dado
   set('DESVIO_ATIVIDADES', caso.desvio_acumulo_fatos || caso.acumulo_atividades);
   set('JORNADA_HORARIO', caso.jornada_horario);
   set('JORNADA_PERIODOS', caso.jornada_horario);
-  set('VAL_ASSIDUIDADE_MENSAL', caso.assiduidade_prometido != null ? formatBRL(caso.assiduidade_prometido) : '');
-  set('VALOR_CONDUCAO_DIA', caso.val_conducao != null ? formatBRL(caso.val_conducao) : '');
-  set('VALOR_ALIMENTACAO_DIA', caso.valor_aux_alimentacao != null ? formatBRL(caso.valor_aux_alimentacao) : '');
+  set('VAL_ASSIDUIDADE_MENSAL', money(caso.assiduidade_prometido));
+  set('VALOR_CONDUCAO_DIA', money(caso.val_conducao));
+  set('VALOR_ALIMENTACAO_DIA', money(caso.valor_aux_alimentacao));
 
   return dados;
 }
