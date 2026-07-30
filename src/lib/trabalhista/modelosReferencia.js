@@ -3,9 +3,6 @@ import mammoth from 'mammoth';
 import { TIPO_DISPENSA_LABELS } from './tokens';
 import { loadTemplateContent } from '@/lib/templateContent';
 import { extrairCasoDeTexto } from './parserEntrevista';
-import { validarCasoTrabalhista } from './validacaoCaso';
-import { redigirPecaIntegral } from './redacaoIntegral';
-import { derivarValoresCct } from './derivarValoresCct';
 import { calcularVerbasCaso } from './mathUtils';
 import { runtimeCacheKey, withRuntimeCache } from './runtimeCache';
 import { removeTextLetterhead } from '@/lib/removeTextLetterhead';
@@ -193,7 +190,7 @@ Peça, quando ainda não informado, os dados NECESSÁRIOS para uma petição com
 
 ATENÇÃO AO FORMATO DAS ENTREVISTAS: o advogado costuma escrever em lista de rótulos. A DATA DE SAÍDA aparece frequentemente rotulada pela própria modalidade da rescisão — ex.: "Sem JUSTA CAUSA: 07/12/2025", "Rescisão indireta: 10/03/2025", "Pedido de demissão: 01/02/2025". Nesses casos, a data é a DATA DE RESCISÃO e o rótulo indica o tipo_dispensa. Nunca diga que a data de rescisão está faltando quando ela aparece nesse formato. Da mesma forma, "Jornada: 12x36 18:30 as 07:30" é a jornada/escala e "Salário: 2148,22" é o salário.
 
-Extraia em "atributos" TUDO o que já for possível inferir da conversa. Nunca devolva "atributos" vazio quando o relato contiver função, CNPJ, CEP, tomadora, rito ou teses. Considere como teses fatos como dano moral, intervalo reduzido, folgas trabalhadas e jornada extraordinária. Defina "pronto_para_gerar" como true quando o advogado pedir a minuta OU quando já houver identificação do reclamante, função, reclamada, datas do contrato, salário, jornada e fatos essenciais. Não invente dados. Se houver um FORMULÁRIO DE ENTREVISTA anexado (padrão do escritório, assinado via ZapSign), LEIA-O e extraia dele os atributos (partes, CNPJ/CEP, função, escala, tipo de dispensa, teses) — os anexos são fonte primária.
+Extraia em "atributos" TUDO o que já for possível inferir da conversa. Nunca devolva "atributos" vazio quando o relato contiver função, CNPJ, CEP, tomadora, rito ou teses. Considere como teses fatos como dano moral, intervalo reduzido, folgas trabalhadas e jornada extraordinária. Defina "pronto_para_gerar" como true quando o advogado pedir a minuta OU quando já houver identificação do reclamante, função, reclamada, datas do contrato, salário, jornada e fatos essenciais. Não invente dados.
 
 MODELOS DE REFERÊNCIA DISPONÍVEIS (o sistema escolherá automaticamente o mais aderente aos atributos):
 ${resumoModelos(modelos)}
@@ -209,7 +206,7 @@ Responda APENAS com o objeto JSON.`;
 
 // Rótulos usados na prática para a data de saída. Inclui a modalidade como
 // rótulo ("Sem justa causa: 07/12/2025"), formato comum nas entrevistas.
-const RESCISAO_RE = /(?:demiss[aã]o|rescis[aã]o|dispensa|desligamento|sa[íi]da|t[eé]rmino|(?:sem\s+)?justa\s+causa|pedido\s+de\s+demiss[aã]o|acordo|[uú]ltimo\s+dia\s+trabalhado|parada\s+imediata)[^\d\n]{0,40}(\d{2}\/\d{2}\/\d{4})/i;
+const RESCISAO_RE = /(?:demiss[aã]o|rescis[aã]o|dispensa|desligamento|sa[íi]da|t[eé]rmino|(?:sem\s+)?justa\s+causa|pedido\s+de\s+demiss[aã]o|acordo)\s*:?\s*(?:em\s*)?(\d{2}\/\d{2}\/\d{4})/i;
 
 const MODALIDADE_RE = [
   [/rescis[aã]o\s+indireta|art\.?\s*483/i, 'rescisao_indireta'],
@@ -275,7 +272,7 @@ function inferirAtributosEntrevista(transcript) {
   if (!funcao) faltando.push('Função do reclamante');
   if (!atributos.cnpjs.length) faltando.push('CNPJ da(s) reclamada(s)');
   if (!/\b\d{3}\.?\d{3}\.?\d{3}-?\d{2}\b/.test(texto)) faltando.push('CPF do reclamante');
-  if (!/(?:admiss[aã]o|tempo\s+laborado|in[íi]cio|contrata[çc][aã]o)[^\d\n]{0,20}\d{2}\/\d{2}\/\d{4}/i.test(texto)) faltando.push('Data de admissão');
+  if (!/admiss[aã]o\s*:?\s*\d{2}\/\d{2}\/\d{4}/i.test(texto)) faltando.push('Data de admissão');
   if (!RESCISAO_RE.test(texto)) faltando.push('Data de rescisão/demissão');
   if (!/sal[aá]rio\s*:?\s*(?:r\$\s*)?[\d.,]+/i.test(texto)) faltando.push('Salário');
   if (!/(?:escala|hor[aá]rio|jornada)\s*:?/i.test(texto)) faltando.push('Jornada/escala de trabalho');
@@ -311,32 +308,14 @@ export async function conversarEntrevista({ transcript, fileUrls, modelos, attrs
   const transcriptCompacto = compactarTranscript(transcript);
   const req = {
     prompt: buildChatPrompt({ transcript: transcriptCompacto, modelos, attrsAtuais }),
-    model: 'gemini_3_flash',
+    model: 'claude_opus_4_6',
     response_json_schema: CHAT_SCHEMA,
   };
   if (fileUrls?.length) req.file_urls = fileUrls;
-  const key = runtimeCacheKey({ version: 7, transcript: transcriptCompacto, fileUrls, modelos, attrsAtuais });
-  let resposta = null;
-  try {
-    resposta = await withRuntimeCache('entrevista-ia', key, () =>
-      traceAiCall('Análise da entrevista', req, () => base44.integrations.Core.InvokeLLM(req))
-    );
-    // Quando o modelo não respeita o schema, a plataforma devolve { response: "texto" } —
-    // tenta recuperar o JSON de dentro do texto.
-    if (resposta && typeof resposta.response === 'string' && !resposta.reply) {
-      const m = resposta.response.match(/\{[\s\S]*\}/);
-      if (m) {
-        try { resposta = JSON.parse(m[0]); } catch (e) { resposta = null; }
-      } else {
-        resposta = null;
-      }
-    }
-  } catch (e) {
-    // A análise por IA falhou — segue apenas com a extração determinística,
-    // que é suficiente para apontar pendências e o que falta.
-    console.warn('Análise por IA indisponível; usando extração determinística.', e);
-    resposta = null;
-  }
+  const key = runtimeCacheKey({ version: 6, transcript: transcriptCompacto, fileUrls, modelos, attrsAtuais });
+  const resposta = await withRuntimeCache('entrevista-ia', key, () =>
+    traceAiCall('Análise da entrevista', req, () => base44.integrations.Core.InvokeLLM(req))
+  );
   const inferido = inferirAtributosEntrevista(transcript);
   const ia = resposta?.atributos || {};
   const atributos = {
@@ -769,7 +748,7 @@ QUALIFICAÇÃO DO RECLAMANTE (ordem obrigatória):
 nome completo, nacionalidade, estado civil, função, RG, CPF, PIS, CTPS nº, Série nº, nascido em [data], filho de [filiação], residente e domiciliado em [endereço completo].
 
 RECLAMADAS:
-- Usar sempre a razão social oficial e o CNPJ, com endereço completo (dados oficiais da Receita/CEP fornecidos abaixo). Se algum dado não constar, redija a qualificação sem ele — NUNCA use marcador ou colchete.
+- Usar sempre a razão social oficial e o CNPJ, com endereço completo. Se o CNPJ/endereço não constar da entrevista, inserir marcador [CNPJ - confirmar] / [ENDEREÇO - confirmar].
 
 COMPETÊNCIA TERRITORIAL:
 - Identificar o local de prestação de serviços (art. 651 CLT) e indicar a Vara do Trabalho e o TRT correspondentes; se não houver Vara na cidade, indicar o foro vinculado.
@@ -814,21 +793,21 @@ REVISÃO FINAL (garantir antes de responder):
 - Cada causa de pedir tem pedido correspondente; CNPJ, endereço, competência e CCT confirmados ou marcados; total ≤ R$ 400.000,00.
 
 REGRAS DE DADOS:
-- Use SOMENTE dados da entrevista/documentos do caso atual. NÃO invente fatos. NÃO narre etapas, verificações ou alterações. É PROIBIDO usar colchetes, chaves, "preencher", "a confirmar" ou "a apurar": onde faltar um dado, reformule a frase sem ele; onde faltar um valor, use a estimativa conforme a CCT e o salário.
+- Use SOMENTE dados da entrevista/documentos do caso atual. Onde faltar um dado, insira marcador entre colchetes (ex.: [SALÁRIO], [DATA DE ADMISSÃO]). NÃO invente fatos nem valores. NÃO narre etapas, verificações ou alterações.
 
 O QUE É PADRÃO (boilerplate — reproduza IGUAL, palavra por palavra, do modelo):
 - Endereçamento: "AO JUÍZO DA VARA DO TRABALHO DE SÃO PAULO – SEGUNDA REGIÃO" (ajuste a comarca/região apenas se o local de prestação for outro).
 - Fecho da qualificação: "...por seu advogado constituído nos termos do incluso documento de procuração em anexo, com endereço de e-mail: trabalhista@favadvogados.com.br, vem, com fulcro nos artigos 840, §1º, da CLT, c/c 319 do CPC, propor a presente RECLAMAÇÃO TRABALHISTA".
 - Bloco de preliminares, SEMPRE nesta ordem: Da Competência Processual → Da Não Limitação ao Valor da Causa (Estimativa) → Do Juízo 100% Digital → Da Extinção do Feito sem Julgamento de Mérito → Da Justiça Gratuita.
-- Teses de mérito genéricas com texto praticamente idêntico ao modelo: Do Dano Moral; Da Súmula 331 (responsabilidade subsidiária da tomadora); Do Acúmulo de Função; Da Jornada; Das Horas Extras; Da Descaracterização da Escala (a do caso); Do Artigo 71 (intervalo); Do Adicional Noturno; Dos Minutos que Antecedem/Sucedem; DSR; Folgas/Feriados 100%; Integração do "pagamento por fora"; Vale-Transporte; Auxílio-Alimentação; Multas Convencionais; FGTS+40%; Aviso Prévio; Verbas Rescisórias; Multa 477; Multa 467; IR; Previdência; Expedição de Ofícios; Atribuição Estimativa; Dos Pedidos.
+- Teses de mérito genéricas com texto praticamente idêntico ao modelo: Do Dano Moral; Da Súmula 331 (responsabilidade subsidiária da tomadora); Do Acúmulo de Função; Da Jornada; Das Horas Extras; Da Descaracterização da Escala 12x36/4x2; Do Artigo 71 (intervalo); Do Adicional Noturno; Dos Minutos que Antecedem/Sucedem; DSR; Folgas/Feriados 100%; Integração do "pagamento por fora"; Vale-Transporte; Auxílio-Alimentação; Multas Convencionais; FGTS+40%; Aviso Prévio; Verbas Rescisórias; Multa 477; Multa 467; IR; Previdência; Expedição de Ofícios; Atribuição Estimativa; Dos Pedidos.
 - Jurisprudências, citações de doutrina e quadros sinóticos (tabelas de escala) são copiados do modelo sem alteração.
-- Fecho: "Pede deferimento. São Paulo, [data]. FERNANDO ANDRADE VIEIRA – OAB/SP 320.825", com honorários de 15% (art. 791-A da CLT) e Súmulas 425/427 do TST.
+- Fecho: "Pede deferimento. São Paulo, [data]. FERNANDO ANDRADE VIEIRA – OAB/SP 320.825", com honorários de 20% e Súmulas 425/427 do TST.
 
 O QUE MUDA (variáveis a preencher caso a caso):
 - Qualificação do reclamante: nome, RG, CPF, PIS, CTPS, data de nascimento, filiação, endereço e função (ex.: porteiro ou controlador de acesso).
 - Qualificação das reclamadas: razão social, CNPJ e endereço (1ª terceirizada / 2ª tomadora).
 - Datas de admissão/demissão e o último salário.
-- A escala alegada — a seção de descaracterização deve corresponder EXATAMENTE à escala do caso; nunca cite outra escala.
+- A escala alegada (12x36 ou 4x2) — a seção de descaracterização deve corresponder à escala do caso.
 - Rol e valores dos pedidos e o valor da causa.
 - O MOTIVO DA SAÍDA determina o "capítulo especial" da peça: justa causa → "Da Reversão da Dispensa por Justa Causa"; rescisão indireta (art. 483) → "Da Rescisão Indireta / Da Falta Grave do Empregador"; pedido de demissão sob coação → narrativa de coação/ameaça; sem justa causa → NENHUM capítulo de reversão/rescisão indireta (peça mais curta).
 - Teses "avulsas" ligadas ao caso concreto (ex.: periculosidade, doença ocupacional, estabilidade provisória, pensão vitalícia) entram APENAS quando houver suporte no relato.
@@ -847,7 +826,7 @@ PADRÕES VALIDADOS DO ESCRITÓRIO (extraídos de peças-modelo aprovadas — sig
 5. DESVIO × ACÚMULO: "desvio de função" quando executa tarefas de OUTRO cargo (multa normativa, ex.: 50%/mês — cláusula ~64ª); "acúmulo de função" quando soma atribuições de dois cargos (ex.: multa 20%/mês — cláusula ~12ª). Não confundir com a "gratificação de função" do condutor.
 6. JORNADA NOTURNA: se a jornada abrange o período noturno (ex.: 12x36 das 18h30 às 7h30), incluir "Do Adicional Noturno e Hora Noturna Reduzida" (20%, hora reduzida de 52min30s, art. 73 CLT, Súm. 60 e 91 TST).
 7. FOLGAS TRABALHADAS (FT) e "pagamento por fora": quando houver labor em folgas/feriados pago por fora (dinheiro/PIX), pedir adicional de 100% (Súm. 444) + integração dos valores extra-folha + reflexos; e ausência de VT e de auxílio-alimentação nesses dias.
-8. QUALIFICAÇÃO DO RECLAMANTE: manter a ordem nacionalidade, estado civil, função, RG, CPF, PIS, CTPS/Série, nascimento, filiação, endereço — simplesmente OMITINDO (sem colchete) o que não constar.
+8. QUALIFICAÇÃO DO RECLAMANTE: manter a ordem nacionalidade, estado civil, função, RG, CPF, PIS, CTPS/Série, nascimento, filiação, endereço — omitindo com marcador [ ] apenas o que faltar.
 9. HONORÁRIOS: usar 15% de forma UNIFORME no capítulo próprio, no rol de pedidos e no parágrafo de fecho ("julgada procedente...", Súm. 425/427 TST). Nunca misturar 15% e 20% na mesma peça.
 10. FECHO: "Pede deferimento. São Paulo, [data]. FERNANDO ANDRADE VIEIRA – OAB/SP 320.825". Valor da causa = somatório ESTIMATIVO dos pedidos (teto R$ 400.000,00), por extenso.
 11. CONCORDÂNCIA DE GÊNERO: adapte TODOS os pronomes e a concordância nominal ao gênero do reclamante (o/a reclamante, obreiro/obreira, submetido/submetida, contratado/contratada etc.).
@@ -864,33 +843,24 @@ function blocoCalculos(calculos) {
   return `\n\nCÁLCULOS DETERMINÍSTICOS (feitos por código, matematicamente exatos — USE EXATAMENTE estes valores no texto e nos pedidos; NÃO faça aritmética própria nem altere estes números. Some-os para compor o VALOR DA CAUSA, respeitando o teto de R$ 400.000,00):\n${linhas.join('\n')}`;
 }
 
-// Prompt do PLANO de adaptação: a IA NÃO reescreve a peça; ela só indica o
-// que muda. Todo o texto-padrão (formatação, jurisprudência, boilerplate)
-// permanece fixo no modelo, aplicado por código.
-export function buildRedacaoIntegralPrompt({ texto, attrs, caso, calculos, modeloHtml, diferencial, modeloSemelhanteTitulo, dadosReceita, dadosCep, dadosDatajud, dadosCct }) {
+// Geração adaptando o MODELO PADRÃO (HTML formatado), preservando o estilo.
+export function buildGeracaoPadraoPrompt({ texto, attrs, modeloHtml, calculos, diferencial, modeloSemelhanteTitulo, dadosReceita, dadosCep, dadosDatajud, dadosCct }) {
   const municipios = [...new Set((dadosCep || []).map((d) => d.municipio).filter(Boolean))];
   const dataHoje = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
   return `${PROMPT_SISTEMA_PETICAO}${BLOCO_ENGENHARIA_JURIDICA}${blocoRegrasCriticas({ municipios, dataHoje })}
 
-SUA TAREFA: redigir a PETIÇÃO INICIAL COMPLETA, do endereçamento ao fecho, em HTML simples (<h1>, <h2>, <p>, <ul>, <strong>), pronta para protocolo. Regras imutáveis desta redação:
-- TEXTO CORRIDO E FINAL: é PROIBIDO qualquer placeholder, colchete, chave, "preencher", "a apurar", "XXX" ou lacuna. Se um dado não constar, reformule a frase sem ele.
-- Horas extras: adicional convencional de 60% (CCT da categoria). Honorários: 15% de forma uniforme (art. 791-A da CLT) no capítulo, nos pedidos e no fecho.
-- Escala/jornada: use EXATAMENTE a escala e os horários relatados; não mencione escala diferente da do caso.
-- Desvio/acúmulo de função: fundamente estritamente sobre as atividades reais narradas pelo cliente (ex.: prevenção de perdas com conferência de cargas e paletes), sem texto genérico de portaria.
-- Dano moral: 10x a maior remuneração, com a narrativa concreta do caso.
-- Use os VALORES CALCULADOS abaixo exatamente como estão; estime os demais (horas extras, intervalo, adicional noturno, DSR, folgas 100%, benefícios, multas convencionais) com base no salário, na escala e nas cláusulas da CCT. Rol de pedidos individualizado e valor da causa = soma exata dos itens (teto R$ 400.000,00).
-- Inclua APENAS as teses com suporte no relato.
+REGRA PRINCIPAL — ADAPTE O MODELO PADRÃO MANTENDO O ESTILO: abaixo está o MODELO PADRÃO do escritório em HTML (com a formatação, o layout e o texto-padrão corretos, podendo conter marcadores como {{VARIAVEL}}). Sua tarefa é ADAPTAR este HTML ao caso atual:
+- Substitua os marcadores {{...}} e quaisquer dados de exemplo pelos dados REAIS do caso (entrevista/documentos). Onde faltar um dado, deixe um marcador claro entre colchetes, ex.: [SALÁRIO].
+- Ajuste ou REMOVA os tópicos que não se aplicam ao caso; mantenha os tópicos fixos.
+- Todo valor que você preencher ou substituir com dados do caso atual deve ficar envolvido por <mark class="ai-filled-field" data-ai-field="nome_do_campo">valor preenchido</mark>. Marque somente os dados variáveis inseridos por você, nunca o texto jurídico padrão.
+- MANTENHA EXATAMENTE a formatação e a estrutura HTML do modelo (mesmas tags e estilos). NÃO reescreva o texto-padrão nem crie estrutura nova.
 
-MODELO PADRÃO DO ESCRITÓRIO (referência de ESTILO, estrutura e boilerplate — reaproveite a redação padrão, mas adapte tudo ao caso; NÃO copie dados, escalas, percentuais ou valores de outro caso):
-"""
-${(modeloHtml || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').slice(0, 45000)}
-"""
-
-DADOS ESTRUTURADOS DO CASO (extraídos por IA da entrevista/anexos): ${JSON.stringify(caso || {})}
-
-${diferencial ? `\n=== CASO SEMELHANTE NA BASE${modeloSemelhanteTitulo ? ` (${modeloSemelhanteTitulo})` : ''} — DIFERENCIAL ===\n${diferencial}\n=== FIM DO DIFERENCIAL ===\n` : ''}
-=== ENTREVISTA / CASO ATUAL (o texto e/ou o FORMULÁRIO DE ENTREVISTA anexado — padrão do escritório, assinado — são a FONTE PRIMÁRIA dos dados; leia os anexos) ===
-${texto || '(ver o formulário de entrevista e os documentos anexados)'}
+=== MODELO PADRÃO (HTML — preserve a formatação) ===
+${modeloHtml}
+=== FIM DO MODELO PADRÃO ===
+${diferencial ? `\n=== CASO SEMELHANTE NA BASE${modeloSemelhanteTitulo ? ` (${modeloSemelhanteTitulo})` : ''} — DIFERENCIAL ===\nO sistema selecionou, na base de referências, o caso mais semelhante a esta entrevista. Use os pontos PARTICULARES abaixo como orientação para as teses/capítulos específicos deste tipo de caso (o restante segue o Modelo Padrão). Inclua apenas o que tiver suporte no relato:\n${diferencial}\n=== FIM DO DIFERENCIAL ===\n` : ''}
+=== ENTREVISTA / CASO ATUAL ===
+${texto || '(ver documentos anexados)'}
 
 Atributos detectados: função=${attrs?.funcao || '-'}, modalidade=${attrs?.tipo_dispensa || '-'}, rito=${attrs?.rito || '-'}, tomadora=${attrs?.tem_tomadora ? 'sim' : 'não'}.${
     municipios.length
@@ -901,7 +871,7 @@ Atributos detectados: função=${attrs?.funcao || '-'}, modalidade=${attrs?.tipo
   }
 === FIM DA ENTREVISTA ===${blocoReceita(dadosReceita)}${blocoCeps(dadosCep)}${blocoDatajud(dadosDatajud)}${blocoCct(dadosCct)}${blocoCalculos(calculos)}
 
-Responda APENAS com o HTML final da petição, sem comentários, sem cercas de código e sem qualquer lacuna.`;
+FORMATO DE SAÍDA: retorne APENAS o HTML adaptado do corpo da petição (sem <html>, <head> ou <body>), PRESERVANDO a formatação/estilo do modelo. NÃO acrescente avisos, notas ou observações ao final.`;
 }
 
 // Limpa a saída da IA: remove cercas de código markdown (```html) e tags de
@@ -934,12 +904,12 @@ export async function gerarPecaPadrao({ texto, fileUrls, attrs, modeloPadrao, on
     if (termos.length) notify(`Consultando DataJud/CNJ (${config.datajud_tribunal || 'trt2'}): ${termos.join(', ')}...`);
   }
   // Extração estruturada do caso (parser) para alimentar o cálculo determinístico.
-  if ((texto && texto.trim()) || (fileUrls && fileUrls.length)) notify('Extraindo dados do caso (entrevista/anexos) e calculando verbas (determinístico)...');
+  if (texto && texto.trim()) notify('Extraindo dados do caso e calculando verbas (determinístico)...');
   const [dadosReceita, dadosCep, dadosDatajud, caso] = await Promise.all([
     enriquecerCnpjs(cnpjs),
     enriquecerCeps(ceps),
     enriquecerDatajud(attrs, config),
-    (texto && texto.trim()) || (fileUrls && fileUrls.length)
+    texto && texto.trim()
       ? withRuntimeCache('extracao-caso', runtimeCacheKey({ texto, fileUrls: fileUrls || [] }), () => extrairCasoDeTexto(texto, fileUrls), {
           onHit: () => notify('Reutilizando análise estruturada da entrevista em cache...'),
         }).catch(() => ({}))
@@ -962,36 +932,6 @@ export async function gerarPecaPadrao({ texto, fileUrls, attrs, modeloPadrao, on
     if (dadosCct?.meta?.titulo) notify(`CCT aplicável: ${dadosCct.meta.titulo}`);
   }
 
-  // EXPERTISE: quando faltam dados econômicos na entrevista, derivar da CCT
-  // (piso salarial da função, valores de benefícios, adicionais) — como a
-  // especialista faz. Preenche APENAS lacunas; nunca sobrescreve o que veio.
-  if (dadosCct?.clausulas?.length) {
-    const num = (v) => { const n = Number(v); return Number.isFinite(n) && n > 0 ? n : null; };
-    try {
-      notify('Derivando valores normativos da CCT (piso, benefícios, adicionais)...');
-      const vc = await derivarValoresCct({ caso, attrs, dadosCct });
-      caso.valores_cct = vc;
-      if (!num(caso.salario) && num(vc.piso_salarial)) {
-        caso.salario = num(vc.piso_salarial);
-        caso.salario_origem = 'piso normativo da CCT (estimado — confirmar)';
-        if (!num(caso.maior_remuneracao)) caso.maior_remuneracao = caso.salario;
-        notify(`Salário ausente na entrevista — usando o piso normativo da CCT: R$ ${caso.salario}`);
-      }
-      if (!num(caso.valor_aux_alimentacao) && (num(vc.auxilio_alimentacao_dia) || num(vc.vale_refeicao_dia))) {
-        caso.valor_aux_alimentacao = num(vc.auxilio_alimentacao_dia) || num(vc.vale_refeicao_dia);
-      }
-      if (!num(caso.val_conducao) && num(vc.vale_transporte_dia)) caso.val_conducao = num(vc.vale_transporte_dia);
-    } catch (e) {
-      /* segue sem derivação da CCT */
-    }
-  }
-
-  // Validação rígida (datas/valores) ANTES dos cálculos — evita distorções.
-  const validado = validarCasoTrabalhista(caso || {});
-  for (const alerta of validado.alertas) notify(`Validação do caso: ${alerta}`);
-  Object.assign(caso, validado.caso);
-  for (const k of Object.keys(caso)) if (!(k in validado.caso)) delete caso[k];
-
   // Cálculo 100% determinístico (a IA não faz aritmética).
   const calculos = calcularVerbasCaso(caso || {});
 
@@ -1010,24 +950,31 @@ export async function gerarPecaPadrao({ texto, fileUrls, attrs, modeloPadrao, on
     /* segue sem referência */
   }
 
+  const req = {
+    prompt: buildGeracaoPadraoPrompt({
+      texto,
+      attrs,
+      modeloHtml: modeloPadrao?.html || '',
+      calculos,
+      diferencial,
+      modeloSemelhanteTitulo: modeloSemelhante?.titulo || '',
+      dadosReceita,
+      dadosCep,
+      dadosDatajud,
+      dadosCct,
+    }),
+    model: 'claude_opus_4_6',
+  };
   const urls = [...(fileUrls || [])];
-  const prompt = buildRedacaoIntegralPrompt({
-    texto,
-    attrs,
-    caso,
-    calculos,
-    modeloHtml: modeloPadrao?.html || '',
-    diferencial,
-    modeloSemelhanteTitulo: modeloSemelhante?.titulo || '',
-    dadosReceita,
-    dadosCep,
-    dadosDatajud,
-    dadosCct,
-  });
-  const { html, pendentes } = await redigirPecaIntegral({ prompt, fileUrls: urls, onTool: notify });
+  if (urls.length) req.file_urls = urls;
+  const resultado = await withRuntimeCache(
+    'geracao-minuta',
+    runtimeCacheKey({ prompt: req.prompt, fileUrls: urls }),
+    () => traceAiCall('Geração da minuta', req, () => base44.integrations.Core.InvokeLLM(req)),
+    { onHit: () => notify('Reutilizando geração idêntica em cache...') }
+  );
   return {
-    html: limparHtmlIA(html),
-    pendentes,
+    html: limparHtmlIA(resultado),
     dadosReceita,
     dadosCep,
     dadosDatajud,
