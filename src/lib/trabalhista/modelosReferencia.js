@@ -3,6 +3,7 @@ import mammoth from 'mammoth';
 import { TIPO_DISPENSA_LABELS } from './tokens';
 import { loadTemplateContent } from '@/lib/templateContent';
 import { extrairCasoDeTexto } from './parserEntrevista';
+import { montarPeca } from './montarPeca';
 import { calcularVerbasCaso } from './mathUtils';
 import { runtimeCacheKey, withRuntimeCache } from './runtimeCache';
 import { removeTextLetterhead } from '@/lib/removeTextLetterhead';
@@ -1027,7 +1028,11 @@ export async function gerarPecaPadrao({ texto, fileUrls, attrs, modeloPadrao, on
     () => traceAiCall('Plano de adaptação da minuta', req, () => base44.integrations.Core.InvokeLLM(req)),
     { onHit: () => notify('Reutilizando plano idêntico em cache...') }
   );
-  const { html, relatorio } = aplicarPlano(modeloPadrao?.html || '', plano);
+  let { html, relatorio } = aplicarPlano(modeloPadrao?.html || '', plano);
+  // Rede de segurança determinística: resolve os condicionais {{#if T_X}} de
+  // modalidade e substitui/מarca qualquer token que o plano da IA não preencheu,
+  // garantindo que nenhum {{token}} cru chegue ao documento.
+  html = montarPeca(html, { caso, calculos, dadosReceita, dadosCep, attrs });
   if (relatorio.faltaram.length) {
     notify(`Trechos não localizados no modelo (revisar manualmente): ${relatorio.faltaram.slice(0, 8).join(' | ')}`);
   }
