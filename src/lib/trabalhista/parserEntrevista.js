@@ -69,7 +69,8 @@ const CASO_SCHEMA = {
     periodo_ferias_vencidas: { type: 'string', description: 'Período das férias vencidas, se houver' },
 
     // Flags das teses (true APENAS com suporte no relato)
-    tem_acumulo: { type: 'boolean' },
+    tem_acumulo: { type: 'boolean', description: 'ACUMULAVA um segundo cargo junto com o contratado' },
+    tem_desvio: { type: 'boolean', description: 'Exercia tarefas de OUTRO cargo (desvio de função)' },
     tem_adic_noturno: { type: 'boolean', description: 'Houve labor em horário noturno (jornada cruza 22h–5h)' },
     tem_integracao_por_fora: { type: 'boolean', description: 'Pagamento "por fora" (dinheiro/PIX)' },
     tem_periculosidade: { type: 'boolean' },
@@ -109,7 +110,7 @@ ESTRUTURA DO FORMULÁRIO DE ENTREVISTA (quando anexado):
   3. Jornada (finais de semana/feriados) e 5. Folgas Trabalhadas (FT): "Quantidade"→ft_qtd_media; "Valor recebido"→val_ft; "Forma: DINHEIRO/PIX"→tem_integracao_por_fora=true e valor_por_fora=val_ft; FT marcada "Sim"→tem_ft=true.
   6. Intervalo Intrajornada: "suprimido / quanto tempo em média"→intervalo_usufruido.
   7. Horas Extras: média + período antecedente + sucedente→prorrogacao_jornada.
-  8. Acúmulo/Desvio de função: "Sim"→tem_acumulo=true; "Quais funções"→acumulo_atividades.
+  8. Acúmulo/Desvio de função: "Sim" → se exercia tarefas de OUTRO cargo (ex.: prevenção de perdas, recepção) → tem_desvio=true; se ACUMULAVA um segundo cargo junto com o seu → tem_acumulo=true; "Quais funções" → acumulo_atividades e desvio_acumulo_fatos.
   10. Gratificações: se recebe algum tipo de gratificação (relevante p/ vigilante condutor).
   11. Documentos (holerites, rescisão, espelho de ponto): se NÃO fornecidos, é argumento da Súm. 338 TST — registre no dano_fatos apenas se pertinente.
   13. Saúde e Segurança: Insalubridade "Sim"→tem_insalubridade; Periculosidade "Sim"→tem_periculosidade; doença/acidente de trabalho→tem_doenca e doenca_descricao.
