@@ -864,37 +864,6 @@ function blocoCalculos(calculos) {
   return `\n\nCÁLCULOS DETERMINÍSTICOS (feitos por código, matematicamente exatos — USE EXATAMENTE estes valores no texto e nos pedidos; NÃO faça aritmética própria nem altere estes números. Some-os para compor o VALOR DA CAUSA, respeitando o teto de R$ 400.000,00):\n${linhas.join('\n')}`;
 }
 
-// Geração adaptando o MODELO PADRÃO (HTML formatado), preservando o estilo.
-export function buildGeracaoPadraoPrompt({ texto, attrs, modeloHtml, calculos, diferencial, modeloSemelhanteTitulo, dadosReceita, dadosCep, dadosDatajud, dadosCct }) {
-  const municipios = [...new Set((dadosCep || []).map((d) => d.municipio).filter(Boolean))];
-  const dataHoje = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
-  return `${PROMPT_SISTEMA_PETICAO}${BLOCO_ENGENHARIA_JURIDICA}${blocoRegrasCriticas({ municipios, dataHoje })}
-
-REGRA PRINCIPAL — ADAPTE O MODELO PADRÃO MANTENDO O ESTILO: abaixo está o MODELO PADRÃO do escritório em HTML (com a formatação, o layout e o texto-padrão corretos, podendo conter marcadores como {{VARIAVEL}}). Sua tarefa é ADAPTAR este HTML ao caso atual:
-- Substitua os marcadores {{...}} e quaisquer dados de exemplo pelos dados REAIS do caso (entrevista/documentos). Onde faltar um dado, deixe um marcador claro entre colchetes, ex.: [SALÁRIO].
-- Ajuste ou REMOVA os tópicos que não se aplicam ao caso; mantenha os tópicos fixos.
-- Todo valor que você preencher ou substituir com dados do caso atual deve ficar envolvido por <mark class="ai-filled-field" data-ai-field="nome_do_campo">valor preenchido</mark>. Marque somente os dados variáveis inseridos por você, nunca o texto jurídico padrão.
-- MANTENHA EXATAMENTE a formatação e a estrutura HTML do modelo (mesmas tags e estilos). NÃO reescreva o texto-padrão nem crie estrutura nova.
-
-=== MODELO PADRÃO (HTML — preserve a formatação) ===
-${modeloHtml}
-=== FIM DO MODELO PADRÃO ===
-${diferencial ? `\n=== CASO SEMELHANTE NA BASE${modeloSemelhanteTitulo ? ` (${modeloSemelhanteTitulo})` : ''} — DIFERENCIAL ===\nO sistema selecionou, na base de referências, o caso mais semelhante a esta entrevista. Use os pontos PARTICULARES abaixo como orientação para as teses/capítulos específicos deste tipo de caso (o restante segue o Modelo Padrão). Inclua apenas o que tiver suporte no relato:\n${diferencial}\n=== FIM DO DIFERENCIAL ===\n` : ''}
-=== ENTREVISTA / CASO ATUAL (o texto e/ou o FORMULÁRIO DE ENTREVISTA anexado — padrão do escritório, assinado — são a FONTE PRIMÁRIA dos dados; leia os anexos) ===
-${texto || '(ver o formulário de entrevista e os documentos anexados)'}
-
-Atributos detectados: função=${attrs?.funcao || '-'}, modalidade=${attrs?.tipo_dispensa || '-'}, rito=${attrs?.rito || '-'}, tomadora=${attrs?.tem_tomadora ? 'sim' : 'não'}.${
-    municipios.length
-      ? `\nCompetência calculada por código: ${municipios
-          .map((m) => `${m} → ${regiaoTrtPorMunicipio(m) || 'região a confirmar'}`)
-          .join('; ')}. USE esta região; não a recalcule.`
-      : ''
-  }
-=== FIM DA ENTREVISTA ===${blocoReceita(dadosReceita)}${blocoCeps(dadosCep)}${blocoDatajud(dadosDatajud)}${blocoCct(dadosCct)}${blocoCalculos(calculos)}
-
-FORMATO DE SAÍDA: retorne APENAS o HTML adaptado do corpo da petição (sem <html>, <head> ou <body>), PRESERVANDO a formatação/estilo do modelo. NÃO acrescente avisos, notas ou observações ao final.`;
-}
-
 // Prompt do PLANO de adaptação: a IA NÃO reescreve a peça; ela só indica o
 // que muda. Todo o texto-padrão (formatação, jurisprudência, boilerplate)
 // permanece fixo no modelo, aplicado por código.
