@@ -31,19 +31,44 @@ export function avisoPrevio(salario, anos) {
   return { dias, valor: round2((salario / 30) * dias) };
 }
 
-// 13º proporcional (avos sobre os meses do contrato — estimativa p/ valor da causa)
-export function decimoTerceiroProporcional(salario, meses) {
-  if (!salario || !meses) return null;
-  const avos = meses % 12 || 12;
+const parseData = (s) => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(s || ''));
+  return m ? new Date(+m[1], +m[2] - 1, +m[3]) : null;
+};
+
+// Avos do 13º: meses do ANO DA RESCISÃO (de janeiro, ou da admissão se posterior,
+// até o mês da rescisão) — nunca extrapola o ano do desligamento.
+export function avos13(admissao, rescisao) {
+  const a = parseData(admissao);
+  const r = parseData(rescisao);
+  if (!r || (a && r < a)) return null;
+  const inicioMes = a && a.getFullYear() === r.getFullYear() ? a.getMonth() : 0;
+  let avos = r.getMonth() - inicioMes + (r.getDate() >= 15 ? 1 : 0);
+  return Math.min(Math.max(avos, 0), 12);
+}
+
+// Avos das férias proporcionais: meses desde o último aniversário do contrato
+// até a rescisão (período aquisitivo em curso).
+export function avosFerias(admissao, rescisao) {
+  const a = parseData(admissao);
+  const r = parseData(rescisao);
+  if (!a || !r || r < a) return null;
+  const meses = (r.getFullYear() - a.getFullYear()) * 12 + (r.getMonth() - a.getMonth());
+  let avos = meses % 12;
+  if (r.getDate() - a.getDate() >= 14) avos += 1;
+  return Math.min(Math.max(avos, 0), 12);
+}
+
+// 13º proporcional (avos do ano da rescisão)
+export function decimoTerceiroProporcional(salario, avos) {
+  if (!salario || !avos) return null;
   return { avos, valor: round2((salario / 12) * avos) };
 }
 
 // Férias proporcionais + 1/3
-export function feriasProporcionais(salario, meses) {
-  if (!salario || !meses) return null;
-  const avos = meses % 12 || 12;
-  const base = (salario / 12) * avos;
-  return { avos, valor: round2(base * (4 / 3)) };
+export function feriasProporcionais(salario, avos) {
+  if (!salario || !avos) return null;
+  return { avos, valor: round2(((salario / 12) * avos) * (4 / 3)) };
 }
 
 // FGTS do período (8% ao mês) e multa de 40%
@@ -89,10 +114,10 @@ export function calcularVerbasCaso(caso = {}) {
       itens.push({ item: 'Saldo de salário', memoria: `${dia} dia(s) do mês da rescisão`, valor: saldo });
     }
   }
-  const dt = decimoTerceiroProporcional(salario, meses);
-  if (dt) itens.push({ item: '13º proporcional', memoria: `${dt.avos}/12 avos`, valor: dt.valor });
-  const fe = feriasProporcionais(salario, meses);
-  if (fe) itens.push({ item: 'Férias proporcionais + 1/3', memoria: `${fe.avos}/12 avos + 1/3`, valor: fe.valor });
+  const dt = decimoTerceiroProporcional(salario, avos13(caso.data_admissao, caso.data_rescisao));
+  if (dt) itens.push({ item: '13º proporcional', memoria: `${dt.avos}/12 avos do ano da rescisão`, valor: dt.valor });
+  const fe = feriasProporcionais(salario, avosFerias(caso.data_admissao, caso.data_rescisao));
+  if (fe) itens.push({ item: 'Férias proporcionais + 1/3', memoria: `${fe.avos}/12 avos + 1/3 (período aquisitivo em curso)`, valor: fe.valor });
   const fg = fgtsPeriodo(salario, meses);
   if (fg) {
     itens.push({ item: 'FGTS do período (8%)', memoria: `8% × ${meses} meses`, valor: fg.deposito });
