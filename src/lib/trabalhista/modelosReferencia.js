@@ -3,7 +3,7 @@ import mammoth from 'mammoth';
 import { TIPO_DISPENSA_LABELS } from './tokens';
 import { loadTemplateContent } from '@/lib/templateContent';
 import { extrairCasoDeTexto } from './parserEntrevista';
-import { montarPeca } from './montarPeca';
+import { montarPeca, flagsSecoes } from './montarPeca';
 import { derivarValoresCct } from './derivarValoresCct';
 import { calcularVerbasCaso } from './mathUtils';
 import { runtimeCacheKey, withRuntimeCache } from './runtimeCache';
@@ -11,7 +11,7 @@ import { removeTextLetterhead } from '@/lib/removeTextLetterhead';
 import { blocoRegrasCriticas, regiaoTrtPorMunicipio } from './regrasCriticas';
 import { BLOCO_ENGENHARIA_JURIDICA } from './engenhariaJuridica';
 import { traceAiCall } from '@/lib/sessionTrace';
-import { dividirSecoes, resumoSecoes, aplicarPlano, PLANO_SCHEMA } from './montagemSecoes';
+import { dividirSecoes, resumoSecoes, aplicarPlano, podarPorFlags, PLANO_SCHEMA } from './montagemSecoes';
 
 // ============================================================
 // Anonimização (mesma lógica usada no cadastro dos modelos)
@@ -1077,11 +1077,12 @@ export async function gerarPecaPadrao({ texto, fileUrls, attrs, modeloPadrao, on
     () => traceAiCall('Plano de adaptação da minuta', req, () => base44.integrations.Core.InvokeLLM(req)),
     { onHit: () => notify('Reutilizando plano idêntico em cache...') }
   );
-  let { html, relatorio } = aplicarPlano(modeloPadrao?.html || '', plano);
-  // Rede de segurança determinística: resolve os condicionais {{#if T_X}} de
-  // modalidade e substitui/marca qualquer token que o plano da IA não preencheu,
-  // garantindo que nenhum {{token}} cru chegue ao documento.
-  html = montarPeca(html, { caso, calculos, dadosReceita, dadosCep, attrs });
+  let { html, relatorio } = aplicarPlano(modeloPadrao?.html || '', { substituicoes: plano?.substituicoes });
+  // Estrutura por CÓDIGO (não depende do LLM): remove as seções opcionais sem
+  // suporte no caso — mantendo a Súmula 331 quando há tomadora — e então resolve
+  // os condicionais {{#if}} de modalidade e preenche/marca TODOS os tokens.
+  html = podarPorFlags(html, flagsSecoes(caso, attrs));
+  html = montarPeca(html, { caso, calculos, dadosReceita, dadosCep, attrs, valoresIA: plano?.valores_estimados });
   if (relatorio.faltaram.length) {
     notify(`Trechos não localizados no modelo (revisar manualmente): ${relatorio.faltaram.slice(0, 8).join(' | ')}`);
   }
