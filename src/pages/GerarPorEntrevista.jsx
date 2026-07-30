@@ -267,7 +267,7 @@ export default function GerarPorEntrevista() {
       const faltando = res?.faltando || [];
       if (res?.pronto_para_gerar) {
         await gerarMinuta({ texto: textoCompleto, urls, attrs: novoAttrs, sources: fontesAtuais });
-      } else if (faltando.length) {
+      } else if (faltando.length && !pendingGeneration) {
         // Avisa o que falta e pede aprovação antes de gerar com marcadores
         setPendingGeneration({ texto: textoCompleto, urls, attrs: novoAttrs, sources: fontesAtuais });
         setMessages((m) => [...m, { role: 'approval', faltando }]);

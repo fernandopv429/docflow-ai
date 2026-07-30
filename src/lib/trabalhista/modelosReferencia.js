@@ -272,7 +272,7 @@ function inferirAtributosEntrevista(transcript) {
   if (!funcao) faltando.push('Função do reclamante');
   if (!atributos.cnpjs.length) faltando.push('CNPJ da(s) reclamada(s)');
   if (!/\b\d{3}\.?\d{3}\.?\d{3}-?\d{2}\b/.test(texto)) faltando.push('CPF do reclamante');
-  if (!/(?:admiss[aã]o|tempo\s+laborado|in[íi]cio)\s*:?\s*(?:em\s*)?\d{2}\/\d{2}\/\d{4}/i.test(texto)) faltando.push('Data de admissão');
+  if (!/(?:admiss[aã]o|tempo\s+laborado|in[íi]cio|contrata[çc][aã]o)[^\d\n]{0,20}\d{2}\/\d{2}\/\d{4}/i.test(texto)) faltando.push('Data de admissão');
   if (!RESCISAO_RE.test(texto)) faltando.push('Data de rescisão/demissão');
   if (!/sal[aá]rio\s*:?\s*(?:r\$\s*)?[\d.,]+/i.test(texto)) faltando.push('Salário');
   if (!/(?:escala|hor[aá]rio|jornada)\s*:?/i.test(texto)) faltando.push('Jornada/escala de trabalho');
