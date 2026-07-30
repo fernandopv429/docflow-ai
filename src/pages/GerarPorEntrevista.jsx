@@ -264,15 +264,18 @@ export default function GerarPorEntrevista() {
       ]
         .filter(Boolean)
         .join('\n\n');
+      // Quando o texto dos documentos já foi extraído, não reenvia os arquivos
+      // à IA na geração (evita reprocessar o PDF e dobrar o tempo).
+      const urlsGeracao = textoDocs ? [] : urls;
       const faltando = res?.faltando || [];
       if (res?.pronto_para_gerar) {
-        await gerarMinuta({ texto: textoCompleto, urls, attrs: novoAttrs, sources: fontesAtuais });
+        await gerarMinuta({ texto: textoCompleto, urls: urlsGeracao, attrs: novoAttrs, sources: fontesAtuais });
       } else if (faltando.length && !pendingGeneration) {
         // Avisa o que falta e pede aprovação antes de gerar com marcadores
-        setPendingGeneration({ texto: textoCompleto, urls, attrs: novoAttrs, sources: fontesAtuais });
+        setPendingGeneration({ texto: textoCompleto, urls: urlsGeracao, attrs: novoAttrs, sources: fontesAtuais });
         setMessages((m) => [...m, { role: 'approval', faltando }]);
       } else if (docHtml) {
-        await gerarMinuta({ texto: textoCompleto, urls, attrs: novoAttrs, sources: fontesAtuais });
+        await gerarMinuta({ texto: textoCompleto, urls: urlsGeracao, attrs: novoAttrs, sources: fontesAtuais });
       }
     } catch (err) {
       console.error(err);

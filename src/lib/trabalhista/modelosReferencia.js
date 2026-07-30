@@ -308,7 +308,7 @@ export async function conversarEntrevista({ transcript, fileUrls, modelos, attrs
   const transcriptCompacto = compactarTranscript(transcript);
   const req = {
     prompt: buildChatPrompt({ transcript: transcriptCompacto, modelos, attrsAtuais }),
-    model: 'claude_opus_4_6',
+    model: 'gemini_3_flash',
     response_json_schema: CHAT_SCHEMA,
   };
   if (fileUrls?.length) req.file_urls = fileUrls;
