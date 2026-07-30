@@ -5,6 +5,11 @@
 // Competência: o TRT decorre do município da prestação de serviços (art. 651 CLT).
 // A Grande São Paulo, Baixada Santista e Litoral pertencem ao TRT da 2ª Região;
 // o interior do Estado (Campinas e região) ao TRT da 15ª Região.
+import { MUNICIPIOS_TRT15 } from './engenhariaJuridica';
+import { UF_TRT_MAP } from './tokens';
+
+const normMun = (s) => (s || '').toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '');
+
 export const MUNICIPIOS_TRT2 = [
   'são paulo', 'itapecerica da serra', 'embu', 'embu das artes', 'embu-guaçu', 'taboão da serra',
   'osasco', 'carapicuíba', 'cotia', 'barueri', 'jandira', 'itapevi', 'guarulhos', 'santo andré',
@@ -16,18 +21,37 @@ export const MUNICIPIOS_TRT2 = [
   'mongaguá', 'bertioga', 'caraguatatuba', 'são sebastião', 'ubatuba', 'ilhabela',
 ];
 
+// Classifica o município de SP: 'TRT15' (interior/Campinas) ou 'TRT2' (Grande SP,
+// Baixada e Litoral). Verifica o interior PRIMEIRO para não cair no fallback errado.
+function classificaTrtSp(municipio) {
+  const m = normMun(municipio);
+  if (!m) return null;
+  if (MUNICIPIOS_TRT15.some((n) => m.includes(normMun(n)))) return 'TRT15';
+  if (MUNICIPIOS_TRT2.some((n) => m.includes(normMun(n)))) return 'TRT2';
+  return null;
+}
+
 export function regiaoTrtPorMunicipio(municipio) {
-  const m = (municipio || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-  const achou = MUNICIPIOS_TRT2.some(
-    (nome) => m.includes(nome.normalize('NFD').replace(/[\u0300-\u036f]/g, ''))
-  );
-  return achou ? '2ª Região (TRT-2)' : null;
+  const c = classificaTrtSp(municipio);
+  if (c === 'TRT15') return '15ª Região (TRT-15)';
+  if (c === 'TRT2') return '2ª Região (TRT-2)';
+  return null;
+}
+
+// Região do TRT no formato canônico do endereçamento (ex.: "SEGUNDA REGIÃO"),
+// com fallback pela UF quando o município não está mapeado.
+export function regiaoTrtCanonica(municipio, uf) {
+  const c = classificaTrtSp(municipio);
+  if (c === 'TRT15') return 'DÉCIMA QUINTA REGIÃO';
+  if (c === 'TRT2') return 'SEGUNDA REGIÃO';
+  const u = (uf || '').toUpperCase().slice(-2);
+  return UF_TRT_MAP[u] || '';
 }
 
 export function blocoRegrasCriticas({ municipios = [], dataHoje } = {}) {
-  const trt2 = municipios.filter((m) => regiaoTrtPorMunicipio(m));
-  const orientacaoTrt = trt2.length
-    ? `O local de prestação (${trt2.join(', ')}) pertence ao TRT da 2ª Região. Enderece a peça a "AO JUÍZO DA VARA DO TRABALHO DE ${trt2[0].toUpperCase()} – SEGUNDA REGIÃO" (ou à Vara de São Paulo, se for o caso). NUNCA use TRT da 15ª Região para esses municípios.`
+  const comReg = municipios.map((m) => ({ m, reg: regiaoTrtPorMunicipio(m) })).filter((x) => x.reg);
+  const orientacaoTrt = comReg.length
+    ? `Competência pelo município de prestação (art. 651 CLT): ${comReg.map((x) => `${x.m} → ${x.reg}`).join('; ')}. Enderece a peça à Vara do Trabalho do município NA REGIÃO INDICADA; não troque a região.`
     : 'Confirme o TRT pelo município de prestação: Grande São Paulo, Baixada Santista e Litoral = TRT da 2ª Região; interior/Campinas = TRT da 15ª Região. Em dúvida, use o marcador [REGIÃO DO TRT - confirmar]; nunca "adivinhe" a região.';
 
   return `

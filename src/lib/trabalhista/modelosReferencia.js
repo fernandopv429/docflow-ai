@@ -3,12 +3,16 @@ import mammoth from 'mammoth';
 import { TIPO_DISPENSA_LABELS } from './tokens';
 import { loadTemplateContent } from '@/lib/templateContent';
 import { extrairCasoDeTexto } from './parserEntrevista';
+import { montarPeca, flagsSecoes, assertNoUnreplacedTokens } from './montarPeca';
+import { validarCasoTrabalhista } from './validacaoCaso';
+import { derivarValoresCct } from './derivarValoresCct';
 import { calcularVerbasCaso } from './mathUtils';
 import { runtimeCacheKey, withRuntimeCache } from './runtimeCache';
 import { removeTextLetterhead } from '@/lib/removeTextLetterhead';
 import { blocoRegrasCriticas, regiaoTrtPorMunicipio } from './regrasCriticas';
 import { BLOCO_ENGENHARIA_JURIDICA } from './engenhariaJuridica';
 import { traceAiCall } from '@/lib/sessionTrace';
+import { dividirSecoes, resumoSecoes, aplicarPlano, podarPorFlags, PLANO_SCHEMA } from './montagemSecoes';
 
 // ============================================================
 // Anonimização (mesma lógica usada no cadastro dos modelos)
@@ -190,7 +194,7 @@ Peça, quando ainda não informado, os dados NECESSÁRIOS para uma petição com
 
 ATENÇÃO AO FORMATO DAS ENTREVISTAS: o advogado costuma escrever em lista de rótulos. A DATA DE SAÍDA aparece frequentemente rotulada pela própria modalidade da rescisão — ex.: "Sem JUSTA CAUSA: 07/12/2025", "Rescisão indireta: 10/03/2025", "Pedido de demissão: 01/02/2025". Nesses casos, a data é a DATA DE RESCISÃO e o rótulo indica o tipo_dispensa. Nunca diga que a data de rescisão está faltando quando ela aparece nesse formato. Da mesma forma, "Jornada: 12x36 18:30 as 07:30" é a jornada/escala e "Salário: 2148,22" é o salário.
 
-Extraia em "atributos" TUDO o que já for possível inferir da conversa. Nunca devolva "atributos" vazio quando o relato contiver função, CNPJ, CEP, tomadora, rito ou teses. Considere como teses fatos como dano moral, intervalo reduzido, folgas trabalhadas e jornada extraordinária. Defina "pronto_para_gerar" como true quando o advogado pedir a minuta OU quando já houver identificação do reclamante, função, reclamada, datas do contrato, salário, jornada e fatos essenciais. Não invente dados.
+Extraia em "atributos" TUDO o que já for possível inferir da conversa. Nunca devolva "atributos" vazio quando o relato contiver função, CNPJ, CEP, tomadora, rito ou teses. Considere como teses fatos como dano moral, intervalo reduzido, folgas trabalhadas e jornada extraordinária. Defina "pronto_para_gerar" como true quando o advogado pedir a minuta OU quando já houver identificação do reclamante, função, reclamada, datas do contrato, salário, jornada e fatos essenciais. Não invente dados. Se houver um FORMULÁRIO DE ENTREVISTA anexado (padrão do escritório, assinado via ZapSign), LEIA-O e extraia dele os atributos (partes, CNPJ/CEP, função, escala, tipo de dispensa, teses) — os anexos são fonte primária.
 
 MODELOS DE REFERÊNCIA DISPONÍVEIS (o sistema escolherá automaticamente o mais aderente aos atributos):
 ${resumoModelos(modelos)}
@@ -206,7 +210,7 @@ Responda APENAS com o objeto JSON.`;
 
 // Rótulos usados na prática para a data de saída. Inclui a modalidade como
 // rótulo ("Sem justa causa: 07/12/2025"), formato comum nas entrevistas.
-const RESCISAO_RE = /(?:demiss[aã]o|rescis[aã]o|dispensa|desligamento|sa[íi]da|t[eé]rmino|(?:sem\s+)?justa\s+causa|pedido\s+de\s+demiss[aã]o|acordo)\s*:?\s*(?:em\s*)?(\d{2}\/\d{2}\/\d{4})/i;
+const RESCISAO_RE = /(?:demiss[aã]o|rescis[aã]o|dispensa|desligamento|sa[íi]da|t[eé]rmino|(?:sem\s+)?justa\s+causa|pedido\s+de\s+demiss[aã]o|acordo|[uú]ltimo\s+dia\s+trabalhado|parada\s+imediata)[^\d\n]{0,40}(\d{2}\/\d{2}\/\d{4})/i;
 
 const MODALIDADE_RE = [
   [/rescis[aã]o\s+indireta|art\.?\s*483/i, 'rescisao_indireta'],
@@ -272,7 +276,7 @@ function inferirAtributosEntrevista(transcript) {
   if (!funcao) faltando.push('Função do reclamante');
   if (!atributos.cnpjs.length) faltando.push('CNPJ da(s) reclamada(s)');
   if (!/\b\d{3}\.?\d{3}\.?\d{3}-?\d{2}\b/.test(texto)) faltando.push('CPF do reclamante');
-  if (!/admiss[aã]o\s*:?\s*\d{2}\/\d{2}\/\d{4}/i.test(texto)) faltando.push('Data de admissão');
+  if (!/(?:admiss[aã]o|tempo\s+laborado|in[íi]cio|contrata[çc][aã]o)[^\d\n]{0,20}\d{2}\/\d{2}\/\d{4}/i.test(texto)) faltando.push('Data de admissão');
   if (!RESCISAO_RE.test(texto)) faltando.push('Data de rescisão/demissão');
   if (!/sal[aá]rio\s*:?\s*(?:r\$\s*)?[\d.,]+/i.test(texto)) faltando.push('Salário');
   if (!/(?:escala|hor[aá]rio|jornada)\s*:?/i.test(texto)) faltando.push('Jornada/escala de trabalho');
@@ -308,14 +312,32 @@ export async function conversarEntrevista({ transcript, fileUrls, modelos, attrs
   const transcriptCompacto = compactarTranscript(transcript);
   const req = {
     prompt: buildChatPrompt({ transcript: transcriptCompacto, modelos, attrsAtuais }),
-    model: 'claude_opus_4_6',
+    model: 'gemini_3_flash',
     response_json_schema: CHAT_SCHEMA,
   };
   if (fileUrls?.length) req.file_urls = fileUrls;
-  const key = runtimeCacheKey({ version: 6, transcript: transcriptCompacto, fileUrls, modelos, attrsAtuais });
-  const resposta = await withRuntimeCache('entrevista-ia', key, () =>
-    traceAiCall('Análise da entrevista', req, () => base44.integrations.Core.InvokeLLM(req))
-  );
+  const key = runtimeCacheKey({ version: 7, transcript: transcriptCompacto, fileUrls, modelos, attrsAtuais });
+  let resposta = null;
+  try {
+    resposta = await withRuntimeCache('entrevista-ia', key, () =>
+      traceAiCall('Análise da entrevista', req, () => base44.integrations.Core.InvokeLLM(req))
+    );
+    // Quando o modelo não respeita o schema, a plataforma devolve { response: "texto" } —
+    // tenta recuperar o JSON de dentro do texto.
+    if (resposta && typeof resposta.response === 'string' && !resposta.reply) {
+      const m = resposta.response.match(/\{[\s\S]*\}/);
+      if (m) {
+        try { resposta = JSON.parse(m[0]); } catch (e) { resposta = null; }
+      } else {
+        resposta = null;
+      }
+    }
+  } catch (e) {
+    // A análise por IA falhou — segue apenas com a extração determinística,
+    // que é suficiente para apontar pendências e o que falta.
+    console.warn('Análise por IA indisponível; usando extração determinística.', e);
+    resposta = null;
+  }
   const inferido = inferirAtributosEntrevista(transcript);
   const ia = resposta?.atributos || {};
   const atributos = {
@@ -801,7 +823,7 @@ O QUE É PADRÃO (boilerplate — reproduza IGUAL, palavra por palavra, do model
 - Bloco de preliminares, SEMPRE nesta ordem: Da Competência Processual → Da Não Limitação ao Valor da Causa (Estimativa) → Do Juízo 100% Digital → Da Extinção do Feito sem Julgamento de Mérito → Da Justiça Gratuita.
 - Teses de mérito genéricas com texto praticamente idêntico ao modelo: Do Dano Moral; Da Súmula 331 (responsabilidade subsidiária da tomadora); Do Acúmulo de Função; Da Jornada; Das Horas Extras; Da Descaracterização da Escala 12x36/4x2; Do Artigo 71 (intervalo); Do Adicional Noturno; Dos Minutos que Antecedem/Sucedem; DSR; Folgas/Feriados 100%; Integração do "pagamento por fora"; Vale-Transporte; Auxílio-Alimentação; Multas Convencionais; FGTS+40%; Aviso Prévio; Verbas Rescisórias; Multa 477; Multa 467; IR; Previdência; Expedição de Ofícios; Atribuição Estimativa; Dos Pedidos.
 - Jurisprudências, citações de doutrina e quadros sinóticos (tabelas de escala) são copiados do modelo sem alteração.
-- Fecho: "Pede deferimento. São Paulo, [data]. FERNANDO ANDRADE VIEIRA – OAB/SP 320.825", com honorários de 20% e Súmulas 425/427 do TST.
+- Fecho: "Pede deferimento. São Paulo, [data]. FERNANDO ANDRADE VIEIRA – OAB/SP 320.825", com honorários de 15% (art. 791-A da CLT) e Súmulas 425/427 do TST.
 
 O QUE MUDA (variáveis a preencher caso a caso):
 - Qualificação do reclamante: nome, RG, CPF, PIS, CTPS, data de nascimento, filiação, endereço e função (ex.: porteiro ou controlador de acesso).
@@ -843,24 +865,25 @@ function blocoCalculos(calculos) {
   return `\n\nCÁLCULOS DETERMINÍSTICOS (feitos por código, matematicamente exatos — USE EXATAMENTE estes valores no texto e nos pedidos; NÃO faça aritmética própria nem altere estes números. Some-os para compor o VALOR DA CAUSA, respeitando o teto de R$ 400.000,00):\n${linhas.join('\n')}`;
 }
 
-// Geração adaptando o MODELO PADRÃO (HTML formatado), preservando o estilo.
-export function buildGeracaoPadraoPrompt({ texto, attrs, modeloHtml, calculos, diferencial, modeloSemelhanteTitulo, dadosReceita, dadosCep, dadosDatajud, dadosCct }) {
+// Prompt do PLANO de adaptação: a IA NÃO reescreve a peça; ela só indica o
+// que muda. Todo o texto-padrão (formatação, jurisprudência, boilerplate)
+// permanece fixo no modelo, aplicado por código.
+export function buildPlanoPrompt({ texto, attrs, resumo, calculos, diferencial, modeloSemelhanteTitulo, dadosReceita, dadosCep, dadosDatajud, dadosCct }) {
   const municipios = [...new Set((dadosCep || []).map((d) => d.municipio).filter(Boolean))];
   const dataHoje = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
   return `${PROMPT_SISTEMA_PETICAO}${BLOCO_ENGENHARIA_JURIDICA}${blocoRegrasCriticas({ municipios, dataHoje })}
 
-REGRA PRINCIPAL — ADAPTE O MODELO PADRÃO MANTENDO O ESTILO: abaixo está o MODELO PADRÃO do escritório em HTML (com a formatação, o layout e o texto-padrão corretos, podendo conter marcadores como {{VARIAVEL}}). Sua tarefa é ADAPTAR este HTML ao caso atual:
-- Substitua os marcadores {{...}} e quaisquer dados de exemplo pelos dados REAIS do caso (entrevista/documentos). Onde faltar um dado, deixe um marcador claro entre colchetes, ex.: [SALÁRIO].
-- Ajuste ou REMOVA os tópicos que não se aplicam ao caso; mantenha os tópicos fixos.
-- Todo valor que você preencher ou substituir com dados do caso atual deve ficar envolvido por <mark class="ai-filled-field" data-ai-field="nome_do_campo">valor preenchido</mark>. Marque somente os dados variáveis inseridos por você, nunca o texto jurídico padrão.
-- MANTENHA EXATAMENTE a formatação e a estrutura HTML do modelo (mesmas tags e estilos). NÃO reescreva o texto-padrão nem crie estrutura nova.
+SUA TAREFA AGORA NÃO É REDIGIR A PETIÇÃO INTEIRA. O modelo padrão do escritório já está montado, formatado e com todo o texto-padrão correto. Você deve devolver apenas o PLANO DE ADAPTAÇÃO deste modelo ao caso atual:
+1. "substituicoes": para cada DADO textual que muda no modelo (qualificação das partes, CNPJ/endereços, comarca/região, datas, função, escala e a FREQUÊNCIA de folgas/eventos — ex.: "10 a 12" → "5 a 7" —, concordância de gênero, data do fecho), copie em "de" o trecho EXATO do modelo (curto e único) e em "para" o valor do caso. Para os VALORES já calculados por código (abaixo) NÃO crie substituição — o sistema os insere sozinho.
+2. "valores_estimados": ESTIME (em R$, só número) as verbas que dependem de contagem de horas/dias e que NÃO estão nos cálculos determinísticos: horas_extras, intervalo_art71, adicional_noturno, dsr, domingos_feriados_100, dez_minutos, periculosidade_he, minutos_residuais, vt_folgas, alimentacao_folgas, multas_convencionais, ft_diferenca. Baseie-se no salário, na escala/jornada, nas horas extras e nas folgas do caso e nos percentuais da CCT. NÃO use 0 nem "a apurar"; estime como faria um advogado.
+3. NÃO decida a ESTRUTURA da peça: o sistema já REMOVE as seções sem suporte e MANTÉM a Súmula 331 quando há tomadora. Você não precisa preencher "remover_secoes" nem "secoes_novas".
 
-=== MODELO PADRÃO (HTML — preserve a formatação) ===
-${modeloHtml}
-=== FIM DO MODELO PADRÃO ===
-${diferencial ? `\n=== CASO SEMELHANTE NA BASE${modeloSemelhanteTitulo ? ` (${modeloSemelhanteTitulo})` : ''} — DIFERENCIAL ===\nO sistema selecionou, na base de referências, o caso mais semelhante a esta entrevista. Use os pontos PARTICULARES abaixo como orientação para as teses/capítulos específicos deste tipo de caso (o restante segue o Modelo Padrão). Inclua apenas o que tiver suporte no relato:\n${diferencial}\n=== FIM DO DIFERENCIAL ===\n` : ''}
-=== ENTREVISTA / CASO ATUAL ===
-${texto || '(ver documentos anexados)'}
+=== SEÇÕES DO MODELO PADRÃO (índice, título e trecho do texto) ===
+${resumo}
+=== FIM DAS SEÇÕES ===
+${diferencial ? `\n=== CASO SEMELHANTE NA BASE${modeloSemelhanteTitulo ? ` (${modeloSemelhanteTitulo})` : ''} — DIFERENCIAL ===\n${diferencial}\n=== FIM DO DIFERENCIAL ===\n` : ''}
+=== ENTREVISTA / CASO ATUAL (o texto e/ou o FORMULÁRIO DE ENTREVISTA anexado — padrão do escritório, assinado — são a FONTE PRIMÁRIA dos dados; leia os anexos) ===
+${texto || '(ver o formulário de entrevista e os documentos anexados)'}
 
 Atributos detectados: função=${attrs?.funcao || '-'}, modalidade=${attrs?.tipo_dispensa || '-'}, rito=${attrs?.rito || '-'}, tomadora=${attrs?.tem_tomadora ? 'sim' : 'não'}.${
     municipios.length
@@ -871,7 +894,7 @@ Atributos detectados: função=${attrs?.funcao || '-'}, modalidade=${attrs?.tipo
   }
 === FIM DA ENTREVISTA ===${blocoReceita(dadosReceita)}${blocoCeps(dadosCep)}${blocoDatajud(dadosDatajud)}${blocoCct(dadosCct)}${blocoCalculos(calculos)}
 
-FORMATO DE SAÍDA: retorne APENAS o HTML adaptado do corpo da petição (sem <html>, <head> ou <body>), PRESERVANDO a formatação/estilo do modelo. NÃO acrescente avisos, notas ou observações ao final.`;
+Responda APENAS com o objeto JSON do plano.`;
 }
 
 // Limpa a saída da IA: remove cercas de código markdown (```html) e tags de
@@ -904,12 +927,12 @@ export async function gerarPecaPadrao({ texto, fileUrls, attrs, modeloPadrao, on
     if (termos.length) notify(`Consultando DataJud/CNJ (${config.datajud_tribunal || 'trt2'}): ${termos.join(', ')}...`);
   }
   // Extração estruturada do caso (parser) para alimentar o cálculo determinístico.
-  if (texto && texto.trim()) notify('Extraindo dados do caso e calculando verbas (determinístico)...');
+  if ((texto && texto.trim()) || (fileUrls && fileUrls.length)) notify('Extraindo dados do caso (entrevista/anexos) e calculando verbas (determinístico)...');
   const [dadosReceita, dadosCep, dadosDatajud, caso] = await Promise.all([
     enriquecerCnpjs(cnpjs),
     enriquecerCeps(ceps),
     enriquecerDatajud(attrs, config),
-    texto && texto.trim()
+    (texto && texto.trim()) || (fileUrls && fileUrls.length)
       ? withRuntimeCache('extracao-caso', runtimeCacheKey({ texto, fileUrls: fileUrls || [] }), () => extrairCasoDeTexto(texto, fileUrls), {
           onHit: () => notify('Reutilizando análise estruturada da entrevista em cache...'),
         }).catch(() => ({}))
@@ -932,6 +955,60 @@ export async function gerarPecaPadrao({ texto, fileUrls, attrs, modeloPadrao, on
     if (dadosCct?.meta?.titulo) notify(`CCT aplicável: ${dadosCct.meta.titulo}`);
   }
 
+  // EXPERTISE: quando faltam dados econômicos na entrevista, derivar da CCT
+  // (piso salarial da função, valores de benefícios, adicionais) — como a
+  // especialista faz. Preenche APENAS lacunas; nunca sobrescreve o que veio.
+  if (dadosCct?.clausulas?.length) {
+    const num = (v) => { const n = Number(v); return Number.isFinite(n) && n > 0 ? n : null; };
+    try {
+      notify('Derivando valores normativos da CCT (piso, benefícios, adicionais)...');
+      const vc = await derivarValoresCct({ caso, attrs, dadosCct });
+      caso.valores_cct = vc;
+      if (!num(caso.salario) && num(vc.piso_salarial)) {
+        caso.salario = num(vc.piso_salarial);
+        caso.salario_origem = 'piso normativo da CCT (estimado — confirmar)';
+        if (!num(caso.maior_remuneracao)) caso.maior_remuneracao = caso.salario;
+        notify(`Salário ausente na entrevista — usando o piso normativo da CCT: R$ ${caso.salario}`);
+      }
+      if (!num(caso.valor_aux_alimentacao) && (num(vc.auxilio_alimentacao_dia) || num(vc.vale_refeicao_dia))) {
+        caso.valor_aux_alimentacao = num(vc.auxilio_alimentacao_dia) || num(vc.vale_refeicao_dia);
+      }
+      if (!num(caso.val_conducao) && num(vc.vale_transporte_dia)) caso.val_conducao = num(vc.vale_transporte_dia);
+    } catch (e) {
+      /* segue sem derivação da CCT */
+    }
+  }
+
+  // EXPERTISE: quando faltam dados econômicos na entrevista, derivar da CCT
+  // (piso salarial da função, valores de benefícios, adicionais) — como a
+  // especialista faz. Preenche APENAS lacunas; nunca sobrescreve o que veio.
+  if (dadosCct?.clausulas?.length) {
+    const num = (v) => { const n = Number(v); return Number.isFinite(n) && n > 0 ? n : null; };
+    try {
+      notify('Derivando valores normativos da CCT (piso, benefícios, adicionais)...');
+      const vc = await derivarValoresCct({ caso, attrs, dadosCct });
+      caso.valores_cct = vc;
+      if (!num(caso.salario) && num(vc.piso_salarial)) {
+        caso.salario = num(vc.piso_salarial);
+        caso.salario_origem = 'piso normativo da CCT (estimado — confirmar)';
+        if (!num(caso.maior_remuneracao)) caso.maior_remuneracao = caso.salario;
+        notify(`Salário ausente na entrevista — usando o piso normativo da CCT: R$ ${caso.salario}`);
+      }
+      if (!num(caso.valor_aux_alimentacao) && (num(vc.auxilio_alimentacao_dia) || num(vc.vale_refeicao_dia))) {
+        caso.valor_aux_alimentacao = num(vc.auxilio_alimentacao_dia) || num(vc.vale_refeicao_dia);
+      }
+      if (!num(caso.val_conducao) && num(vc.vale_transporte_dia)) caso.val_conducao = num(vc.vale_transporte_dia);
+    } catch (e) {
+      /* segue sem derivação da CCT */
+    }
+  }
+
+  // Validação rígida (datas/valores) ANTES dos cálculos — evita distorções.
+  const validado = validarCasoTrabalhista(caso || {});
+  for (const alerta of validado.alertas) notify(`Validação do caso: ${alerta}`);
+  Object.assign(caso, validado.caso);
+  for (const k of Object.keys(caso)) if (!(k in validado.caso)) delete caso[k];
+
   // Cálculo 100% determinístico (a IA não faz aritmética).
   const calculos = calcularVerbasCaso(caso || {});
 
@@ -950,11 +1027,13 @@ export async function gerarPecaPadrao({ texto, fileUrls, attrs, modeloPadrao, on
     /* segue sem referência */
   }
 
+  const { secoes } = dividirSecoes(modeloPadrao?.html || '');
+  notify(`Modelo padrão dividido em ${secoes.length} seções — o texto-padrão fica fixo; a IA só adapta o que muda.`);
   const req = {
-    prompt: buildGeracaoPadraoPrompt({
+    prompt: buildPlanoPrompt({
       texto,
       attrs,
-      modeloHtml: modeloPadrao?.html || '',
+      resumo: resumoSecoes(secoes),
       calculos,
       diferencial,
       modeloSemelhanteTitulo: modeloSemelhante?.titulo || '',
@@ -963,18 +1042,35 @@ export async function gerarPecaPadrao({ texto, fileUrls, attrs, modeloPadrao, on
       dadosDatajud,
       dadosCct,
     }),
-    model: 'claude_opus_4_6',
+    model: 'claude_sonnet_4_6',
+    response_json_schema: PLANO_SCHEMA,
   };
   const urls = [...(fileUrls || [])];
   if (urls.length) req.file_urls = urls;
-  const resultado = await withRuntimeCache(
-    'geracao-minuta',
+  const plano = await withRuntimeCache(
+    'plano-minuta',
     runtimeCacheKey({ prompt: req.prompt, fileUrls: urls }),
-    () => traceAiCall('Geração da minuta', req, () => base44.integrations.Core.InvokeLLM(req)),
-    { onHit: () => notify('Reutilizando geração idêntica em cache...') }
+    () => traceAiCall('Plano de adaptação da minuta', req, () => base44.integrations.Core.InvokeLLM(req)),
+    { onHit: () => notify('Reutilizando plano idêntico em cache...') }
   );
+  let { html, relatorio } = aplicarPlano(modeloPadrao?.html || '', { substituicoes: plano?.substituicoes });
+  // Estrutura por CÓDIGO (não depende do LLM): remove as seções opcionais sem
+  // suporte no caso — mantendo a Súmula 331 quando há tomadora — e então resolve
+  // os condicionais {{#if}} de modalidade e preenche/marca TODOS os tokens.
+  html = podarPorFlags(html, flagsSecoes(caso, attrs));
+  html = montarPeca(html, { caso, calculos, dadosReceita, dadosCep, attrs, valoresIA: plano?.valores_estimados });
+  if (relatorio.faltaram.length) {
+    notify(`Trechos não localizados no modelo (revisar manualmente): ${relatorio.faltaram.slice(0, 8).join(' | ')}`);
+  }
+  const htmlFinal = limparHtmlIA(html);
+  const pendentes = assertNoUnreplacedTokens(htmlFinal);
+  if (pendentes.length) {
+    notify(`Campos ainda sem valor (marcados em amarelo na minuta — informe no chat para eu recalcular): ${pendentes.join(', ')}`);
+  }
   return {
-    html: limparHtmlIA(resultado),
+    html: htmlFinal,
+    pendentes,
+    plano,
     dadosReceita,
     dadosCep,
     dadosDatajud,

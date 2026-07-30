@@ -1,10 +1,10 @@
 import { base44 } from '@/api/base44Client';
 import { traceAiCall } from '@/lib/sessionTrace';
 
-// Agente extrator: converte o texto livre da entrevista (e os documentos
-// anexados) nos campos estruturados do caso, com um modelo rápido/barato.
-// Fornece mais CONTEXTO para a geração — a IA não faz aritmética (isso é do
-// mathUtils) nem inventa dados; apenas extrai o que consta no relato/anexos.
+// Agente extrator: converte a entrevista (texto livre E/OU o FORMULÁRIO DE
+// ENTREVISTA padrão do escritório, anexado em PDF/imagem/DOCX) nos campos
+// estruturados do caso, com um modelo rápido/barato. Não faz aritmética
+// (isso é do mathUtils) nem inventa dados; apenas extrai o que consta.
 const CASO_SCHEMA = {
   type: 'object',
   properties: {
@@ -47,20 +47,20 @@ const CASO_SCHEMA = {
     // Jornada
     jornada_horario: { type: 'string', description: 'Horários. Ex.: das 19h às 7h' },
     escala: { type: 'string', description: 'Escala. Ex.: 12x36, 4x2, 5x2, 6x1' },
-    intervalo_usufruido: { type: 'string', description: 'Intervalo efetivo. Ex.: 10 a 15 minutos' },
-    prorrogacao_jornada: { type: 'string', description: 'Extensão habitual. Ex.: 30 min a 1h' },
+    intervalo_usufruido: { type: 'string', description: 'Intervalo efetivo. Ex.: 10 a 15 minutos / suprimido' },
+    prorrogacao_jornada: { type: 'string', description: 'Extensão habitual (horas extras). Ex.: 30 min a 1h; antecedente/sucedente' },
     val_ft: { type: 'number', description: 'Valor pago por CADA folga trabalhada (R$)' },
     val_conducao: { type: 'number', description: 'Valor de UMA condução (R$), p/ vale-transporte nas folgas' },
     ft_qtd_media: { type: 'number', description: 'Média de folgas/feriados trabalhados por mês' },
 
     // Teses — dados de apoio
-    acumulo_atividades: { type: 'string', description: 'Tarefas extras acumuladas (ex.: rondas, recepção, limpeza)' },
+    acumulo_atividades: { type: 'string', description: 'Tarefas extras acumuladas (ex.: recepção, cadastro, medicação, rondas)' },
     assiduidade_prometido: { type: 'number', description: 'Bônus de assiduidade prometido (R$)' },
     assiduidade_pago: { type: 'number', description: 'Bônus de assiduidade efetivamente pago (R$)' },
     assiduidade_diferenca: { type: 'number', description: 'Diferença mensal da assiduidade (R$)' },
     doenca_descricao: { type: 'string', description: 'Doença/lesão ocupacional (ex.: hérnia de disco)' },
     valor_por_fora: { type: 'number', description: 'Valor médio pago por fora (R$)' },
-    valor_aux_alimentacao: { type: 'number', description: 'Valor diário do auxílio-alimentação da CCT (R$)' },
+    valor_aux_alimentacao: { type: 'number', description: 'Valor diário do auxílio/vale-alimentação-refeição (R$)' },
     cct_ano: { type: 'string', description: 'Ano da CCT aplicável. Ex.: 2025' },
     cct_clausulas: { type: 'string', description: 'Cláusulas específicas citadas' },
     cct_clausula_multa: { type: 'string', description: 'Cláusula da multa convencional' },
@@ -69,10 +69,12 @@ const CASO_SCHEMA = {
     periodo_ferias_vencidas: { type: 'string', description: 'Período das férias vencidas, se houver' },
 
     // Flags das teses (true APENAS com suporte no relato)
-    tem_acumulo: { type: 'boolean' },
-    tem_adic_noturno: { type: 'boolean', description: 'Houve labor em horário noturno' },
+    tem_acumulo: { type: 'boolean', description: 'ACUMULAVA um segundo cargo junto com o contratado' },
+    tem_desvio: { type: 'boolean', description: 'Exercia tarefas de OUTRO cargo (desvio de função)' },
+    tem_adic_noturno: { type: 'boolean', description: 'Houve labor em horário noturno (jornada cruza 22h–5h)' },
     tem_integracao_por_fora: { type: 'boolean', description: 'Pagamento "por fora" (dinheiro/PIX)' },
     tem_periculosidade: { type: 'boolean' },
+    tem_insalubridade: { type: 'boolean' },
     tem_assiduidade: { type: 'boolean', description: 'Bônus de assiduidade pago a menor' },
     tem_vale_transporte: { type: 'boolean', description: 'Ausência de VT nas folgas' },
     tem_auxilio_alimentacao: { type: 'boolean', description: 'Ausência de auxílio-alimentação nas folgas' },
@@ -83,31 +85,45 @@ const CASO_SCHEMA = {
     tem_ferias_vencidas: { type: 'boolean' },
     tem_dano_moral: { type: 'boolean' },
 
-    // Textos livres do caso concreto
-    dano_fatos: { type: 'string', description: 'Fato concreto do dano moral, redigido em 2-4 frases (nome do supervisor, tipo de perseguição/humilhação)' },
+    // Textos livres do caso concreto (narrativas customizadas — o boilerplate/doutrina fica no template)
+    dano_fatos: { type: 'string', description: 'Fatos CONCRETOS do dano moral (2-4 parágrafos): nome do líder/supervisor, perseguição, humilhações, gritos, atrasos de salário, suspensões indevidas, mudança de posto etc. NÃO incluir doutrina nem artigos de lei (já estão no template).' },
+    motivo_rescisao_fatos: { type: 'string', description: 'Resumo sucinto (2-3 frases) das faltas graves da ré que fundamentam a modalidade, quando rescisão indireta / reversão da justa causa / nulidade por coação. Omitir em dispensa sem justa causa.' },
+    desvio_acumulo_fatos: { type: 'string', description: 'Descrição concreta das funções contratadas vs. atividades extras exercidas no dia a dia (desvio/acúmulo), quando houver.' },
   },
 };
 
 export async function extrairCasoDeTexto(texto, fileUrls) {
   const request = {
-    prompt: `Você é um extrator de dados de entrevistas trabalhistas. Leia o texto livre abaixo (resumo da entrevista feito pelo advogado) e preencha os campos do caso.
+    prompt: `Você é um extrator de dados de entrevistas trabalhistas do escritório FAV Advogados. Os dados podem estar no TEXTO abaixo E/OU nos DOCUMENTOS ANEXADOS (PDF/imagem/DOCX) — em especial o FORMULÁRIO DE ENTREVISTA padrão do escritório (assinado via ZapSign). LEIA OS ANEXOS e preencha os campos do caso.
 
-TEXTO:
+TEXTO (pode estar vazio se tudo estiver no anexo):
 """
-${texto}
+${texto || '(sem texto — usar os documentos anexados)'}
 """
+
+ESTRUTURA DO FORMULÁRIO DE ENTREVISTA (quando anexado):
+- "IDENTIFICAÇÃO DO(A) CLIENTE": parágrafo único com nome, data de nascimento, nacionalidade, estado civil, função, RG, CPF, PIS, Série, filiação (mãe/pai), endereço, CEP, e-mail e telefone → preencha os campos recl_*.
+- "IDENTIFICAÇÃO DO(S) RECLAMADO(S)": 1ª RECLAMADA = empregadora (recl1_nome/recl1_cnpj/recl1_logradouro); 2ª RECLAMADA = tomadora (recl2_nome/recl2_cnpj); "CARGO" → funcao; "TEMPO LABORADO" → data_admissao e data_rescisao (e a modalidade citada, ex.: "RESCISÃO INDIRETA"); "ESCALA/HORARIO" (ex.: "12X36 19H AS 7H") → escala ("12x36") e jornada_horario ("das 19h às 7h").
+- Seções NUMERADAS com caixas no formato "(X)" (MARCADA) e "( )" (vazia). Considere apenas a opção marcada com X:
+  1. Tipo de Dispensa → tipo_dispensa (Justa causa→reversao_justa_causa; Sem justa causa→sem_justa_causa; Pedido de demissão [se sob coação/perseguição no relato]→nulidade_pedido_demissao; Rescisão indireta→rescisao_indireta). "Último dia trabalhado" → data_rescisao.
+  2. Benefícios → Vale-refeição/alimentação (valor)→valor_aux_alimentacao; se marcado "NÃO"→tem_auxilio_alimentacao=true; Vale-transporte.
+  3. Jornada (finais de semana/feriados) e 5. Folgas Trabalhadas (FT): "Quantidade"→ft_qtd_media; "Valor recebido"→val_ft; "Forma: DINHEIRO/PIX"→tem_integracao_por_fora=true e valor_por_fora=val_ft; FT marcada "Sim"→tem_ft=true.
+  6. Intervalo Intrajornada: "suprimido / quanto tempo em média"→intervalo_usufruido.
+  7. Horas Extras: média + período antecedente + sucedente→prorrogacao_jornada.
+  8. Acúmulo/Desvio de função: "Sim" → se exercia tarefas de OUTRO cargo (ex.: prevenção de perdas, recepção) → tem_desvio=true; se ACUMULAVA um segundo cargo junto com o seu → tem_acumulo=true; "Quais funções" → acumulo_atividades e desvio_acumulo_fatos.
+  10. Gratificações: se recebe algum tipo de gratificação (relevante p/ vigilante condutor).
+  11. Documentos (holerites, rescisão, espelho de ponto): se NÃO fornecidos, é argumento da Súm. 338 TST — registre no dano_fatos apenas se pertinente.
+  13. Saúde e Segurança: Insalubridade "Sim"→tem_insalubridade; Periculosidade "Sim"→tem_periculosidade; doença/acidente de trabalho→tem_doenca e doenca_descricao.
+- "FATOS NARRADOS PELO RECLAMANTE": texto livre (líder/supervisor, perseguição, humilhações, ameaças, suspensões indevidas, mudança de posto/andar, reserva técnica) → sintetize em dano_fatos e defina tem_dano_moral=true quando houver.
 
 Regras:
-- Extraia SOMENTE o que estiver explícito ou claramente inferível no texto/documentos anexados. NÃO invente dados.
-- Omita campos sem informação (não retorne string vazia nem null).
-- Datas em YYYY-MM-DD (interprete formatos brasileiros como 22/01/26 → 2026-01-22).
-- CPF/CNPJ somente números. Valores monetários como número (ex.: 2500.00).
-- tipo_dispensa: "demissão forçada", coação ou perseguição para pedir demissão → nulidade_pedido_demissao; falta grave do empregador → rescisao_indireta; justa causa contestada → reversao_justa_causa.
-- Booleans (tem_*): defina true apenas com suporte no relato.
+- Extraia SOMENTE o que estiver explícito ou claramente inferível no texto/anexos. NÃO invente dados. Omita campos sem informação (não retorne string vazia nem null).
+- Datas em YYYY-MM-DD (interprete formatos brasileiros; "17/12/2024 – RESCISÃO INDIRETA ... 28/07/2026" → data_admissao=2024-12-17, data_rescisao=2026-07-28).
+- CPF/CNPJ/PIS somente números. Valores monetários como número (ex.: 220.00); ignore "$"/"R$".
 - recl_genero: 'M' ou 'F', inferido do nome/relato (para concordância de gênero na peça).
-- maior_remuneracao: preencha só se citada uma remuneração maior que o salário (base do dano moral); senão omita.
-- val_ft = valor de CADA folga trabalhada; val_conducao = valor de UMA condução; valor_aux_alimentacao = valor diário; ft_qtd_media = folgas por mês.
-- dano_fatos: redija de forma objetiva (2-4 frases) SOMENTE se houver fatos no relato; caso contrário, omita.
+- escala noturna (jornada que cruza 22h–5h, ex.: 19h às 7h) → tem_adic_noturno=true.
+- maior_remuneracao: só se citada uma remuneração maior que o salário (base do dano moral); senão omita.
+- Narrativas: escreva textos fluidos e humanizados APENAS com fatos do caso. dano_fatos = abusos concretos (sem doutrina/lei). motivo_rescisao_fatos = faltas graves da ré (só em rescisão indireta/reversão/coação). desvio_acumulo_fatos = funções contratadas vs. atividades extras (só se houver desvio/acúmulo). Ajuste a concordância ao gênero do reclamante.
 
 Responda APENAS com o objeto JSON.`,
     model: 'gemini_3_flash',

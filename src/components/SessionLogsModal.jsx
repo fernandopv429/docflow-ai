@@ -1,5 +1,5 @@
 import React from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ScrollText } from 'lucide-react';
 
 const LABELS = {
@@ -21,6 +21,7 @@ export default function SessionLogsModal({ open, onOpenChange, messages }) {
           <DialogTitle className="flex items-center gap-2">
             <ScrollText className="h-5 w-5" /> Logs da sessão
           </DialogTitle>
+          <DialogDescription>Histórico das mensagens, ferramentas e erros desta sessão.</DialogDescription>
         </DialogHeader>
         <div className="max-h-[65vh] space-y-2 overflow-y-auto pr-2">
           {messages.length === 0 ? (
