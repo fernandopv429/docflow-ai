@@ -13,6 +13,7 @@ import { TIPO_DISPENSA_LABELS } from '@/lib/trabalhista/tokens';
 import { formatBRL } from '@/lib/trabalhista/mathUtils';
 import { fontesAuditoria, fontesEntrevista, fontesGeracao } from '@/lib/trabalhista/fontesAnalise';
 import useConsoleLogs from '@/hooks/useConsoleLogs';
+import { extrairTextoDocumento } from '@/lib/trabalhista/extrairTextoDocumento';
 import {
   carregarModeloPadrao,
   conversarEntrevista,
@@ -36,6 +37,7 @@ export default function GerarPorEntrevista() {
 
   const [allUrls, setAllUrls] = useState([]);
   const [documentSources, setDocumentSources] = useState([]);
+  const [docTexts, setDocTexts] = useState([]);
   const [modeloPadrao, setModeloPadrao] = useState(null);
   const [attrs, setAttrs] = useState(null);
   const [pendingGeneration, setPendingGeneration] = useState(null);
@@ -184,23 +186,36 @@ export default function GerarPorEntrevista() {
     try {
       let urls = allUrls;
       let fontesAtuais = documentSources;
+      let textosAtuais = docTexts;
       if (attached.length) {
         const novos = [];
         const novasFontes = [];
+        const novosTextos = [];
         for (const file of attached) {
           const { file_url } = await base44.integrations.Core.UploadFile({ file });
           novos.push(file_url);
           novasFontes.push({ nome: file.name, url: file_url });
+          setMessages((m) => [...m, { role: 'tool', text: `Extraindo o texto de "${file.name}"...` }]);
+          const textoDoc = await extrairTextoDocumento(file, file_url).catch(() => '');
+          if (textoDoc.trim()) novosTextos.push({ nome: file.name, texto: textoDoc.trim() });
         }
         urls = [...allUrls, ...novos];
         fontesAtuais = [...documentSources, ...novasFontes];
+        textosAtuais = [...docTexts, ...novosTextos];
         setAllUrls(urls);
         setDocumentSources(fontesAtuais);
+        setDocTexts(textosAtuais);
       }
 
-      const transcript = novasMsgs
-        .filter((m) => m.role === 'user' || m.role === 'assistant')
-        .map((m) => ({ role: m.role, text: m.text || '' }));
+      const textoDocs = textosAtuais
+        .map((d) => `=== DOCUMENTO ANEXADO: ${d.nome} ===\n${d.texto}`)
+        .join('\n\n');
+      const transcript = [
+        ...(textoDocs ? [{ role: 'user', text: textoDocs }] : []),
+        ...novasMsgs
+          .filter((m) => m.role === 'user' || m.role === 'assistant')
+          .map((m) => ({ role: m.role, text: m.text || '' })),
+      ];
       const modelosCtx = modeloPadrao ? [{ titulo: modeloPadrao.titulo, teses: [] }] : [];
       const res = await conversarEntrevista({
         transcript,
@@ -239,9 +254,10 @@ export default function GerarPorEntrevista() {
       ]);
 
       // Inicia a geração/atualização da minuta automaticamente após cada envio
-      const textoCompleto = novasMsgs
-        .filter((m) => m.role === 'user')
-        .map((m) => m.text)
+      const textoCompleto = [
+        textoDocs,
+        ...novasMsgs.filter((m) => m.role === 'user').map((m) => m.text),
+      ]
         .filter(Boolean)
         .join('\n\n');
       const faltando = res?.faltando || [];
