@@ -65,7 +65,7 @@ function montarQualificacao(caso = {}) {
 }
 
 // Constrói o mapa de tokens determinísticos a partir do caso + cálculos + dados oficiais.
-export function tokensDaPeca({ caso = {}, calculos = [], dadosReceita = [], dadosCep = [], attrs = {} } = {}) {
+export function tokensDaPeca({ caso = {}, calculos = [], dadosReceita = [], dadosCep = [], attrs = {}, valoresIA = {} } = {}) {
   const uf = (caso.comarca_uf || '').toUpperCase().slice(-2);
   const soDig = (s) => (s || '').replace(/\D/g, '');
   const receita = (cnpj) => (dadosReceita || []).find((d) => d && !d.erro && soDig(d.cnpj) === soDig(cnpj));
@@ -98,8 +98,28 @@ export function tokensDaPeca({ caso = {}, calculos = [], dadosReceita = [], dado
   if (fgtsDep && fgtsMul) partesResc.push(`FGTS + 40%: ${formatBRL((Number(fgtsDep.valor) || 0) + (Number(fgtsMul.valor) || 0))}`);
   if (partesResc.length) set('VERBAS_RESCISORIAS_DETALHE', `${partesResc.join('; ')}.`);
 
-  // Valor da causa (estimativo): soma dos valores determinísticos calculados, teto R$ 400.000
-  let somaCausa = 0;
+  // Valores ESTIMADOS pela IA (verbas que dependem de contagem de horas/dias)
+  const IA_TOKEN = {
+    horas_extras: 'VALORES_HORAS_EXTRAS',
+    intervalo_art71: 'VALORES_INTERVALO',
+    adicional_noturno: 'VALOR_ADICIONAL_NOTURNO',
+    domingos_feriados_100: 'VALORES_DOMINGOS_FERIADOS',
+    dez_minutos: 'VALORES_DESCANSO_SENTADO',
+    periculosidade_he: 'VALORES_PERICULOSIDADE_HE',
+    minutos_residuais: 'VALORES_MINUTOS_RESIDUAIS',
+    vt_folgas: 'VALOR_VT_FOLGAS',
+    alimentacao_folgas: 'VALOR_ALIMENTACAO_FOLGAS',
+    multas_convencionais: 'VALOR_MULTAS_CONVENCIONAIS',
+    ft_diferenca: 'VALOR_FT_DIFERENCA',
+  };
+  let somaIA = 0;
+  for (const [k, tk] of Object.entries(IA_TOKEN)) {
+    const v = money((valoresIA || {})[k]);
+    if (v) { set(tk, v); somaIA += Number(valoresIA[k]) || 0; }
+  }
+
+  // Valor da causa (estimativo): soma determinística + estimativas da IA, teto R$ 400.000
+  let somaCausa = somaIA;
   for (const c of calculos || []) { const n = Number(c.valor); if (Number.isFinite(n) && n > 0) somaCausa += n; }
   if (somaCausa > 0) set('VALOR_CAUSA', formatBRL(Math.min(Math.round((somaCausa + Number.EPSILON) * 100) / 100, 400000)));
 
@@ -147,6 +167,22 @@ export function flagsDaPeca(caso = {}, attrs = {}) {
     T_COACAO: tipo === 'nulidade_pedido_demissao',
     T_REVERSAO: tipo === 'reversao_justa_causa',
     T_ACORDO: tipo === 'acordo',
+  };
+}
+
+// Flags que determinam a PODA determinística das seções opcionais (montagemSecoes.podarPorFlags).
+export function flagsSecoes(caso = {}, attrs = {}) {
+  return {
+    tem_tomadora: !!(caso.recl2_nome || caso.recl2_cnpj || attrs.tem_tomadora),
+    tem_gratificacao: /condutor|motorizad/i.test(caso.funcao || ''),
+    tem_acumulo: !!caso.tem_acumulo,
+    tem_desvio: !!caso.tem_desvio,
+    tem_assiduidade: !!(caso.tem_assiduidade || caso.assiduidade_prometido),
+    tem_adic_noturno: !!caso.tem_adic_noturno,
+    escala_12x36: /12\s*x\s*36/i.test(`${caso.escala || ''} ${caso.jornada_horario || ''}`),
+    tem_periculosidade: !!caso.tem_periculosidade,
+    tem_integracao_por_fora: !!(caso.tem_integracao_por_fora || caso.val_ft),
+    tem_ft: !!(caso.tem_ft || caso.val_ft),
   };
 }
 
