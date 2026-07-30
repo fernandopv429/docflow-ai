@@ -981,7 +981,7 @@ export async function gerarPecaPadrao({ texto, fileUrls, attrs, modeloPadrao, on
       dadosDatajud,
       dadosCct,
     }),
-    model: 'claude_opus_4_6',
+    model: 'claude_sonnet_4_6',
   };
   const urls = [...(fileUrls || [])];
   if (urls.length) req.file_urls = urls;
