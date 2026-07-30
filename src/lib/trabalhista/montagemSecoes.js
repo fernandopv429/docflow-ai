@@ -96,6 +96,41 @@ export function aplicarPlano(html, plano) {
   return { html: estilos + doc.body.innerHTML, relatorio };
 }
 
+// Seções OPCIONAIS do modelo e a flag do caso que as sustenta. A poda é
+// DETERMINÍSTICA (não depende do "achismo" do LLM): se a flag for falsa, a
+// seção é removida; caso contrário permanece. Súmula 331 permanece SEMPRE que
+// houver tomadora. Seções não listadas aqui são sempre mantidas.
+const SECOES_OPCIONAIS = [
+  { re: /S[ÚU]MULA\s*331|RESPONSABILIDADE\s+SUBSIDI/i, flag: 'tem_tomadora' },
+  { re: /GRATIFICA[ÇC][ÃA]O\s+DE\s+FUN[ÇC][ÃA]O/i, flag: 'tem_gratificacao' },
+  { re: /AC[ÚU]MULO\s+DE\s+FUN[ÇC][ÃA]O/i, flag: 'tem_acumulo' },
+  { re: /DESVIO\s+DE\s+FUN[ÇC][ÃA]O/i, flag: 'tem_desvio' },
+  { re: /ASSIDUIDADE/i, flag: 'tem_assiduidade' },
+  { re: /ADICIONAL\s+NOTURNO/i, flag: 'tem_adic_noturno' },
+  { re: /DESCARACTERIZA[ÇC][ÃA]O.*12\s*X?\s*36/i, flag: 'escala_12x36' },
+  { re: /PERICULOSIDADE/i, flag: 'tem_periculosidade' },
+  { re: /INTEGRA[ÇC][ÃA]O\s+DOS\s+VALORES\s+REMUNERADOS\s+FORA/i, flag: 'tem_integracao_por_fora' },
+  { re: /HORAS\s+EXTRAS\s+DE\s+100%|FOLGAS\s+TRABALHADAS\s+E\s+FERIADOS/i, flag: 'tem_ft' },
+  { re: /VALE\s+TRANSPORTE\s+NAS\s+FOLGAS/i, flag: 'tem_ft' },
+  { re: /AUX[ÍI]LIO\s+ALIMENTA[ÇC][ÃA]O\s+NAS\s+FOLGAS/i, flag: 'tem_ft' },
+];
+
+// Remove as seções opcionais cuja flag de suporte é falsa. Determinístico.
+export function podarPorFlags(html, flags = {}) {
+  const { doc, secoes } = dividirSecoes(html);
+  for (const secao of secoes) {
+    const tit = (secao.titulo || '').toUpperCase();
+    for (const { re, flag } of SECOES_OPCIONAIS) {
+      if (re.test(tit) && !flags[flag]) {
+        secao.nodes.forEach((n) => n.remove());
+        break;
+      }
+    }
+  }
+  const estilos = [...doc.head.querySelectorAll('style')].map((s) => s.outerHTML).join('');
+  return estilos + doc.body.innerHTML;
+}
+
 export const PLANO_SCHEMA = {
   type: 'object',
   required: ['substituicoes'],
@@ -116,6 +151,24 @@ export const PLANO_SCHEMA = {
           para: { type: 'string', description: 'Texto correto para o caso atual' },
           campo: { type: 'string', description: 'Nome do dado (ex.: nome_reclamante, salario)' },
         },
+      },
+    },
+    valores_estimados: {
+      type: 'object',
+      description: 'ESTIMATIVAS (em R$, só número) das verbas que dependem de contagem de horas/dias — a IA estima a partir do salário, escala, horas extras e folgas do caso. Preencha só as aplicáveis.',
+      properties: {
+        horas_extras: { type: 'number' },
+        intervalo_art71: { type: 'number' },
+        adicional_noturno: { type: 'number' },
+        dsr: { type: 'number' },
+        domingos_feriados_100: { type: 'number' },
+        dez_minutos: { type: 'number' },
+        periculosidade_he: { type: 'number' },
+        minutos_residuais: { type: 'number' },
+        vt_folgas: { type: 'number' },
+        alimentacao_folgas: { type: 'number' },
+        multas_convencionais: { type: 'number' },
+        ft_diferenca: { type: 'number' },
       },
     },
     secoes_novas: {
