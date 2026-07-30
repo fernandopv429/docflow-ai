@@ -904,9 +904,9 @@ export function buildPlanoPrompt({ texto, attrs, resumo, calculos, diferencial, 
   return `${PROMPT_SISTEMA_PETICAO}${BLOCO_ENGENHARIA_JURIDICA}${blocoRegrasCriticas({ municipios, dataHoje })}
 
 SUA TAREFA AGORA NÃO É REDIGIR A PETIÇÃO INTEIRA. O modelo padrão do escritório já está montado, formatado e com todo o texto-padrão correto. Você deve devolver apenas o PLANO DE ADAPTAÇÃO deste modelo ao caso atual:
-1. "remover_secoes": índices das seções que NÃO se aplicam (ex.: capítulo de escala diferente da relatada, teses sem suporte no relato, Súmula 331 quando não há tomadora).
-2. "substituicoes": para cada dado do modelo que precisa mudar (qualificação das partes, CNPJ, endereços, comarca/região, datas, salário, função, escala, valores dos pedidos, valor da causa, percentual de honorários, concordância de gênero, data do fecho), copie em "de" o trecho EXATO como aparece no modelo (curto e único, ex.: um nome, um número, uma data) e escreva em "para" o valor correto do caso. Nunca invente valores: use os cálculos determinísticos e os dados oficiais abaixo. Não deixe colchetes de rascunho nem "R$ 0,00".
-3. "secoes_novas": apenas os capítulos necessários ao caso que NÃO existem no modelo (ex.: "DA RESCISÃO INDIRETA"), em HTML simples, inseridos após a seção indicada.
+1. "substituicoes": para cada DADO textual que muda no modelo (qualificação das partes, CNPJ/endereços, comarca/região, datas, função, escala e a FREQUÊNCIA de folgas/eventos — ex.: "10 a 12" → "5 a 7" —, concordância de gênero, data do fecho), copie em "de" o trecho EXATO do modelo (curto e único) e em "para" o valor do caso. Para os VALORES já calculados por código (abaixo) NÃO crie substituição — o sistema os insere sozinho.
+2. "valores_estimados": ESTIME (em R$, só número) as verbas que dependem de contagem de horas/dias e que NÃO estão nos cálculos determinísticos: horas_extras, intervalo_art71, adicional_noturno, dsr, domingos_feriados_100, dez_minutos, periculosidade_he, minutos_residuais, vt_folgas, alimentacao_folgas, multas_convencionais, ft_diferenca. Baseie-se no salário, na escala/jornada, nas horas extras e nas folgas do caso e nos percentuais da CCT. NÃO use 0 nem "a apurar"; estime como faria um advogado.
+3. NÃO decida a ESTRUTURA da peça: o sistema já REMOVE as seções sem suporte e MANTÉM a Súmula 331 quando há tomadora. Você não precisa preencher "remover_secoes" nem "secoes_novas".
 
 === SEÇÕES DO MODELO PADRÃO (índice, título e trecho do texto) ===
 ${resumo}
