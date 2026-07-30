@@ -422,7 +422,7 @@ export default function GerarPorEntrevista() {
                 <input
                   type="file"
                   multiple
-                  accept=".pdf,.jpg,.jpeg,.png,.docx,.txt"
+                  accept=".pdf,application/pdf,.jpg,.jpeg,.png,image/jpeg,image/png,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.txt,text/plain"
                   className="hidden"
                   onChange={(e) => {
                     setFiles((prev) => [...prev, ...Array.from(e.target.files)]);
