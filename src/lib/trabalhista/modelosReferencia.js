@@ -206,7 +206,7 @@ Responda APENAS com o objeto JSON.`;
 
 // Rótulos usados na prática para a data de saída. Inclui a modalidade como
 // rótulo ("Sem justa causa: 07/12/2025"), formato comum nas entrevistas.
-const RESCISAO_RE = /(?:demiss[aã]o|rescis[aã]o|dispensa|desligamento|sa[íi]da|t[eé]rmino|(?:sem\s+)?justa\s+causa|pedido\s+de\s+demiss[aã]o|acordo)\s*:?\s*(?:em\s*)?(\d{2}\/\d{2}\/\d{4})/i;
+const RESCISAO_RE = /(?:demiss[aã]o|rescis[aã]o|dispensa|desligamento|sa[íi]da|t[eé]rmino|(?:sem\s+)?justa\s+causa|pedido\s+de\s+demiss[aã]o|acordo|[uú]ltimo\s+dia\s+trabalhado|parada\s+imediata)[^\d\n]{0,40}(\d{2}\/\d{2}\/\d{4})/i;
 
 const MODALIDADE_RE = [
   [/rescis[aã]o\s+indireta|art\.?\s*483/i, 'rescisao_indireta'],
@@ -272,7 +272,7 @@ function inferirAtributosEntrevista(transcript) {
   if (!funcao) faltando.push('Função do reclamante');
   if (!atributos.cnpjs.length) faltando.push('CNPJ da(s) reclamada(s)');
   if (!/\b\d{3}\.?\d{3}\.?\d{3}-?\d{2}\b/.test(texto)) faltando.push('CPF do reclamante');
-  if (!/admiss[aã]o\s*:?\s*\d{2}\/\d{2}\/\d{4}/i.test(texto)) faltando.push('Data de admissão');
+  if (!/(?:admiss[aã]o|tempo\s+laborado|in[íi]cio)\s*:?\s*(?:em\s*)?\d{2}\/\d{2}\/\d{4}/i.test(texto)) faltando.push('Data de admissão');
   if (!RESCISAO_RE.test(texto)) faltando.push('Data de rescisão/demissão');
   if (!/sal[aá]rio\s*:?\s*(?:r\$\s*)?[\d.,]+/i.test(texto)) faltando.push('Salário');
   if (!/(?:escala|hor[aá]rio|jornada)\s*:?/i.test(texto)) faltando.push('Jornada/escala de trabalho');
@@ -312,10 +312,28 @@ export async function conversarEntrevista({ transcript, fileUrls, modelos, attrs
     response_json_schema: CHAT_SCHEMA,
   };
   if (fileUrls?.length) req.file_urls = fileUrls;
-  const key = runtimeCacheKey({ version: 6, transcript: transcriptCompacto, fileUrls, modelos, attrsAtuais });
-  const resposta = await withRuntimeCache('entrevista-ia', key, () =>
-    traceAiCall('Análise da entrevista', req, () => base44.integrations.Core.InvokeLLM(req))
-  );
+  const key = runtimeCacheKey({ version: 7, transcript: transcriptCompacto, fileUrls, modelos, attrsAtuais });
+  let resposta = null;
+  try {
+    resposta = await withRuntimeCache('entrevista-ia', key, () =>
+      traceAiCall('Análise da entrevista', req, () => base44.integrations.Core.InvokeLLM(req))
+    );
+    // Quando o modelo não respeita o schema, a plataforma devolve { response: "texto" } —
+    // tenta recuperar o JSON de dentro do texto.
+    if (resposta && typeof resposta.response === 'string' && !resposta.reply) {
+      const m = resposta.response.match(/\{[\s\S]*\}/);
+      if (m) {
+        try { resposta = JSON.parse(m[0]); } catch (e) { resposta = null; }
+      } else {
+        resposta = null;
+      }
+    }
+  } catch (e) {
+    // A análise por IA falhou — segue apenas com a extração determinística,
+    // que é suficiente para apontar pendências e o que falta.
+    console.warn('Análise por IA indisponível; usando extração determinística.', e);
+    resposta = null;
+  }
   const inferido = inferirAtributosEntrevista(transcript);
   const ia = resposta?.atributos || {};
   const atributos = {
