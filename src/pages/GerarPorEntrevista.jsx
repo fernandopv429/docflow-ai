@@ -93,7 +93,7 @@ export default function GerarPorEntrevista() {
     setMessages((m) => [...m, { role: 'tool', text: `Usando template principal: ${modeloPadrao.titulo}` }]);
     try {
       const geracaoTexto = opts.texto ?? userText;
-      const { html, dadosReceita, dadosCep, dadosDatajud, dadosCct, calculos, caso, modeloSemelhante } = await gerarPecaPadrao({
+      const { html, plano, dadosReceita, dadosCep, dadosDatajud, dadosCct, calculos, caso, modeloSemelhante } = await gerarPecaPadrao({
         texto: geracaoTexto,
         fileUrls: opts.urls ?? allUrls,
         attrs: opts.attrs ?? attrs,
@@ -110,6 +110,7 @@ export default function GerarPorEntrevista() {
         caso && Object.keys(caso).length && { role: 'tool_result', title: 'Dados analisados e extraídos pela IA', text: JSON.stringify(caso, null, 2) },
         calculos?.length && { role: 'tool_result', title: 'Retorno dos cálculos determinísticos', text: JSON.stringify(calculos, null, 2) },
         modeloSemelhante && { role: 'tool_result', title: 'Modelo de referência selecionado', text: JSON.stringify(modeloSemelhante, null, 2) },
+        plano && { role: 'tool_result', title: 'Plano de adaptação do modelo padrão', text: JSON.stringify(plano, null, 2) },
         {
           role: 'tool_result',
           title: 'Fontes consultadas nesta geração',

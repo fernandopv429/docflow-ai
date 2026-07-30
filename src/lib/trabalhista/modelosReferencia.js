@@ -9,6 +9,7 @@ import { removeTextLetterhead } from '@/lib/removeTextLetterhead';
 import { blocoRegrasCriticas, regiaoTrtPorMunicipio } from './regrasCriticas';
 import { BLOCO_ENGENHARIA_JURIDICA } from './engenhariaJuridica';
 import { traceAiCall } from '@/lib/sessionTrace';
+import { dividirSecoes, resumoSecoes, aplicarPlano, PLANO_SCHEMA } from './montagemSecoes';
 
 // ============================================================
 // Anonimização (mesma lógica usada no cadastro dos modelos)
@@ -892,6 +893,38 @@ Atributos detectados: função=${attrs?.funcao || '-'}, modalidade=${attrs?.tipo
 FORMATO DE SAÍDA: retorne APENAS o HTML adaptado do corpo da petição (sem <html>, <head> ou <body>), PRESERVANDO a formatação/estilo do modelo. NÃO acrescente avisos, notas ou observações ao final.`;
 }
 
+// Prompt do PLANO de adaptação: a IA NÃO reescreve a peça; ela só indica o
+// que muda. Todo o texto-padrão (formatação, jurisprudência, boilerplate)
+// permanece fixo no modelo, aplicado por código.
+export function buildPlanoPrompt({ texto, attrs, resumo, calculos, diferencial, modeloSemelhanteTitulo, dadosReceita, dadosCep, dadosDatajud, dadosCct }) {
+  const municipios = [...new Set((dadosCep || []).map((d) => d.municipio).filter(Boolean))];
+  const dataHoje = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
+  return `${PROMPT_SISTEMA_PETICAO}${BLOCO_ENGENHARIA_JURIDICA}${blocoRegrasCriticas({ municipios, dataHoje })}
+
+SUA TAREFA AGORA NÃO É REDIGIR A PETIÇÃO INTEIRA. O modelo padrão do escritório já está montado, formatado e com todo o texto-padrão correto. Você deve devolver apenas o PLANO DE ADAPTAÇÃO deste modelo ao caso atual:
+1. "remover_secoes": índices das seções que NÃO se aplicam (ex.: capítulo de escala diferente da relatada, teses sem suporte no relato, Súmula 331 quando não há tomadora).
+2. "substituicoes": para cada dado do modelo que precisa mudar (qualificação das partes, CNPJ, endereços, comarca/região, datas, salário, função, escala, valores dos pedidos, valor da causa, percentual de honorários, concordância de gênero, data do fecho), copie em "de" o trecho EXATO como aparece no modelo (curto e único, ex.: um nome, um número, uma data) e escreva em "para" o valor correto do caso. Nunca invente valores: use os cálculos determinísticos e os dados oficiais abaixo. Não deixe colchetes de rascunho nem "R$ 0,00".
+3. "secoes_novas": apenas os capítulos necessários ao caso que NÃO existem no modelo (ex.: "DA RESCISÃO INDIRETA"), em HTML simples, inseridos após a seção indicada.
+
+=== SEÇÕES DO MODELO PADRÃO (índice, título e trecho do texto) ===
+${resumo}
+=== FIM DAS SEÇÕES ===
+${diferencial ? `\n=== CASO SEMELHANTE NA BASE${modeloSemelhanteTitulo ? ` (${modeloSemelhanteTitulo})` : ''} — DIFERENCIAL ===\n${diferencial}\n=== FIM DO DIFERENCIAL ===\n` : ''}
+=== ENTREVISTA / CASO ATUAL ===
+${texto || '(ver documentos anexados)'}
+
+Atributos detectados: função=${attrs?.funcao || '-'}, modalidade=${attrs?.tipo_dispensa || '-'}, rito=${attrs?.rito || '-'}, tomadora=${attrs?.tem_tomadora ? 'sim' : 'não'}.${
+    municipios.length
+      ? `\nCompetência calculada por código: ${municipios
+          .map((m) => `${m} → ${regiaoTrtPorMunicipio(m) || 'região a confirmar'}`)
+          .join('; ')}. USE esta região; não a recalcule.`
+      : ''
+  }
+=== FIM DA ENTREVISTA ===${blocoReceita(dadosReceita)}${blocoCeps(dadosCep)}${blocoDatajud(dadosDatajud)}${blocoCct(dadosCct)}${blocoCalculos(calculos)}
+
+Responda APENAS com o objeto JSON do plano.`;
+}
+
 // Limpa a saída da IA: remove cercas de código markdown (```html) e tags de
 // envelope (<html>/<head>/<body>) que aparecem como texto no preview/export.
 export function limparHtmlIA(html) {
@@ -968,11 +1001,13 @@ export async function gerarPecaPadrao({ texto, fileUrls, attrs, modeloPadrao, on
     /* segue sem referência */
   }
 
+  const { secoes } = dividirSecoes(modeloPadrao?.html || '');
+  notify(`Modelo padrão dividido em ${secoes.length} seções — o texto-padrão fica fixo; a IA só adapta o que muda.`);
   const req = {
-    prompt: buildGeracaoPadraoPrompt({
+    prompt: buildPlanoPrompt({
       texto,
       attrs,
-      modeloHtml: modeloPadrao?.html || '',
+      resumo: resumoSecoes(secoes),
       calculos,
       diferencial,
       modeloSemelhanteTitulo: modeloSemelhante?.titulo || '',
@@ -982,17 +1017,23 @@ export async function gerarPecaPadrao({ texto, fileUrls, attrs, modeloPadrao, on
       dadosCct,
     }),
     model: 'claude_sonnet_4_6',
+    response_json_schema: PLANO_SCHEMA,
   };
   const urls = [...(fileUrls || [])];
   if (urls.length) req.file_urls = urls;
-  const resultado = await withRuntimeCache(
-    'geracao-minuta',
+  const plano = await withRuntimeCache(
+    'plano-minuta',
     runtimeCacheKey({ prompt: req.prompt, fileUrls: urls }),
-    () => traceAiCall('Geração da minuta', req, () => base44.integrations.Core.InvokeLLM(req)),
-    { onHit: () => notify('Reutilizando geração idêntica em cache...') }
+    () => traceAiCall('Plano de adaptação da minuta', req, () => base44.integrations.Core.InvokeLLM(req)),
+    { onHit: () => notify('Reutilizando plano idêntico em cache...') }
   );
+  const { html, relatorio } = aplicarPlano(modeloPadrao?.html || '', plano);
+  if (relatorio.faltaram.length) {
+    notify(`Trechos não localizados no modelo (revisar manualmente): ${relatorio.faltaram.slice(0, 8).join(' | ')}`);
+  }
   return {
-    html: limparHtmlIA(resultado),
+    html: limparHtmlIA(html),
+    plano,
     dadosReceita,
     dadosCep,
     dadosDatajud,
