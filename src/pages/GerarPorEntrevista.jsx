@@ -174,10 +174,10 @@ export default function GerarPorEntrevista() {
     setGenerating(false);
   };
 
-  const handleSend = async () => {
-    if (sending || generating || (!input.trim() && files.length === 0)) return;
+  const handleSend = async (opts = {}) => {
+    const attached = opts.attachedFiles ?? files;
+    if (sending || generating || (!input.trim() && attached.length === 0)) return;
     const text = input.trim();
-    const attached = files;
     const novasMsgs = [...messages, { role: 'user', text, files: attached.map((f) => f.name) }];
     setMessages(novasMsgs);
     setInput('');
@@ -441,8 +441,13 @@ export default function GerarPorEntrevista() {
                   accept=".pdf,application/pdf,.jpg,.jpeg,.png,image/jpeg,image/png,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.txt,text/plain"
                   className="hidden"
                   onChange={(e) => {
-                    setFiles((prev) => [...prev, ...Array.from(e.target.files)]);
+                    const novos = Array.from(e.target.files);
                     e.target.value = '';
+                    if (!novos.length) return;
+                    const todos = [...files, ...novos];
+                    setFiles(todos);
+                    // A entrevista costuma ser o próprio arquivo — envia na hora
+                    handleSend({ attachedFiles: todos });
                   }}
                 />
               </label>
