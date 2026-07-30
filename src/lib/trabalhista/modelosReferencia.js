@@ -1030,7 +1030,7 @@ export async function gerarPecaPadrao({ texto, fileUrls, attrs, modeloPadrao, on
   );
   let { html, relatorio } = aplicarPlano(modeloPadrao?.html || '', plano);
   // Rede de segurança determinística: resolve os condicionais {{#if T_X}} de
-  // modalidade e substitui/מarca qualquer token que o plano da IA não preencheu,
+  // modalidade e substitui/marca qualquer token que o plano da IA não preencheu,
   // garantindo que nenhum {{token}} cru chegue ao documento.
   html = montarPeca(html, { caso, calculos, dadosReceita, dadosCep, attrs });
   if (relatorio.faltaram.length) {
