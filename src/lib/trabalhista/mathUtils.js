@@ -24,11 +24,6 @@ export function mesesContrato(admissao, rescisao) {
   return Math.max(meses, 0);
 }
 
-export function anosCompletos(admissao, rescisao) {
-  const m = mesesContrato(admissao, rescisao);
-  return m == null ? null : Math.floor(m / 12);
-}
-
 // Aviso prévio indenizado (Lei 12.506/2011): 30 dias + 3 dias por ano completo, máx. 90 dias
 export function avisoPrevio(salario, anos) {
   if (!salario || anos == null) return null;
