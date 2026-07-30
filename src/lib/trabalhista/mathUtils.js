@@ -12,8 +12,9 @@ export function formatBRL(n) {
 // Meses completos entre duas datas (mínimo 0)
 export function mesesContrato(admissao, rescisao) {
   if (!admissao || !rescisao) return null;
-  const a = new Date(admissao);
-  const r = new Date(rescisao);
+  const pd = (s) => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(s || '')); return m ? new Date(+m[1], +m[2] - 1, +m[3]) : new Date(s); };
+  const a = pd(admissao);
+  const r = pd(rescisao);
   if (isNaN(a) || isNaN(r) || r < a) return null;
   let meses = (r.getFullYear() - a.getFullYear()) * 12 + (r.getMonth() - a.getMonth());
   if (r.getDate() >= a.getDate()) {
@@ -37,14 +38,14 @@ export function avisoPrevio(salario, anos) {
 
 // 13º proporcional (avos sobre os meses do contrato — estimativa p/ valor da causa)
 export function decimoTerceiroProporcional(salario, meses) {
-  if (!salario || meses == null) return null;
+  if (!salario || !meses) return null;
   const avos = meses % 12 || 12;
   return { avos, valor: round2((salario / 12) * avos) };
 }
 
 // Férias proporcionais + 1/3
 export function feriasProporcionais(salario, meses) {
-  if (!salario || meses == null) return null;
+  if (!salario || !meses) return null;
   const avos = meses % 12 || 12;
   const base = (salario / 12) * avos;
   return { avos, valor: round2(base * (4 / 3)) };
@@ -52,7 +53,7 @@ export function feriasProporcionais(salario, meses) {
 
 // FGTS do período (8% ao mês) e multa de 40%
 export function fgtsPeriodo(salario, meses) {
-  if (!salario || meses == null) return null;
+  if (!salario || !meses) return null;
   const deposito = round2(salario * 0.08 * meses);
   return { deposito, multa40: round2(deposito * 0.4) };
 }
