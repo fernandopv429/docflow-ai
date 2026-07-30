@@ -84,8 +84,10 @@ const CASO_SCHEMA = {
     tem_ferias_vencidas: { type: 'boolean' },
     tem_dano_moral: { type: 'boolean' },
 
-    // Textos livres do caso concreto
-    dano_fatos: { type: 'string', description: 'Fato concreto do dano moral (2-4 frases): nome do líder/supervisor, perseguição, humilhações, suspensões indevidas, mudança de posto etc.' },
+    // Textos livres do caso concreto (narrativas customizadas — o boilerplate/doutrina fica no template)
+    dano_fatos: { type: 'string', description: 'Fatos CONCRETOS do dano moral (2-4 parágrafos): nome do líder/supervisor, perseguição, humilhações, gritos, atrasos de salário, suspensões indevidas, mudança de posto etc. NÃO incluir doutrina nem artigos de lei (já estão no template).' },
+    motivo_rescisao_fatos: { type: 'string', description: 'Resumo sucinto (2-3 frases) das faltas graves da ré que fundamentam a modalidade, quando rescisão indireta / reversão da justa causa / nulidade por coação. Omitir em dispensa sem justa causa.' },
+    desvio_acumulo_fatos: { type: 'string', description: 'Descrição concreta das funções contratadas vs. atividades extras exercidas no dia a dia (desvio/acúmulo), quando houver.' },
   },
 };
 
@@ -120,6 +122,7 @@ Regras:
 - recl_genero: 'M' ou 'F', inferido do nome/relato (para concordância de gênero na peça).
 - escala noturna (jornada que cruza 22h–5h, ex.: 19h às 7h) → tem_adic_noturno=true.
 - maior_remuneracao: só se citada uma remuneração maior que o salário (base do dano moral); senão omita.
+- Narrativas: escreva textos fluidos e humanizados APENAS com fatos do caso. dano_fatos = abusos concretos (sem doutrina/lei). motivo_rescisao_fatos = faltas graves da ré (só em rescisão indireta/reversão/coação). desvio_acumulo_fatos = funções contratadas vs. atividades extras (só se houver desvio/acúmulo). Ajuste a concordância ao gênero do reclamante.
 
 Responda APENAS com o objeto JSON.`,
     model: 'gemini_3_flash',
