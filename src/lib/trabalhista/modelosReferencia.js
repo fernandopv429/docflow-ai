@@ -1070,6 +1070,12 @@ export async function gerarPecaPadrao({ texto, fileUrls, attrs, modeloPadrao, on
   html = podarPorFlags(html, secoesFlags);
   html = podarEscala4x2SeNaoAplicavel(html, secoesFlags.escala_12x36);
   const verbasPorHora = await verbasPorHoraPromise;
+  const qtdEstimadas = Object.keys(verbasPorHora || {}).length;
+  notify(
+    qtdEstimadas
+      ? `Verbas por hora estimadas: ${Object.entries(verbasPorHora).map(([k, v]) => `${k}=R$${v}`).join(', ')}`
+      : 'A estimativa de verbas por hora não retornou valores — essas verbas ficarão marcadas para preenchimento manual.'
+  );
   html = montarPeca(html, { caso, calculos, dadosReceita, dadosCep, attrs, valoresIA: verbasPorHora });
   if (relatorio.faltaram.length) {
     notify(`Trechos não localizados no modelo (revisar manualmente): ${relatorio.faltaram.slice(0, 8).join(' | ')}`);
