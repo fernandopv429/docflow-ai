@@ -1,5 +1,5 @@
 import { applyConditionals } from '@/lib/variables';
-import { formatBRL, brlComExtenso } from './mathUtils';
+import { formatBRL, brlComExtenso, valorPorExtenso } from './mathUtils';
 import { regiaoTrtCanonica } from './regrasCriticas';
 
 // Formata dinheiro só quando há valor POSITIVO; 0/ausente/inválido → undefined
