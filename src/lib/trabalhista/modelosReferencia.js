@@ -309,7 +309,7 @@ export async function conversarEntrevista({ transcript, fileUrls, modelos, attrs
   const transcriptCompacto = compactarTranscript(transcript);
   const req = {
     prompt: buildChatPrompt({ transcript: transcriptCompacto, modelos, attrsAtuais }),
-    model: 'claude_opus_4_6',
+    model: 'claude_sonnet_4_6',
     response_json_schema: CHAT_SCHEMA,
   };
   if (fileUrls?.length) req.file_urls = fileUrls;
@@ -724,10 +724,10 @@ function blocoCct(dadosCct) {
   const cab = m
     ? `CONVENÇÃO COLETIVA APLICÁVEL${local} — ${m.titulo || 'CCT'}${m.ano_base ? `, ano-base ${m.ano_base}` : ''}${m.vigencia_inicio ? ` (vigência ${m.vigencia_inicio}${m.vigencia_fim ? ` a ${m.vigencia_fim}` : ''})` : ''}${m.sindicato_laboral ? `; sindicato profissional: ${m.sindicato_laboral}` : ''}`
     : 'CLÁUSULAS DE CONVENÇÃO COLETIVA (CCT) APLICÁVEIS';
-  const linhas = dadosCct.clausulas.slice(0, 8).map((c) => {
+  const linhas = dadosCct.clausulas.slice(0, 5).map((c) => {
     const ref = c.clausula_ref ? `Cláusula ${c.clausula_ref}` : '•';
     const texto = (c.texto || c.conteudo || c.trecho || c.clausula_texto || c.resumo || '')
-      .toString().trim().replace(/\s+/g, ' ').slice(0, 600);
+      .toString().trim().replace(/\s+/g, ' ').slice(0, 350);
     return `- ${ref}: ${texto}`;
   });
   return `\n\n${cab}\nUSE as cláusulas REAIS abaixo (fonte: base de CCTs do escritório) para fundamentar os tópicos de convenção coletiva (adicional noturno, auxílio-alimentação/refeição, vale-transporte, multa convencional, intervalo, horas extras). Cite a cláusula pelo número quando disponível. NÃO invente cláusulas que não constem aqui:\n${linhas.join('\n')}`;
@@ -844,7 +844,7 @@ REGRA PRINCIPAL — ADAPTE O MODELO PADRÃO MANTENDO O ESTILO: abaixo está o MO
 === MODELO PADRÃO (HTML — preserve a formatação) ===
 ${modeloHtml}
 === FIM DO MODELO PADRÃO ===
-${diferencial ? `\n=== CASO SEMELHANTE NA BASE${modeloSemelhanteTitulo ? ` (${modeloSemelhanteTitulo})` : ''} — DIFERENCIAL ===\nO sistema selecionou, na base de referências, o caso mais semelhante a esta entrevista. Use os pontos PARTICULARES abaixo como orientação para as teses/capítulos específicos deste tipo de caso (o restante segue o Modelo Padrão). Inclua apenas o que tiver suporte no relato:\n${diferencial}\n=== FIM DO DIFERENCIAL ===\n` : ''}
+${diferencial ? `\n=== CASO SEMELHANTE NA BASE${modeloSemelhanteTitulo ? ` (${modeloSemelhanteTitulo})` : ''} — DIFERENCIAL ===\nO sistema selecionou, na base de referências, o caso mais semelhante a esta entrevista. Use os pontos PARTICULARES abaixo como orientação para as teses/capítulos específicos deste tipo de caso (o restante segue o Modelo Padrão). Inclua apenas o que tiver suporte no relato:\n${(diferencial || '').slice(0, 4000)}\n=== FIM DO DIFERENCIAL ===\n` : ''}
 === ENTREVISTA / CASO ATUAL ===
 ${texto || '(ver documentos anexados)'}
 
@@ -949,34 +949,19 @@ export async function gerarPecaPadrao({ texto, fileUrls, attrs, modeloPadrao, on
       dadosDatajud,
       dadosCct,
     }),
-    model: 'claude_opus_4_6',
+    model: 'claude_sonnet_4_6',
   };
   const urls = [...(fileUrls || [])];
   if (urls.length) req.file_urls = urls;
   const resultado = await withRuntimeCache(
     'geracao-minuta',
     runtimeCacheKey({ prompt: req.prompt, fileUrls: urls }),
-    async () => {
-      try {
-        return await traceAiCall('Geração da minuta', req, () =>
-          invokeLLMComRetry(req, {
-            tentativas: 2,
-            onRetry: () => notify('Instabilidade no serviço de IA — tentando novamente com o Opus...'),
-          })
-        );
-      } catch (err) {
-        const status = err?.response?.status || err?.status;
-        if (![502, 503, 504].includes(status) && !/timeout|network/i.test(err?.message || '')) throw err;
-        // Provável timeout do gateway na geração longa com Opus: refaz com o Sonnet (mais rápido).
-        notify('O Opus excedeu o tempo do serviço. Gerando com o Claude Sonnet (mais rápido)...');
-        const reqSonnet = { ...req, model: 'claude_sonnet_4_6' };
-        return await traceAiCall('Geração da minuta (fallback Sonnet)', reqSonnet, () =>
-          invokeLLMComRetry(reqSonnet, {
-            onRetry: (n) => notify(`Instabilidade no serviço de IA — tentando novamente (${n}ª retentativa)...`),
-          })
-        );
-      }
-    },
+    () =>
+      traceAiCall('Geração da minuta', req, () =>
+        invokeLLMComRetry(req, {
+          onRetry: (n) => notify(`Instabilidade no serviço de IA — tentando novamente (${n}ª retentativa)...`),
+        })
+      ),
     { onHit: () => notify('Reutilizando geração idêntica em cache...') }
   );
   return {
