@@ -189,13 +189,35 @@ export function calcularVerbasCaso(caso = {}) {
   }
 
   // Integração dos valores pagos "por fora" (FTs) = valor por folga × folgas/mês × meses
+  // (mesmo valor aparece em dois pontos do template: no mérito e no rol de
+  // pedidos — por isso este ITEM único é mapeado para os DOIS tokens em montarPeca).
   const valFolga = Number(caso.val_ft) || null;
+  const qtdFolgas = Number(caso.ft_qtd_media) || null;
   if (valFolga) {
-    const qtd = Number(caso.ft_qtd_media) || null;
-    const total = qtd && meses ? round2(valFolga * qtd * meses) : round2(valFolga * (meses || 1));
+    const total = qtdFolgas && meses ? round2(valFolga * qtdFolgas * meses) : round2(valFolga * (meses || 1));
     const dsr = dsrSobreValor(total);
-    itens.push({ item: 'Integração de valores pagos por fora (FTs)', memoria: qtd && meses ? `R$ ${valFolga} × ${qtd} folgas × ${meses} meses` : 'valor informado', valor: total });
+    itens.push({ item: 'Integração de valores pagos por fora (FTs)', memoria: qtdFolgas && meses ? `R$ ${valFolga} × ${qtdFolgas} folgas × ${meses} meses` : 'valor informado', valor: total });
     if (dsr) itens.push({ item: 'Reflexo DSR sobre FT (1/6)', memoria: 'Súm. 172 TST', valor: dsr });
+  }
+
+  // Vale-transporte e auxílio-alimentação nas folgas trabalhadas (valor diário
+  // conhecido × quantidade de folgas/mês × meses — mesmo padrão das FTs acima,
+  // seguro por não depender de contagem de horas/julgamento).
+  if (qtdFolgas && meses) {
+    const valConducao = Number(caso.val_conducao) || null;
+    if (valConducao) {
+      itens.push({
+        item: 'Vale-transporte nas folgas trabalhadas', memoria: `2 conduções × R$ ${valConducao} × ${qtdFolgas} folgas × ${meses} meses`,
+        valor: round2(2 * valConducao * qtdFolgas * meses),
+      });
+    }
+    const valAlim = Number(caso.valor_aux_alimentacao) || null;
+    if (valAlim) {
+      itens.push({
+        item: 'Auxílio-alimentação nas folgas trabalhadas', memoria: `R$ ${valAlim} × ${qtdFolgas} folgas × ${meses} meses`,
+        valor: round2(valAlim * qtdFolgas * meses),
+      });
+    }
   }
   return itens;
 }
