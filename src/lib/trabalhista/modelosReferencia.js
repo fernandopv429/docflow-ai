@@ -8,6 +8,7 @@ import { runtimeCacheKey, withRuntimeCache } from './runtimeCache';
 import { removeTextLetterhead } from '@/lib/removeTextLetterhead';
 import { blocoRegrasCriticas, regiaoTrtPorMunicipio } from './regrasCriticas';
 import { BLOCO_ENGENHARIA_JURIDICA } from './engenhariaJuridica';
+import { invokeLLMComRetry } from './llmRetry';
 import { traceAiCall } from '@/lib/sessionTrace';
 
 // ============================================================
@@ -955,7 +956,12 @@ export async function gerarPecaPadrao({ texto, fileUrls, attrs, modeloPadrao, on
   const resultado = await withRuntimeCache(
     'geracao-minuta',
     runtimeCacheKey({ prompt: req.prompt, fileUrls: urls }),
-    () => traceAiCall('Geração da minuta', req, () => base44.integrations.Core.InvokeLLM(req)),
+    () =>
+      traceAiCall('Geração da minuta', req, () =>
+        invokeLLMComRetry(req, {
+          onRetry: (n) => notify(`Instabilidade no serviço de IA — tentando novamente (${n}ª retentativa)...`),
+        })
+      ),
     { onHit: () => notify('Reutilizando geração idêntica em cache...') }
   );
   return {
@@ -1025,7 +1031,7 @@ Responda APENAS com o objeto JSON.`;
     response_json_schema: COERENCIA_SCHEMA,
   };
   return withRuntimeCache('auditoria-coerencia', runtimeCacheKey(prompt), () =>
-    traceAiCall('Auditoria de coerência', request, () => base44.integrations.Core.InvokeLLM(request))
+    traceAiCall('Auditoria de coerência', request, () => invokeLLMComRetry(request))
   );
 }
 
