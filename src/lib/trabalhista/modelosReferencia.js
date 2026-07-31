@@ -956,12 +956,27 @@ export async function gerarPecaPadrao({ texto, fileUrls, attrs, modeloPadrao, on
   const resultado = await withRuntimeCache(
     'geracao-minuta',
     runtimeCacheKey({ prompt: req.prompt, fileUrls: urls }),
-    () =>
-      traceAiCall('Geração da minuta', req, () =>
-        invokeLLMComRetry(req, {
-          onRetry: (n) => notify(`Instabilidade no serviço de IA — tentando novamente (${n}ª retentativa)...`),
-        })
-      ),
+    async () => {
+      try {
+        return await traceAiCall('Geração da minuta', req, () =>
+          invokeLLMComRetry(req, {
+            tentativas: 2,
+            onRetry: () => notify('Instabilidade no serviço de IA — tentando novamente com o Opus...'),
+          })
+        );
+      } catch (err) {
+        const status = err?.response?.status || err?.status;
+        if (![502, 503, 504].includes(status) && !/timeout|network/i.test(err?.message || '')) throw err;
+        // Provável timeout do gateway na geração longa com Opus: refaz com o Sonnet (mais rápido).
+        notify('O Opus excedeu o tempo do serviço. Gerando com o Claude Sonnet (mais rápido)...');
+        const reqSonnet = { ...req, model: 'claude_sonnet_4_6' };
+        return await traceAiCall('Geração da minuta (fallback Sonnet)', reqSonnet, () =>
+          invokeLLMComRetry(reqSonnet, {
+            onRetry: (n) => notify(`Instabilidade no serviço de IA — tentando novamente (${n}ª retentativa)...`),
+          })
+        );
+      }
+    },
     { onHit: () => notify('Reutilizando geração idêntica em cache...') }
   );
   return {
