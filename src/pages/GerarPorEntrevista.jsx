@@ -343,15 +343,23 @@ export default function GerarPorEntrevista() {
       {/* Corpo: chat (esq) + documento (dir) */}
       <div className="flex-1 flex flex-col lg:flex-row min-h-0 overflow-hidden">
         {/* Chat */}
-        <div className="flex flex-col min-h-0 lg:w-[420px] lg:flex-shrink-0 lg:border-r border-[#dadce0]">
+        <div
+          className="flex flex-col min-h-0 lg:w-[420px] lg:flex-shrink-0 lg:border-r border-[#dadce0]"
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={(e) => {
+            e.preventDefault();
+            const dropped = Array.from(e.dataTransfer.files || []);
+            if (dropped.length) setFiles((prev) => [...prev, ...dropped]);
+          }}
+        >
           <div className="flex-1 overflow-y-auto px-4 py-4 min-h-0">
             <div className="space-y-3">
               {messages.length === 0 && (
                 <div className="text-center py-10">
                   <Bot className="w-8 h-8 text-[#dadce0] mx-auto mb-2" />
                   <p className="text-sm text-[#5f6368]">
-                    Descreva o caso ou cole a entrevista.
-                    <br />Pode anexar documentos e enviar mais informações a qualquer momento.
+                    Descreva o caso, cole a entrevista ou arraste o PDF aqui.
+                    <br />Aceita PDF, DOCX, planilhas e imagens — pode enviar só o arquivo, sem texto.
                   </p>
                 </div>
               )}
@@ -422,7 +430,7 @@ export default function GerarPorEntrevista() {
                 <input
                   type="file"
                   multiple
-                  accept=".pdf,.jpg,.jpeg,.png,.docx,.txt"
+                  accept=".pdf,.doc,.docx,.txt,.rtf,.odt,.csv,.xls,.xlsx,.jpg,.jpeg,.png,.webp,.heic,.tif,.tiff,application/pdf,image/*"
                   className="hidden"
                   onChange={(e) => {
                     setFiles((prev) => [...prev, ...Array.from(e.target.files)]);
