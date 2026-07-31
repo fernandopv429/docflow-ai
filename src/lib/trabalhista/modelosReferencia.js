@@ -8,6 +8,7 @@ import { runtimeCacheKey, withRuntimeCache } from './runtimeCache';
 import { removeTextLetterhead } from '@/lib/removeTextLetterhead';
 import { blocoRegrasCriticas, regiaoTrtPorMunicipio } from './regrasCriticas';
 import { BLOCO_ENGENHARIA_JURIDICA } from './engenhariaJuridica';
+import { BLOCO_REGRAS_QUALIDADE_FAV } from './regrasQualidadeFav';
 import { invokeLLMComRetry } from './llmRetry';
 import { traceAiCall } from '@/lib/sessionTrace';
 
@@ -833,7 +834,7 @@ function blocoCalculos(calculos) {
 export function buildGeracaoPadraoPrompt({ texto, attrs, modeloHtml, calculos, diferencial, modeloSemelhanteTitulo, dadosReceita, dadosCep, dadosDatajud, dadosCct }) {
   const municipios = [...new Set((dadosCep || []).map((d) => d.municipio).filter(Boolean))];
   const dataHoje = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
-  return `${PROMPT_SISTEMA_PETICAO}${BLOCO_ENGENHARIA_JURIDICA}${blocoRegrasCriticas({ municipios, dataHoje })}
+  return `${PROMPT_SISTEMA_PETICAO}${BLOCO_ENGENHARIA_JURIDICA}${BLOCO_REGRAS_QUALIDADE_FAV}${blocoRegrasCriticas({ municipios, dataHoje })}
 
 REGRA PRINCIPAL — ADAPTE O MODELO PADRÃO MANTENDO O ESTILO: abaixo está o MODELO PADRÃO do escritório em HTML (com a formatação, o layout e o texto-padrão corretos, podendo conter marcadores como {{VARIAVEL}}). Sua tarefa é ADAPTAR este HTML ao caso atual:
 - Substitua os marcadores {{...}} e quaisquer dados de exemplo pelos dados REAIS do caso (entrevista/documentos). Onde faltar um dado, deixe um marcador claro entre colchetes, ex.: [SALÁRIO].
@@ -1008,7 +1009,11 @@ Checagens obrigatórias:
 - Data do fecho anterior à data de desligamento do empregado — BLOQUEANTE.
 - Valores estimados redondos/genéricos sem base de cálculo, ou valor da causa desproporcional ao salário e ao período contratual.
 - Data do fecho ainda como "[data]".
-- Verba pedida em DUPLICIDADE.
+- Verba pedida em DUPLICIDADE (ex.: aviso prévio indenizado em item isolado e novamente no detalhamento das verbas rescisórias, inflando o valor da causa) — BLOQUEANTE.
+- E-mail do escritório usado na qualificação do reclamante em lugar do e-mail pessoal dele — BLOQUEANTE.
+- Endereço residencial do reclamante indicado como local de prestação de serviços no tópico da competência — BLOQUEANTE.
+- Endereço das reclamadas com grafia divergente da entrevista/dados oficiais (inclusive quilometragem).
+- Frases soltas, cortadas ou fragmentadas no tópico de dano moral.
 - Marcadores entre colchetes [ ] ainda pendentes (dados que faltam preencher).
 - Modalidade de rescisão incompatível com os pedidos.
 - Valor da causa acima de R$ 400.000,00, ou diferente da soma dos itens do rol de pedidos.
