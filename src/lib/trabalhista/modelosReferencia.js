@@ -876,8 +876,8 @@ export function buildPlanoPrompt({ texto, attrs, resumo, calculos, diferencial, 
 
 SUA TAREFA AGORA NÃO É REDIGIR A PETIÇÃO INTEIRA. O modelo padrão do escritório já está montado, formatado e com todo o texto-padrão correto. Você deve devolver apenas o PLANO DE ADAPTAÇÃO deste modelo ao caso atual:
 1. "substituicoes": para cada DADO textual que muda no modelo (qualificação das partes, CNPJ/endereços, comarca/região, datas, função, escala e a FREQUÊNCIA de folgas/eventos — ex.: "10 a 12" → "5 a 7" —, concordância de gênero, data do fecho), copie em "de" o trecho EXATO do modelo (curto e único) e em "para" o valor do caso. Para os VALORES já calculados por código (abaixo) NÃO crie substituição — o sistema os insere sozinho.
-2. "valores_estimados": ESTIME (em R$, só número) as verbas que dependem de contagem de horas/dias e que NÃO estão nos cálculos determinísticos: horas_extras, intervalo_art71, adicional_noturno, dsr, domingos_feriados_100, dez_minutos, periculosidade_he, minutos_residuais, vt_folgas, alimentacao_folgas, multas_convencionais, ft_diferenca. Baseie-se no salário, na escala/jornada, nas horas extras e nas folgas do caso e nos percentuais da CCT. NÃO use 0 nem "a apurar"; estime como faria um advogado.
-3. NÃO decida a ESTRUTURA da peça: o sistema já REMOVE as seções sem suporte e MANTÉM a Súmula 331 quando há tomadora. Você não precisa preencher "remover_secoes" nem "secoes_novas".
+2. NÃO decida a ESTRUTURA da peça: o sistema já REMOVE as seções sem suporte e MANTÉM a Súmula 331 quando há tomadora. Você não precisa preencher "remover_secoes" nem "secoes_novas".
+3. NÃO estime valores de verbas por hora (horas extras, intervalo, adicional noturno etc.) — isso é feito por um passo dedicado do sistema. Foque só nas substituições de dados/texto.
 
 === SEÇÕES DO MODELO PADRÃO (índice, título e trecho do texto) ===
 ${resumo}
@@ -1062,7 +1062,8 @@ export async function gerarPecaPadrao({ texto, fileUrls, attrs, modeloPadrao, on
   // suporte no caso — mantendo a Súmula 331 quando há tomadora — e então resolve
   // os condicionais {{#if}} de modalidade e preenche/marca TODOS os tokens.
   html = podarPorFlags(html, flagsSecoes(caso, attrs));
-  html = montarPeca(html, { caso, calculos, dadosReceita, dadosCep, attrs, valoresIA: plano?.valores_estimados });
+  html = podarEscala4x2SeNaoAplicavel(html, secoesFlags.escala_12x36);
+  html = montarPeca(html, { caso, calculos, dadosReceita, dadosCep, attrs, valoresIA: verbasPorHora });
   if (relatorio.faltaram.length) {
     notify(`Trechos não localizados no modelo (revisar manualmente): ${relatorio.faltaram.slice(0, 8).join(' | ')}`);
   }
