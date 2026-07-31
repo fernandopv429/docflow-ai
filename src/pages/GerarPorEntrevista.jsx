@@ -13,14 +13,12 @@ import { TIPO_DISPENSA_LABELS } from '@/lib/trabalhista/tokens';
 import { formatBRL } from '@/lib/trabalhista/mathUtils';
 import { fontesAuditoria, fontesEntrevista, fontesGeracao } from '@/lib/trabalhista/fontesAnalise';
 import useConsoleLogs from '@/hooks/useConsoleLogs';
-import { extrairTextoDocumento } from '@/lib/trabalhista/extrairTextoDocumento';
 import {
   carregarModeloPadrao,
   conversarEntrevista,
   gerarPecaPadrao,
   verificarCoerencia,
 } from '@/lib/trabalhista/modelosReferencia';
-import { classificarCorrecao, salvarRegraAprendida } from '@/lib/trabalhista/regrasAprendidas';
 
 export default function GerarPorEntrevista() {
   const [messages, setMessages] = useState([]);
@@ -38,7 +36,6 @@ export default function GerarPorEntrevista() {
 
   const [allUrls, setAllUrls] = useState([]);
   const [documentSources, setDocumentSources] = useState([]);
-  const [docTexts, setDocTexts] = useState([]);
   const [modeloPadrao, setModeloPadrao] = useState(null);
   const [attrs, setAttrs] = useState(null);
   const [pendingGeneration, setPendingGeneration] = useState(null);
@@ -94,7 +91,7 @@ export default function GerarPorEntrevista() {
     setMessages((m) => [...m, { role: 'tool', text: `Usando template principal: ${modeloPadrao.titulo}` }]);
     try {
       const geracaoTexto = opts.texto ?? userText;
-      const { html, plano, dadosReceita, dadosCep, dadosDatajud, dadosCct, calculos, caso, modeloSemelhante } = await gerarPecaPadrao({
+      const { html, dadosReceita, dadosCep, dadosDatajud, dadosCct, calculos, caso, modeloSemelhante } = await gerarPecaPadrao({
         texto: geracaoTexto,
         fileUrls: opts.urls ?? allUrls,
         attrs: opts.attrs ?? attrs,
@@ -111,7 +108,6 @@ export default function GerarPorEntrevista() {
         caso && Object.keys(caso).length && { role: 'tool_result', title: 'Dados analisados e extraídos pela IA', text: JSON.stringify(caso, null, 2) },
         calculos?.length && { role: 'tool_result', title: 'Retorno dos cálculos determinísticos', text: JSON.stringify(calculos, null, 2) },
         modeloSemelhante && { role: 'tool_result', title: 'Modelo de referência selecionado', text: JSON.stringify(modeloSemelhante, null, 2) },
-        plano && { role: 'tool_result', title: 'Plano de adaptação do modelo padrão', text: JSON.stringify(plano, null, 2) },
         {
           role: 'tool_result',
           title: 'Fontes consultadas nesta geração',
@@ -171,76 +167,40 @@ export default function GerarPorEntrevista() {
       }
     } catch (err) {
       console.error(err);
-      setMessages((m) => [
-        ...m,
-        { role: 'tool_result', title: 'Erro na geração da minuta', text: String(err?.stack || err?.message || err) },
-        { role: 'assistant', text: `Erro ao gerar a minuta: ${err?.message || 'falha desconhecida'}. Tente enviar novamente.` },
-      ]);
+      setMessages((m) => [...m, { role: 'assistant', text: 'Erro ao gerar a minuta. Tente novamente.' }]);
     }
     setGenerating(false);
   };
 
-  const handleSend = async (opts = {}) => {
-    const attached = opts.attachedFiles ?? files;
-    if (sending || generating || (!input.trim() && attached.length === 0)) return;
+  const handleSend = async () => {
+    if (sending || generating || (!input.trim() && files.length === 0)) return;
     const text = input.trim();
+    const attached = files;
     const novasMsgs = [...messages, { role: 'user', text, files: attached.map((f) => f.name) }];
     setMessages(novasMsgs);
     setInput('');
     setFiles([]);
     setSending(true);
     try {
-      // Detecta se a mensagem é uma correção/regra de estilo ou de direito
-      // (aprendizado do escritório) — se for, salva e reaplica na minuta.
-      if (text && !attached.length) {
-        const classificacao = await classificarCorrecao(text);
-        if (classificacao?.eh_correcao && classificacao.regra_extraida) {
-          await salvarRegraAprendida(classificacao, text);
-          setMessages((m) => [
-            ...m,
-            { role: 'tool', text: 'Correção identificada — registrando regra aprendida no sistema...' },
-            { role: 'tool_result', title: 'Regra aprendida registrada', text: JSON.stringify(classificacao, null, 2) },
-            { role: 'assistant', text: classificacao.resposta_chat || 'Entendido! Registrei esta preferência/correção no sistema e ela será aplicada nas próximas gerações.' },
-          ]);
-          setSending(false);
-          if (docHtml) {
-            await gerarMinuta({ texto: userText || undefined });
-          }
-          return;
-        }
-      }
       let urls = allUrls;
       let fontesAtuais = documentSources;
-      let textosAtuais = docTexts;
       if (attached.length) {
         const novos = [];
         const novasFontes = [];
-        const novosTextos = [];
         for (const file of attached) {
           const { file_url } = await base44.integrations.Core.UploadFile({ file });
           novos.push(file_url);
           novasFontes.push({ nome: file.name, url: file_url });
-          setMessages((m) => [...m, { role: 'tool', text: `Extraindo o texto de "${file.name}"...` }]);
-          const textoDoc = await extrairTextoDocumento(file, file_url).catch(() => '');
-          if (textoDoc.trim()) novosTextos.push({ nome: file.name, texto: textoDoc.trim() });
         }
         urls = [...allUrls, ...novos];
         fontesAtuais = [...documentSources, ...novasFontes];
-        textosAtuais = [...docTexts, ...novosTextos];
         setAllUrls(urls);
         setDocumentSources(fontesAtuais);
-        setDocTexts(textosAtuais);
       }
 
-      const textoDocs = textosAtuais
-        .map((d) => `=== DOCUMENTO ANEXADO: ${d.nome} ===\n${d.texto}`)
-        .join('\n\n');
-      const transcript = [
-        ...(textoDocs ? [{ role: 'user', text: textoDocs }] : []),
-        ...novasMsgs
-          .filter((m) => m.role === 'user' || m.role === 'assistant')
-          .map((m) => ({ role: m.role, text: m.text || '' })),
-      ];
+      const transcript = novasMsgs
+        .filter((m) => m.role === 'user' || m.role === 'assistant')
+        .map((m) => ({ role: m.role, text: m.text || '' }));
       const modelosCtx = modeloPadrao ? [{ titulo: modeloPadrao.titulo, teses: [] }] : [];
       const res = await conversarEntrevista({
         transcript,
@@ -279,24 +239,20 @@ export default function GerarPorEntrevista() {
       ]);
 
       // Inicia a geração/atualização da minuta automaticamente após cada envio
-      const textoCompleto = [
-        textoDocs,
-        ...novasMsgs.filter((m) => m.role === 'user').map((m) => m.text),
-      ]
+      const textoCompleto = novasMsgs
+        .filter((m) => m.role === 'user')
+        .map((m) => m.text)
         .filter(Boolean)
         .join('\n\n');
-      // Quando o texto dos documentos já foi extraído, não reenvia os arquivos
-      // à IA na geração (evita reprocessar o PDF e dobrar o tempo).
-      const urlsGeracao = textoDocs ? [] : urls;
       const faltando = res?.faltando || [];
       if (res?.pronto_para_gerar) {
-        await gerarMinuta({ texto: textoCompleto, urls: urlsGeracao, attrs: novoAttrs, sources: fontesAtuais });
-      } else if (faltando.length && !pendingGeneration) {
+        await gerarMinuta({ texto: textoCompleto, urls, attrs: novoAttrs, sources: fontesAtuais });
+      } else if (faltando.length) {
         // Avisa o que falta e pede aprovação antes de gerar com marcadores
-        setPendingGeneration({ texto: textoCompleto, urls: urlsGeracao, attrs: novoAttrs, sources: fontesAtuais });
+        setPendingGeneration({ texto: textoCompleto, urls, attrs: novoAttrs, sources: fontesAtuais });
         setMessages((m) => [...m, { role: 'approval', faltando }]);
       } else if (docHtml) {
-        await gerarMinuta({ texto: textoCompleto, urls: urlsGeracao, attrs: novoAttrs, sources: fontesAtuais });
+        await gerarMinuta({ texto: textoCompleto, urls, attrs: novoAttrs, sources: fontesAtuais });
       }
     } catch (err) {
       console.error(err);
@@ -466,16 +422,11 @@ export default function GerarPorEntrevista() {
                 <input
                   type="file"
                   multiple
-                  accept=".pdf,application/pdf,.jpg,.jpeg,.png,image/jpeg,image/png,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.txt,text/plain"
+                  accept=".pdf,.jpg,.jpeg,.png,.docx,.txt"
                   className="hidden"
                   onChange={(e) => {
-                    const novos = Array.from(e.target.files);
+                    setFiles((prev) => [...prev, ...Array.from(e.target.files)]);
                     e.target.value = '';
-                    if (!novos.length) return;
-                    const todos = [...files, ...novos];
-                    setFiles(todos);
-                    // A entrevista costuma ser o próprio arquivo — envia na hora
-                    handleSend({ attachedFiles: todos });
                   }}
                 />
               </label>
