@@ -118,11 +118,10 @@ export function tokensDaPeca({ caso = {}, calculos = [], dadosReceita = [], dado
   if (fgtsDep && fgtsMul) partesResc.push(`FGTS + 40%: ${formatBRL((Number(fgtsDep.valor) || 0) + (Number(fgtsMul.valor) || 0))}`);
   if (partesResc.length) set('VERBAS_RESCISORIAS_DETALHE', `${partesResc.join('; ')}.`);
 
-  // Valores ESTIMADOS pela IA (verbas que dependem de contagem de horas/dias)
-  // Estes dependem de contagem de horas/dias e não têm fórmula segura o
-  // suficiente para o código calcular sozinho (o próprio escritório estima por
-  // julgamento, não por fórmula fixa) — vêm do passo dedicado de estimativa
-  // (estimarVerbasPorHora, em estimativasHoras.js).
+  // Valores ESTIMADOS: verbas que dependem de contagem de horas/dias e não têm
+  // fórmula segura o suficiente para o código calcular sozinho (o próprio
+  // escritório estima por julgamento, não por fórmula fixa) — vêm do passo
+  // dedicado de estimativa (estimarVerbasPorHora, em estimativasHoras.js).
   const IA_TOKEN = {
     horas_extras: 'VALORES_HORAS_EXTRAS',
     intervalo_art71: 'VALORES_INTERVALO',
