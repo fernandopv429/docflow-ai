@@ -1,5 +1,5 @@
 import { applyConditionals } from '@/lib/variables';
-import { formatBRL } from './mathUtils';
+import { formatBRL, brlComExtenso } from './mathUtils';
 import { regiaoTrtCanonica } from './regrasCriticas';
 
 // Formata dinheiro só quando há valor POSITIVO; 0/ausente/inválido → undefined
@@ -46,15 +46,30 @@ const CALC_TOKEN = {
   'Integração de valores pagos por fora (FTs)': 'VALORES_FORA_FOLHA',
 };
 
+// Pontuação padrão de documentos pessoais para a qualificação (a entrevista/
+// parser entrega só dígitos; aqui formata para leitura/redação jurídica).
+function formatarCpf(v) {
+  const d = (v || '').replace(/\D/g, '');
+  return d.length === 11 ? d.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4') : v;
+}
+function formatarPis(v) {
+  const d = (v || '').replace(/\D/g, '');
+  return d.length === 11 ? d.replace(/(\d{3})(\d{5})(\d{2})(\d{1})/, '$1.$2.$3-$4') : v;
+}
+function formatarRg(v) {
+  const d = (v || '').replace(/\D/g, '');
+  return d.length === 9 ? d.replace(/(\d{2})(\d{3})(\d{3})(\d{1})/, '$1.$2.$3-$4') : v;
+}
+
 function montarQualificacao(caso = {}) {
   const fem = caso.recl_genero === 'F';
   const partes = [
     caso.recl_nacionalidade || (fem ? 'brasileira' : 'brasileiro'),
     caso.recl_estado_civil,
     caso.funcao,
-    caso.recl_rg && `${fem ? 'portadora' : 'portador'} da cédula de identidade RG nº ${caso.recl_rg}`,
-    caso.recl_cpf && `inscrito${fem ? 'a' : ''} no CPF sob nº ${caso.recl_cpf}`,
-    caso.recl_pis && `PIS nº ${caso.recl_pis}`,
+    caso.recl_rg && `${fem ? 'portadora' : 'portador'} da cédula de identidade RG nº ${formatarRg(caso.recl_rg)}`,
+    caso.recl_cpf && `inscrito${fem ? 'a' : ''} no CPF sob nº ${formatarCpf(caso.recl_cpf)}`,
+    caso.recl_pis && `PIS nº ${formatarPis(caso.recl_pis)}`,
     caso.recl_ctps && `CTPS nº ${caso.recl_ctps}`,
     caso.recl_serie && `Série nº ${caso.recl_serie}`,
     caso.recl_nascimento && `nascido${fem ? 'a' : ''} em ${fmtDataExtenso(caso.recl_nascimento)}`,
@@ -121,19 +136,28 @@ export function tokensDaPeca({ caso = {}, calculos = [], dadosReceita = [], dado
   // Valor da causa (estimativo): soma determinística + estimativas da IA, teto R$ 400.000
   let somaCausa = somaIA;
   for (const c of calculos || []) { const n = Number(c.valor); if (Number.isFinite(n) && n > 0) somaCausa += n; }
-  if (somaCausa > 0) set('VALOR_CAUSA', formatBRL(Math.min(Math.round((somaCausa + Number.EPSILON) * 100) / 100, 400000)));
+  const valorCausaFinal = somaCausa > 0 ? Math.min(Math.round((somaCausa + Number.EPSILON) * 100) / 100, 400000) : null;
+  if (valorCausaFinal) {
+    set('VALOR_CAUSA', formatBRL(valorCausaFinal));
+    set('VALOR_CAUSA_EXTENSO', valorPorExtenso(valorCausaFinal));
+  }
 
   // Competência / partes
   set('COMARCA', caso.comarca || (municipioCep && municipioCep.municipio) || '');
   set('COMARCA_UF', uf);
   set('REGIAO_TRT', regiaoTrtCanonica(caso.comarca || (municipioCep && municipioCep.municipio), caso.comarca_uf));
   set('LOCAL_PRESTACAO', caso.local_prestacao || '');
-  set('RITO', attrs.rito === 'sumarissimo' ? 'sumaríssimo' : 'ordinário');
+  // Rito sumaríssimo só é cabível até 40 salários mínimos (art. 852-A da CLT).
+  // Como a estimativa do LLM sobre o rito não é confiável, o código decide pelo
+  // rito com base no valor da causa já calculado (limiar conservador).
+  const RITO_SUMARISSIMO_LIMITE = 40000;
+  const ritoSumarissimoValido = attrs.rito === 'sumarissimo' && (!valorCausaFinal || valorCausaFinal <= RITO_SUMARISSIMO_LIMITE);
+  set('RITO', ritoSumarissimoValido ? 'sumaríssimo' : 'ordinário');
   set('RECL_NOME', caso.recl_nome);
   set('RECL_QUALIFICACAO', montarQualificacao(caso));
   set('FUNCAO', caso.funcao);
   set('SALARIO', money(caso.salario));
-  set('SALARIO_EXTENSO', money(caso.salario));
+  set('SALARIO_EXTENSO', brlComExtenso(caso.salario));
   set('DATA_ADMISSAO', fmtDataExtenso(caso.data_admissao));
   set('DATA_RESCISAO', fmtDataExtenso(caso.data_rescisao));
   set('RECL1_NOME', (r1 && r1.razao_social) || caso.recl1_nome);
