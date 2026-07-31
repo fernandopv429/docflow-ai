@@ -46,11 +46,20 @@ export function resumoSecoes(secoes, limite = 900) {
     .join('\n\n');
 }
 
+// A IA nunca deve substituir um {{TOKEN}} diretamente: quem preenche/estima
+// esses valores é o código (montarPeca, a partir de mathUtils/valoresIA).
+// Isso evita números divergentes/hallucinados quando o mesmo token aparece
+// em mais de um lugar da peça (ex.: valor da causa no rol de pedidos x no
+// fecho) — sem esse filtro, a IA pode substituir só uma ocorrência com um
+// valor inventado, deixando a peça inconsistente entre si.
+const TOKEN_RE = /\{\{\s*[A-Z0-9_]+\s*\}\}/;
+
 function substituirTextos(doc, subs) {
   const aplicadas = [];
   const faltaram = [];
   for (const s of subs || []) {
     if (!s?.de || s.para == null || s.de === s.para) continue;
+    if (TOKEN_RE.test(s.de)) continue; // reservado ao montador determinístico
     const alvos = [];
     const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT);
     while (walker.nextNode()) {
