@@ -20,10 +20,12 @@ import { mesesContrato } from './mathUtils';
 // pedir "adicional noturno" quando não há trabalho noturno, por exemplo).
 function construirSchema(flags) {
   const properties = {};
-  const required = [];
+  // Sem "required" no schema (mesmo padrão do CASO_SCHEMA do parser, já
+  // validado em produção com muitos campos): a obrigatoriedade é reforçada
+  // no TEXTO do prompt, não no JSON Schema — evita risco de o wrapper de
+  // structured output rejeitar/travar com muitos campos number obrigatórios.
   const add = (campo, descricao) => {
     properties[campo] = { type: 'number', description: descricao };
-    required.push(campo);
   };
 
   add('horas_extras', 'Valor PRINCIPAL das horas extras habituais excedentes da 8ª diária/44ª semanal (ou da descaracterização da escala), já com o adicional convencional. R$.');
@@ -41,7 +43,7 @@ function construirSchema(flags) {
   if (flags.tem_ft) {
     add('domingos_feriados_100', 'Valor PRINCIPAL do adicional de 100% pelos domingos/folgas/feriados trabalhados sem compensação (Súm. 146 TST). R$.');
   }
-  return { type: 'object', properties, required };
+  return { type: 'object', properties };
 }
 
 export async function estimarVerbasPorHora({ caso = {}, attrs = {}, flags = {}, dadosCct } = {}) {
@@ -92,8 +94,12 @@ Retorne APENAS o objeto JSON com os campos pedidos, todos preenchidos com um nú
       const n = Number(v);
       if (Number.isFinite(n) && n > 0) limpo[k] = n;
     }
+    if (!Object.keys(limpo).length) {
+      console.warn('[estimarVerbasPorHora] resposta vazia/inválida da IA:', r);
+    }
     return limpo;
   } catch (e) {
+    console.error('[estimarVerbasPorHora] falhou:', e?.message || e);
     return {};
   }
 }
