@@ -140,6 +140,29 @@ export function podarPorFlags(html, flags = {}) {
   return estilos + doc.body.innerHTML;
 }
 
+// Dentro de "DAS HORAS EXTRAS", o modelo traz quadros sinóticos e
+// jurisprudência sobre a INVALIDADE da escala 4x2/6x2 — conteúdo que só faz
+// sentido quando a escala relatada NÃO é 12x36 (nas 6 peças de referência do
+// escritório, todas 12x36, esse bloco nunca aparece; a tese de 12x36 tem sua
+// PRÓPRIA seção "DA DESCARACTERIZAÇÃO..."). Diferente do applyConditionals
+// (que faz recorte de TEXTO e quebraria a paginação do docx aqui, pois o
+// bloco cruza fronteiras de <section> de página), esta remoção é feita por
+// DOM (node.remove()), o que é seguro independente de página: só os elementos
+// de conteúdo (<p>/<table>) são removidos, nunca os wrappers de <section>.
+export function podarEscala4x2SeNaoAplicavel(html, escala12x36) {
+  if (!escala12x36) return html; // só remove quando a escala do caso é 12x36
+  const doc = new DOMParser().parseFromString(html || '', 'text/html');
+  const blocos = [...doc.body.querySelectorAll(BLOCK_SEL)].filter(
+    (el) => el.tagName === 'TABLE' || !el.closest('table')
+  );
+  const startIdx = blocos.findIndex((el) => (el.textContent || '').includes('Na escala 4x2 temos'));
+  const endIdx = blocos.findIndex((el) => (el.textContent || '').includes('Para comprovação das alegações'));
+  if (startIdx === -1 || endIdx === -1 || endIdx <= startIdx) return html; // marcadores não achados: não mexe (seguro)
+  for (let i = startIdx; i < endIdx; i++) blocos[i].remove();
+  const estilos = [...doc.head.querySelectorAll('style')].map((s) => s.outerHTML).join('');
+  return estilos + doc.body.innerHTML;
+}
+
 export const PLANO_SCHEMA = {
   type: 'object',
   required: ['substituicoes'],
@@ -160,24 +183,6 @@ export const PLANO_SCHEMA = {
           para: { type: 'string', description: 'Texto correto para o caso atual' },
           campo: { type: 'string', description: 'Nome do dado (ex.: nome_reclamante, salario)' },
         },
-      },
-    },
-    valores_estimados: {
-      type: 'object',
-      description: 'ESTIMATIVAS (em R$, só número) das verbas que dependem de contagem de horas/dias — a IA estima a partir do salário, escala, horas extras e folgas do caso. Preencha só as aplicáveis.',
-      properties: {
-        horas_extras: { type: 'number' },
-        intervalo_art71: { type: 'number' },
-        adicional_noturno: { type: 'number' },
-        dsr: { type: 'number' },
-        domingos_feriados_100: { type: 'number' },
-        dez_minutos: { type: 'number' },
-        periculosidade_he: { type: 'number' },
-        minutos_residuais: { type: 'number' },
-        vt_folgas: { type: 'number' },
-        alimentacao_folgas: { type: 'number' },
-        multas_convencionais: { type: 'number' },
-        ft_diferenca: { type: 'number' },
       },
     },
     secoes_novas: {
