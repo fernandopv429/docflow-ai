@@ -44,6 +44,8 @@ const CALC_TOKEN = {
   'Multa do art. 477 da CLT': 'VALOR_MULTA_477',
   'Multa do art. 467 da CLT': 'VALOR_ART_467',
   'Integração de valores pagos por fora (FTs)': 'VALORES_FORA_FOLHA',
+  'Vale-transporte nas folgas trabalhadas': 'VALOR_VT_FOLGAS',
+  'Auxílio-alimentação nas folgas trabalhadas': 'VALOR_ALIMENTACAO_FOLGAS',
 };
 
 // Pontuação padrão de documentos pessoais para a qualificação (a entrevista/
@@ -97,6 +99,9 @@ export function tokensDaPeca({ caso = {}, calculos = [], dadosReceita = [], dado
     const tk = CALC_TOKEN[c.item];
     if (tk) set(tk, money(c.valor));
   }
+  // "Integração de valores pagos por fora" aparece em DOIS pontos do template
+  // (mérito e rol de pedidos, tokens diferentes) — mesmo valor nos dois.
+  if (dados.VALORES_FORA_FOLHA) set('VALOR_FT_DIFERENCA', dados.VALORES_FORA_FOLHA);
   const fgtsDep = (calculos || []).find((c) => c.item === 'FGTS do período (8%)');
   const fgtsMul = (calculos || []).find((c) => c.item === 'Multa de 40% do FGTS');
   if (fgtsDep) set('VALOR_FGTS_DIF', money(fgtsDep.valor));
@@ -114,6 +119,10 @@ export function tokensDaPeca({ caso = {}, calculos = [], dadosReceita = [], dado
   if (partesResc.length) set('VERBAS_RESCISORIAS_DETALHE', `${partesResc.join('; ')}.`);
 
   // Valores ESTIMADOS pela IA (verbas que dependem de contagem de horas/dias)
+  // Estes dependem de contagem de horas/dias e não têm fórmula segura o
+  // suficiente para o código calcular sozinho (o próprio escritório estima por
+  // julgamento, não por fórmula fixa) — vêm do passo dedicado de estimativa
+  // (estimarVerbasPorHora, em estimativasHoras.js).
   const IA_TOKEN = {
     horas_extras: 'VALORES_HORAS_EXTRAS',
     intervalo_art71: 'VALORES_INTERVALO',
@@ -122,10 +131,7 @@ export function tokensDaPeca({ caso = {}, calculos = [], dadosReceita = [], dado
     dez_minutos: 'VALORES_DESCANSO_SENTADO',
     periculosidade_he: 'VALORES_PERICULOSIDADE_HE',
     minutos_residuais: 'VALORES_MINUTOS_RESIDUAIS',
-    vt_folgas: 'VALOR_VT_FOLGAS',
-    alimentacao_folgas: 'VALOR_ALIMENTACAO_FOLGAS',
     multas_convencionais: 'VALOR_MULTAS_CONVENCIONAIS',
-    ft_diferenca: 'VALOR_FT_DIFERENCA',
   };
   let somaIA = 0;
   for (const [k, tk] of Object.entries(IA_TOKEN)) {
