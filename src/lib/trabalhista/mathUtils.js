@@ -9,6 +9,68 @@ export function formatBRL(n) {
   return Number(n).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
+// ============================================================
+// Conversão numérica → por extenso (pt-BR), para valores monetários em
+// petições (salário, valor da causa). Suporta 0–999.999 (o teto de valor da
+// causa é R$ 400.000, então não há necessidade de milhões).
+// ============================================================
+const UNIDADES = ['', 'um', 'dois', 'três', 'quatro', 'cinco', 'seis', 'sete', 'oito', 'nove'];
+const DEZ_A_DEZENOVE = ['dez', 'onze', 'doze', 'treze', 'quatorze', 'quinze', 'dezesseis', 'dezessete', 'dezoito', 'dezenove'];
+const DEZENAS = ['', '', 'vinte', 'trinta', 'quarenta', 'cinquenta', 'sessenta', 'setenta', 'oitenta', 'noventa'];
+const CENTENAS = ['', 'cento', 'duzentos', 'trezentos', 'quatrocentos', 'quinhentos', 'seiscentos', 'setecentos', 'oitocentos', 'novecentos'];
+
+function extensoAte99(n) {
+  if (n === 0) return '';
+  if (n < 10) return UNIDADES[n];
+  if (n < 20) return DEZ_A_DEZENOVE[n - 10];
+  const d = Math.floor(n / 10);
+  const u = n % 10;
+  return u ? `${DEZENAS[d]} e ${UNIDADES[u]}` : DEZENAS[d];
+}
+
+function extensoAte999(n) {
+  if (n === 0) return '';
+  if (n === 100) return 'cem';
+  const c = Math.floor(n / 100);
+  const resto = n % 100;
+  if (c === 0) return extensoAte99(resto);
+  return resto ? `${CENTENAS[c]} e ${extensoAte99(resto)}` : CENTENAS[c];
+}
+
+// Inteiro (0–999.999) por extenso, com a vírgula/"e" nos moldes das peças do
+// escritório (ex.: "cento e cinco mil, quatrocentos e noventa e dois").
+export function numeroPorExtenso(valor) {
+  const n = Math.trunc(Math.abs(Number(valor)) || 0);
+  if (n === 0) return 'zero';
+  const milhares = Math.floor(n / 1000);
+  const resto = n % 1000;
+  if (milhares === 0) return extensoAte999(resto);
+  const parteMilhar = milhares === 1 ? 'mil' : `${extensoAte999(milhares)} mil`;
+  if (resto === 0) return parteMilhar;
+  const conectivo = resto < 100 || resto % 100 === 0 ? ' e ' : ', ';
+  return `${parteMilhar}${conectivo}${extensoAte999(resto)}`;
+}
+
+// "dois mil, cento e quarenta e oito reais e vinte e dois centavos"
+export function valorPorExtenso(valor) {
+  const n = Number(valor);
+  if (!Number.isFinite(n)) return '';
+  const reais = Math.trunc(Math.abs(n));
+  const centavos = Math.round((Math.abs(n) - reais) * 100);
+  let texto = `${numeroPorExtenso(reais)} ${reais === 1 ? 'real' : 'reais'}`;
+  if (centavos > 0) {
+    texto += ` e ${numeroPorExtenso(centavos)} ${centavos === 1 ? 'centavo' : 'centavos'}`;
+  }
+  return texto;
+}
+
+// "R$ 2.148,22 (dois mil, cento e quarenta e oito reais e vinte e dois centavos)"
+export function brlComExtenso(valor) {
+  const n = Number(valor);
+  if (!Number.isFinite(n) || n <= 0) return undefined;
+  return `${formatBRL(n)} (${valorPorExtenso(n)})`;
+}
+
 // Meses completos entre duas datas (mínimo 0)
 export function mesesContrato(admissao, rescisao) {
   if (!admissao || !rescisao) return null;
