@@ -12,7 +12,8 @@ import { removeTextLetterhead } from '@/lib/removeTextLetterhead';
 import { blocoRegrasCriticas, regiaoTrtPorMunicipio } from './regrasCriticas';
 import { BLOCO_ENGENHARIA_JURIDICA } from './engenhariaJuridica';
 import { traceAiCall } from '@/lib/sessionTrace';
-import { dividirSecoes, resumoSecoes, aplicarPlano, podarPorFlags, PLANO_SCHEMA } from './montagemSecoes';
+import { dividirSecoes, resumoSecoes, aplicarPlano, podarPorFlags, podarEscala4x2SeNaoAplicavel, PLANO_SCHEMA } from './montagemSecoes';
+import { estimarVerbasPorHora } from './estimativasHoras';
 import { obterBlocoRegrasAprendidas } from './regrasAprendidas';
 
 // ============================================================
@@ -1012,6 +1013,11 @@ export async function gerarPecaPadrao({ texto, fileUrls, attrs, modeloPadrao, on
 
   // Cálculo 100% determinístico (a IA não faz aritmética).
   const calculos = calcularVerbasCaso(caso || {});
+  // Estimativa das verbas por hora (passo dedicado, ver estimativasHoras.js) —
+  // disparada em paralelo com o plano de adaptação para não somar latência.
+  const secoesFlags = flagsSecoes(caso, attrs);
+  notify('Estimando verbas por hora (horas extras, intervalo, adicional noturno etc.)...');
+  const verbasPorHoraPromise = estimarVerbasPorHora({ caso, attrs, flags: secoesFlags, dadosCct }).catch(() => ({}));
 
   // Seleciona o modelo de referência mais semelhante (matching determinístico) → usa seu diferencial.
   let modeloSemelhante = null;
@@ -1061,8 +1067,9 @@ export async function gerarPecaPadrao({ texto, fileUrls, attrs, modeloPadrao, on
   // Estrutura por CÓDIGO (não depende do LLM): remove as seções opcionais sem
   // suporte no caso — mantendo a Súmula 331 quando há tomadora — e então resolve
   // os condicionais {{#if}} de modalidade e preenche/marca TODOS os tokens.
-  html = podarPorFlags(html, flagsSecoes(caso, attrs));
+  html = podarPorFlags(html, secoesFlags);
   html = podarEscala4x2SeNaoAplicavel(html, secoesFlags.escala_12x36);
+  const verbasPorHora = await verbasPorHoraPromise;
   html = montarPeca(html, { caso, calculos, dadosReceita, dadosCep, attrs, valoresIA: verbasPorHora });
   if (relatorio.faltaram.length) {
     notify(`Trechos não localizados no modelo (revisar manualmente): ${relatorio.faltaram.slice(0, 8).join(' | ')}`);
