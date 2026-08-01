@@ -785,7 +785,7 @@ ESTRUTURA E ESTILO DE REDAÇÃO (SEGUIR EXATAMENTE O MODELO)
    - DO DESVIO DE FUNÇÃO (Vigilante executando Prevenção de Perdas/Conferência — Multa da CCT de 50%/mês)
    - DA GRATIFICAÇÃO DE FUNÇÃO (Se houver condução de veículo — 10% da CCT)
    - DA JORNADA DE TRABALHO
-   - DAS HORAS EXTRAS (Excedentes da 8ª diária e 44ª semanal com adicional convencional de 60%)
+   - DAS HORAS EXTRAS (Excedentes da 8ª diária e 44ª semanal, com o ADICIONAL CONVENCIONAL REAL da CCT vigente informado no bloco CONVENÇÃO COLETIVA; nunca presuma um percentual — na falta, use [adicional conforme CCT])
    - DA DESCARACTERIZAÇÃO DA JORNADA DE TRABALHO NO REGIME 12 X 36 (Com citação da Súmula 85 do TST)
    - DO ARTIGO 71 DA CLT (Intervalo intrajornada suprimido)
    - DOS MINUTOS QUE ANTECEDEM E SUCEDEM A JORNADA DE TRABALHO (30min antes / 30min depois — preleção e rendição)
@@ -796,7 +796,7 @@ ESTRUTURA E ESTILO DE REDAÇÃO (SEGUIR EXATAMENTE O MODELO)
    - DA INTEGRAÇÃO DOS VALORES REMUNERADOS FORA DA FOLHA DE PAGAMENTO (Valores pagos pelas FTs em dinheiro/PIX)
    - DA AUSÊNCIA DE CONCESSÃO DO VALE TRANSPORTE NAS FOLGAS TRABALHADAS (2 conduções/dia)
    - DA AUSÊNCIA DE CONCESSÃO DO AUXÍLIO ALIMENTAÇÃO NAS FOLGAS TRABALHADAS (Valor da CCT por dia)
-   - DAS MULTAS CONVENCIONAIS (Cláusula 72ª/71ª da CCT — 3% por dia/cláusula descumprida)
+   - DAS MULTAS CONVENCIONAIS (use o NÚMERO da cláusula e o PERCENTUAL REAIS da CCT vigente fornecida no bloco CONVENÇÃO COLETIVA; é PROIBIDO inventar percentual/cláusula — se a CCT não constar, use o marcador [cláusula/percentual conforme CCT])
    - DOS FGTS + MULTA DE 40% (Art. 18 da Lei 8.036/90)
    - DO AVISO PRÉVIO INDENIZADO (Lei 12.506/11)
    - DAS VERBAS RESCISÓRIAS
@@ -820,7 +820,12 @@ TRAVAS CRÍTICAS ANTI-ERRO (NÃO DESCUMPRIR)
 1. DATA DO FECHO: A data de assinatura ("São Paulo, [data]") DEVE ser obrigatoriamente posterior à data de desligamento do empregado. NUNCA coloque datas passadas ou anacrônicas em relação ao contrato.
 2. HONORÁRIOS NO ENCERRAMENTO: Nos honorários sucumbenciais use a fundamentação do art. 791-A da CLT. NUNCA cite a Súmula 425 do TST para pedir honorários no encerramento (a Súmula 425 trata de jus postulandi).
 3. DESVIO DE FUNÇÃO × ACÚMULO: Se o vigilante atuou em Prevenção de Perdas, peça apenas DESVIO DE FUNÇÃO (multa convencional de 50%). Não misture com acúmulo de função para os mesmos fatos.
-4. SAÍDA DIRETA: Entregue diretamente o texto da petição pronta para uso, sem comentários iniciais ou explicações ao final.`;
+4. DESVIO DE FUNÇÃO — DESCRIÇÃO CONCRETA: ao redigir o tópico do desvio de função, transcreva as ATIVIDADES efetivamente relatadas na entrevista (ex.: prevenção de perdas — conferência de cargas, controle/verificação de validade de produtos, contagem de paletes, registros operacionais). É PROIBIDO deixar a frase incompleta (ex.: "além das funções de VIGILANTE, ,") ou sem a lista de tarefas desviadas.
+5. AVOS PROPORCIONAIS: os avos do 13º e das férias proporcionais escritos no TEXTO devem corresponder aos meses efetivamente trabalhados no período aquisitivo (admissão → saída, com projeção do aviso prévio). Ex.: admissão 14/04 e saída 07/12 = 9/12. NUNCA escreva "11/12" ou "12/12" quando o contrato não alcançou esses meses; os avos narrados devem coincidir com os valores calculados de forma determinística.
+6. VALOR DA CAUSA NO CORPO: qualquer menção ao valor da causa DENTRO do texto (inclusive a base de cálculo dos honorários no rol de pedidos) deve ser o VALOR TOTAL REAL da causa (soma dos itens). NUNCA reproduza um valor da causa antigo herdado do modelo (ex.: "R$ 10.012,79").
+7. JUÍZO 100% DIGITAL × E-MAIL DO CLIENTE: se o reclamante possui e-mail (informado na entrevista), NÃO afirme que "o autor não possui correio eletrônico". Ajuste o parágrafo para indicar o e-mail do cliente na qualificação e apenas o encaminhamento/ciência pelo patrono, sem afirmação falsa.
+8. CONCORDÂNCIA DE GÊNERO: revise CADA ocorrência (contratado/a, ligado/a, prejudicado/a, deferido(s) ao/à reclamante) para o gênero do reclamante informado. Não deixe flexões do modelo no gênero oposto nem formas como "brasileiro(a)".
+9. SAÍDA DIRETA: Entregue diretamente o texto da petição pronta para uso, sem comentários iniciais ou explicações ao final.`;
 
 // Bloco de cálculos determinísticos para o prompt (mesma lógica da auditoria).
 function blocoCalculos(calculos) {
