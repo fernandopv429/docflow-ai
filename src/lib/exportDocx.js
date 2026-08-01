@@ -403,5 +403,5 @@ export async function exportToDocx(html, variables, title) {
   a.click();
   document.body.removeChild(a);
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-  return validacao;
+  return { ...validacao, blob };
 }

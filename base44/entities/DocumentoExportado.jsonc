@@ -1,0 +1,22 @@
+{
+  "name": "DocumentoExportado",
+  "type": "object",
+  "properties": {
+    "titulo": {
+      "type": "string",
+      "title": "T\u00edtulo"
+    },
+    "file_url": {
+      "type": "string",
+      "title": "URL do Arquivo DOCX"
+    },
+    "tamanho_bytes": {
+      "type": "number",
+      "title": "Tamanho (bytes)"
+    }
+  },
+  "required": [
+    "titulo",
+    "file_url"
+  ]
+}

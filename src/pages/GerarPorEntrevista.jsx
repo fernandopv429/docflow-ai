@@ -283,12 +283,27 @@ export default function GerarPorEntrevista() {
     if (!docHtml || !reviewConfirmed || exporting) return;
     setExporting(true);
     try {
-      const validacao = await exportToDocx(docHtml, null, 'Minuta - petição inicial');
+      const { blob, ...validacao } = await exportToDocx(docHtml, null, 'Minuta - petição inicial');
       setMessages((m) => [...m, {
         role: 'tool_result',
         title: 'Validação da exportação DOCX',
         text: JSON.stringify(validacao, null, 2),
       }]);
+      // Salva uma cópia no Histórico para download posterior
+      try {
+        const file = new File([blob], 'Minuta - petição inicial.docx', {
+          type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        });
+        const { file_url } = await base44.integrations.Core.UploadFile({ file });
+        await base44.entities.DocumentoExportado.create({
+          titulo: 'Minuta - petição inicial',
+          file_url,
+          tamanho_bytes: blob.size,
+        });
+        setMessages((m) => [...m, { role: 'tool', text: 'Cópia do DOCX salva no Histórico.' }]);
+      } catch (e) {
+        console.error(e);
+      }
     } catch (err) {
       console.error(err);
       window.alert(`Não foi possível exportar o documento: ${err?.message || 'erro desconhecido'}`);
@@ -317,6 +332,9 @@ export default function GerarPorEntrevista() {
         >
           <ScrollText className="w-4 h-4" />
         </button>
+        <Link to="/historico" className="flex items-center gap-1.5 text-xs text-[#1a73e8] hover:underline whitespace-nowrap">
+          <FileText className="w-3.5 h-3.5" /> Histórico
+        </Link>
         <Link to="/modelos" className="flex items-center gap-1.5 text-xs text-[#1a73e8] hover:underline whitespace-nowrap">
           <Library className="w-3.5 h-3.5" /> Configurações
         </Link>
