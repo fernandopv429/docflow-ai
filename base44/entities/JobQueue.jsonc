@@ -1,0 +1,53 @@
+{
+  "name": "JobQueue",
+  "type": "object",
+  "properties": {
+    "taskType": {
+      "type": "string",
+      "title": "Tipo de Tarefa",
+      "description": "Identificador do tipo de tarefa (ex.: GERAR_PETICAO, CONSULTA_DATAJUD, CONSULTA_CCT)"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "processing",
+        "completed",
+        "failed"
+      ],
+      "default": "pending",
+      "title": "Status"
+    },
+    "payload": {
+      "type": "object",
+      "title": "Par\u00e2metros de Entrada"
+    },
+    "result": {
+      "type": "object",
+      "title": "Resultado"
+    },
+    "error": {
+      "type": "string",
+      "title": "Mensagem de Erro"
+    },
+    "attempts": {
+      "type": "number",
+      "default": 0,
+      "title": "Tentativas Realizadas"
+    },
+    "maxAttempts": {
+      "type": "number",
+      "default": 3,
+      "title": "M\u00e1ximo de Retentativas"
+    },
+    "lockedAt": {
+      "type": "string",
+      "format": "date-time",
+      "title": "In\u00edcio do Processamento"
+    }
+  },
+  "required": [
+    "taskType",
+    "status"
+  ]
+}
