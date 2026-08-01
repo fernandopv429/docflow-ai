@@ -830,6 +830,21 @@ function blocoCalculos(calculos) {
   return `\n\nCÁLCULOS DETERMINÍSTICOS (feitos por código, matematicamente exatos — USE EXATAMENTE estes valores no texto e nos pedidos; NÃO faça aritmética própria nem altere estes números. Some-os para compor o VALOR DA CAUSA, respeitando o teto de R$ 400.000,00):\n${linhas.join('\n')}`;
 }
 
+// HTML vindo de DOCX é muito verboso (comentários, estilos "mso", espaços).
+// Compactar reduz drasticamente o prompt — o que evita estouro de tempo na IA —
+// sem alterar a formatação visível do modelo.
+export function compactarHtmlModelo(html) {
+  return String(html || '')
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/<(style|script)[\s\S]*?<\/\1>/gi, '')
+    .replace(/\s(?:lang|xml:lang|dir|data-[\w-]+)="[^"]*"/gi, '')
+    .replace(/mso-[a-z-]+\s*:\s*[^;"']+;?/gi, '')
+    .replace(/style="\s*"/gi, '')
+    .replace(/>\s+</g, '> <')
+    .replace(/[ \t]{2,}/g, ' ')
+    .trim();
+}
+
 // Geração adaptando o MODELO PADRÃO (HTML formatado), preservando o estilo.
 export function buildGeracaoPadraoPrompt({ texto, attrs, modeloHtml, calculos, diferencial, modeloSemelhanteTitulo, dadosReceita, dadosCep, dadosDatajud, dadosCct }) {
   const municipios = [...new Set((dadosCep || []).map((d) => d.municipio).filter(Boolean))];
@@ -843,7 +858,7 @@ REGRA PRINCIPAL — ADAPTE O MODELO PADRÃO MANTENDO O ESTILO: abaixo está o MO
 - MANTENHA EXATAMENTE a formatação e a estrutura HTML do modelo (mesmas tags e estilos). NÃO reescreva o texto-padrão nem crie estrutura nova.
 
 === MODELO PADRÃO (HTML — preserve a formatação) ===
-${modeloHtml}
+${compactarHtmlModelo(modeloHtml)}
 === FIM DO MODELO PADRÃO ===
 ${diferencial ? `\n=== CASO SEMELHANTE NA BASE${modeloSemelhanteTitulo ? ` (${modeloSemelhanteTitulo})` : ''} — DIFERENCIAL ===\nO sistema selecionou, na base de referências, o caso mais semelhante a esta entrevista. Use os pontos PARTICULARES abaixo como orientação para as teses/capítulos específicos deste tipo de caso (o restante segue o Modelo Padrão). Inclua apenas o que tiver suporte no relato:\n${(diferencial || '').slice(0, 4000)}\n=== FIM DO DIFERENCIAL ===\n` : ''}
 === ENTREVISTA / CASO ATUAL ===
@@ -960,6 +975,8 @@ export async function gerarPecaPadrao({ texto, fileUrls, attrs, modeloPadrao, on
     () =>
       traceAiCall('Geração da minuta', req, () =>
         invokeLLMComRetry(req, {
+          tentativas: 2,
+          timeoutMs: 600000,
           onRetry: (n) => notify(`Instabilidade no serviço de IA — tentando novamente (${n}ª retentativa)...`),
         })
       ),
