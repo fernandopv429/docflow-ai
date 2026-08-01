@@ -727,7 +727,7 @@ function blocoCct(dadosCct) {
     ? `CONVENÇÃO COLETIVA APLICÁVEL${local} — ${m.titulo || 'CCT'}${m.ano_base ? `, ano-base ${m.ano_base}` : ''}${m.vigencia_inicio ? ` (vigência ${m.vigencia_inicio}${m.vigencia_fim ? ` a ${m.vigencia_fim}` : ''})` : ''}${m.sindicato_laboral ? `; sindicato profissional: ${m.sindicato_laboral}` : ''}`
     : 'CLÁUSULAS DE CONVENÇÃO COLETIVA (CCT) APLICÁVEIS';
   const linhas = dadosCct.clausulas.slice(0, 5).map((c) => {
-    const ref = c.clausula_ref ? `Cláusula ${c.clausula_ref}` : '•';
+    const ref = [c.clausula_ref, c.clausula_titulo].filter(Boolean).join(' — ') || '•';
     const texto = (c.texto || c.conteudo || c.trecho || c.clausula_texto || c.resumo || '')
       .toString().trim().replace(/\s+/g, ' ').slice(0, 350);
     return `- ${ref}: ${texto}`;
