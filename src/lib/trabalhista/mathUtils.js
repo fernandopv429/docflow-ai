@@ -35,6 +35,21 @@ export function avisoPrevio(salario, anos) {
   return { dias, valor: round2((salario / 30) * dias) };
 }
 
+// Projeta a data de rescisão pelos dias do aviso prévio INDENIZADO. O aviso
+// prévio (trabalhado ou indenizado) integra o tempo de serviço do empregado
+// para todos os efeitos legais (art. 487, §1º, da CLT; Súmula 371 do C. TST),
+// de modo que 13º, férias proporcionais e FGTS do período devem ser apurados
+// já computando esses dias adicionais — NÃO apenas a data "seca" da rescisão.
+// (Isso NÃO altera os próprios dias do aviso prévio, que continuam calculados
+// sobre os anos completos até a data real de rescisão.)
+export function projetarDataComAvisoPrevio(rescisao, diasAviso) {
+  if (!rescisao || !diasAviso) return rescisao;
+  const r = new Date(rescisao);
+  if (isNaN(r)) return rescisao;
+  r.setDate(r.getDate() + diasAviso);
+  return r.toISOString().slice(0, 10);
+}
+
 // 13º proporcional (avos sobre os meses do contrato — estimativa p/ valor da causa)
 export function decimoTerceiroProporcional(salario, meses) {
   if (!salario || meses == null) return null;
@@ -82,13 +97,21 @@ export function calcularVerbasCaso(caso = {}) {
   }
   const ap = avisoPrevio(salario, anos);
   if (ap) itens.push({ item: 'Aviso prévio indenizado', memoria: `${ap.dias} dias (Lei 12.506/2011)`, valor: ap.valor });
-  const dt = decimoTerceiroProporcional(salario, meses);
-  if (dt) itens.push({ item: '13º proporcional', memoria: `${dt.avos}/12 avos`, valor: dt.valor });
-  const fe = feriasProporcionais(salario, meses);
-  if (fe) itens.push({ item: 'Férias proporcionais + 1/3', memoria: `${fe.avos}/12 avos + 1/3`, valor: fe.valor });
-  const fg = fgtsPeriodo(salario, meses);
+
+  // 13º, férias e FGTS usam o tempo de serviço COM a projeção do aviso prévio
+  // indenizado (art. 487, §1º, CLT; Súmula 371 TST) — por isso os avos podem
+  // diferir de uma contagem "seca" entre admissão e rescisão.
+  const dataProjetada = ap ? projetarDataComAvisoPrevio(caso.data_rescisao, ap.dias) : caso.data_rescisao;
+  const mesesProjetados = mesesContrato(caso.data_admissao, dataProjetada) ?? meses;
+  const sufixoProjecao = ap ? ` (com projeção do aviso prévio indenizado — art. 487 §1º CLT/Súm. 371 TST)` : '';
+
+  const dt = decimoTerceiroProporcional(salario, mesesProjetados);
+  if (dt) itens.push({ item: '13º proporcional', memoria: `${dt.avos}/12 avos${sufixoProjecao}`, valor: dt.valor });
+  const fe = feriasProporcionais(salario, mesesProjetados);
+  if (fe) itens.push({ item: 'Férias proporcionais + 1/3', memoria: `${fe.avos}/12 avos + 1/3${sufixoProjecao}`, valor: fe.valor });
+  const fg = fgtsPeriodo(salario, mesesProjetados);
   if (fg) {
-    itens.push({ item: 'FGTS do período (8%)', memoria: `8% × ${meses} meses`, valor: fg.deposito });
+    itens.push({ item: 'FGTS do período (8%)', memoria: `8% × ${mesesProjetados} meses${sufixoProjecao}`, valor: fg.deposito });
     itens.push({ item: 'Multa de 40% do FGTS', memoria: '40% sobre os depósitos', valor: fg.multa40 });
   }
   if (caso.val_ft) {
