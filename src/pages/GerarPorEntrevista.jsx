@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft, Loader2, Paperclip, Send, X, FileText, Bot, FileDown, Library, RefreshCw, CheckCircle2, ScrollText,
 } from 'lucide-react';
@@ -13,6 +13,14 @@ import { TIPO_DISPENSA_LABELS } from '@/lib/trabalhista/tokens';
 import { formatBRL } from '@/lib/trabalhista/mathUtils';
 import { fontesAuditoria, fontesEntrevista, fontesGeracao } from '@/lib/trabalhista/fontesAnalise';
 import useConsoleLogs from '@/hooks/useConsoleLogs';
+import ConversasSidebar from '@/components/ConversasSidebar';
+import {
+  listarConversas,
+  carregarConversa,
+  salvarConversa,
+  excluirConversa,
+  tituloDaConversa,
+} from '@/lib/conversas';
 import {
   carregarModeloPadrao,
   conversarEntrevista,
@@ -24,15 +32,19 @@ export default function GerarPorEntrevista() {
   const [messages, setMessages] = useState([]);
   const [logsOpen, setLogsOpen] = useState(false);
   const consoleLogs = useConsoleLogs();
-  const [input, setInput] = useState(() => localStorage.getItem('docflow:entrevista-texto') || '');
+  const [input, setInput] = useState('');
   const [files, setFiles] = useState([]);
   const [sending, setSending] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [reviewConfirmed, setReviewConfirmed] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [saveStatus, setSaveStatus] = useState('saved');
-  const draftCaseIdRef = useRef(localStorage.getItem('docflow:caso-rascunho-id'));
   const saveTimerRef = useRef(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const conversaId = searchParams.get('id');
+  const conversaIdRef = useRef(conversaId);
+  const carregandoRef = useRef(false);
+  const [conversas, setConversas] = useState([]);
 
   const [allUrls, setAllUrls] = useState([]);
   const [documentSources, setDocumentSources] = useState([]);
@@ -54,36 +66,79 @@ export default function GerarPorEntrevista() {
 
   const userText = messages.filter((m) => m.role === 'user').map((m) => m.text).filter(Boolean).join('\n\n');
 
-  useEffect(() => {
-    const textoCompleto = [userText, input.trim()].filter(Boolean).join('\n\n');
-    if (!textoCompleto) return;
+  const atualizarLista = () => listarConversas().then(setConversas).catch(() => {});
 
-    localStorage.setItem('docflow:entrevista-texto', textoCompleto);
+  useEffect(() => {
+    atualizarLista();
+  }, []);
+
+  // Carrega a conversa selecionada (ou limpa a tela para uma nova)
+  useEffect(() => {
+    conversaIdRef.current = conversaId;
+    carregandoRef.current = true;
+    if (!conversaId) {
+      setMessages([]);
+      setDocHtml('');
+      setAttrs(null);
+      setAllUrls([]);
+      setDocumentSources([]);
+      setReviewConfirmed(false);
+      carregandoRef.current = false;
+      return;
+    }
+    carregarConversa(conversaId)
+      .then((c) => {
+        setMessages(c.messages || []);
+        setDocHtml(c.doc_html || '');
+        setAttrs(c.estado?.attrs || null);
+        setAllUrls(c.estado?.allUrls || []);
+        setDocumentSources(c.estado?.documentSources || []);
+        setReviewConfirmed(false);
+      })
+      .catch(() => {})
+      .finally(() => {
+        carregandoRef.current = false;
+      });
+  }, [conversaId]);
+
+  // Salva automaticamente a conversa (mensagens + minuta) no banco
+  useEffect(() => {
+    if (carregandoRef.current || !messages.length) return;
     setSaveStatus('saving');
     clearTimeout(saveTimerRef.current);
     saveTimerRef.current = setTimeout(async () => {
-      const payload = {
-        titulo: textoCompleto.slice(0, 80),
-        status: 'rascunho',
-        entrevista_texto: textoCompleto,
-      };
       try {
-        if (draftCaseIdRef.current) {
-          await base44.entities.CasoTrabalhista.update(draftCaseIdRef.current, payload);
-        } else {
-          const caso = await base44.entities.CasoTrabalhista.create(payload);
-          draftCaseIdRef.current = caso.id;
-          localStorage.setItem('docflow:caso-rascunho-id', caso.id);
+        const payload = {
+          titulo: tituloDaConversa(messages),
+          messages,
+          doc_html: docHtml,
+          estado: { attrs, allUrls, documentSources },
+        };
+        const salva = await salvarConversa(conversaIdRef.current, payload);
+        if (!conversaIdRef.current) {
+          conversaIdRef.current = salva.id;
+          setSearchParams({ id: salva.id }, { replace: true });
         }
         setSaveStatus('saved');
+        atualizarLista();
       } catch (error) {
         console.error(error);
         setSaveStatus('local');
       }
-    }, 700);
-
+    }, 800);
     return () => clearTimeout(saveTimerRef.current);
-  }, [input, userText]);
+  }, [messages, docHtml, attrs, allUrls, documentSources]);
+
+  const novaConversa = () => {
+    conversaIdRef.current = null;
+    setSearchParams({});
+  };
+
+  const removerConversa = async (id) => {
+    await excluirConversa(id).catch(() => {});
+    atualizarLista();
+    if (id === conversaIdRef.current) novaConversa();
+  };
 
   const gerarMinuta = async (opts = {}) => {
     if (!modeloPadrao || generating) return;
@@ -360,9 +415,16 @@ export default function GerarPorEntrevista() {
 
       {/* Corpo: chat (esq) + documento (dir) */}
       <div className="flex-1 flex flex-col lg:flex-row min-h-0 overflow-hidden">
+        <ConversasSidebar
+          conversas={conversas}
+          ativaId={conversaId}
+          onNova={novaConversa}
+          onSelecionar={(id) => setSearchParams({ id })}
+          onExcluir={removerConversa}
+        />
         {/* Chat */}
         <div
-          className="flex flex-col min-h-0 lg:w-[420px] lg:flex-shrink-0 lg:border-r border-[#dadce0]"
+          className="flex flex-col min-h-0 lg:w-[400px] lg:flex-shrink-0 lg:border-r border-[#dadce0]"
           onDragOver={(e) => e.preventDefault()}
           onDrop={(e) => {
             e.preventDefault();

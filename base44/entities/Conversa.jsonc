@@ -1,0 +1,28 @@
+{
+  "name": "Conversa",
+  "type": "object",
+  "properties": {
+    "titulo": {
+      "type": "string",
+      "title": "T\u00edtulo"
+    },
+    "messages": {
+      "type": "array",
+      "title": "Mensagens",
+      "items": {
+        "type": "object"
+      }
+    },
+    "doc_html": {
+      "type": "string",
+      "title": "Minuta (HTML)"
+    },
+    "estado": {
+      "type": "object",
+      "title": "Estado da sess\u00e3o (atributos, arquivos, fontes)"
+    }
+  },
+  "required": [
+    "titulo"
+  ]
+}
