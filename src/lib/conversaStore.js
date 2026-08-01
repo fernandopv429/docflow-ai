@@ -242,7 +242,10 @@ export async function gerarMinuta(key, opts = {}) {
     }
   } catch (err) {
     console.error(err);
-    addMessages(key, { role: 'assistant', text: 'Erro ao gerar a minuta. Tente novamente.' });
+    addMessages(key, {
+      role: 'assistant',
+      text: `Erro ao gerar a minuta: ${err?.message || 'falha desconhecida'}. Envie a última mensagem novamente para repetir a geração.`,
+    });
   }
   patch(key, { generating: false });
 }
