@@ -8,323 +8,83 @@ import ToolTraceMessage from '@/components/ToolTraceMessage';
 import SessionLogsModal from '@/components/SessionLogsModal';
 import DocumentReviewPreview from '@/components/DocumentReviewPreview';
 import GenerationApprovalMessage from '@/components/GenerationApprovalMessage';
+import ConversasSidebar from '@/components/ConversasSidebar';
 import { exportToDocx } from '@/lib/exportDocx';
 import { TIPO_DISPENSA_LABELS } from '@/lib/trabalhista/tokens';
-import { formatBRL } from '@/lib/trabalhista/mathUtils';
-import { fontesAuditoria, fontesEntrevista, fontesGeracao } from '@/lib/trabalhista/fontesAnalise';
 import useConsoleLogs from '@/hooks/useConsoleLogs';
-import ConversasSidebar from '@/components/ConversasSidebar';
+import useConversaStore from '@/hooks/useConversaStore';
+import { listarConversas, excluirConversa } from '@/lib/conversas';
 import {
-  listarConversas,
-  carregarConversa,
-  salvarConversa,
-  excluirConversa,
-  tituloDaConversa,
-} from '@/lib/conversas';
-import {
-  carregarModeloPadrao,
-  conversarEntrevista,
-  gerarPecaPadrao,
-  verificarCoerencia,
-} from '@/lib/trabalhista/modelosReferencia';
+  abrirSessao,
+  confirmarRevisao,
+  decidirGeracao,
+  enviarMensagem,
+  esquecerSessao,
+  getListVersion,
+  getSession,
+  novaSessao,
+  obterModeloPadrao,
+  sessoesOcupadas,
+} from '@/lib/conversaStore';
 
 export default function GerarPorEntrevista() {
-  const [messages, setMessages] = useState([]);
+  useConversaStore();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const chaveAtiva = searchParams.get('id');
+  const [conversas, setConversas] = useState([]);
+  const [modeloPadrao, setModeloPadrao] = useState(null);
   const [logsOpen, setLogsOpen] = useState(false);
   const consoleLogs = useConsoleLogs();
-  const [input, setInput] = useState('');
-  const [files, setFiles] = useState([]);
-  const [sending, setSending] = useState(false);
-  const [generating, setGenerating] = useState(false);
-  const [reviewConfirmed, setReviewConfirmed] = useState(false);
+  const [inputs, setInputs] = useState({});
+  const [arquivos, setArquivos] = useState({});
   const [exporting, setExporting] = useState(false);
-  const [saveStatus, setSaveStatus] = useState('saved');
-  const saveTimerRef = useRef(null);
-  const [searchParams, setSearchParams] = useSearchParams();
-  const conversaId = searchParams.get('id');
-  const conversaIdRef = useRef(conversaId);
-  const carregandoRef = useRef(false);
-  const [conversas, setConversas] = useState([]);
-
-  const [allUrls, setAllUrls] = useState([]);
-  const [documentSources, setDocumentSources] = useState([]);
-  const [modeloPadrao, setModeloPadrao] = useState(null);
-  const [attrs, setAttrs] = useState(null);
-  const [pendingGeneration, setPendingGeneration] = useState(null);
-
-  // Documento vivo (painel à direita)
-  const [docHtml, setDocHtml] = useState('');
   const endRef = useRef(null);
 
+  const listVersion = getListVersion();
+  const sessao = getSession(chaveAtiva);
+  const input = inputs[chaveAtiva] || '';
+  const files = arquivos[chaveAtiva] || [];
+  const ocupadas = sessoesOcupadas();
+
   useEffect(() => {
-    carregarModeloPadrao().then(setModeloPadrao).catch(() => {});
+    obterModeloPadrao().then(setModeloPadrao);
   }, []);
+
+  useEffect(() => {
+    listarConversas().then(setConversas).catch(() => {});
+  }, [listVersion]);
+
+  // Garante que sempre existe uma sessão ativa para a chave da URL
+  useEffect(() => {
+    if (!chaveAtiva) {
+      setSearchParams({ id: novaSessao() }, { replace: true });
+      return;
+    }
+    if (!getSession(chaveAtiva)) abrirSessao(chaveAtiva).catch(() => {});
+  }, [chaveAtiva, setSearchParams]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, sending, generating]);
+  }, [sessao?.messages?.length, sessao?.sending, sessao?.generating, chaveAtiva]);
 
-  const userText = messages.filter((m) => m.role === 'user').map((m) => m.text).filter(Boolean).join('\n\n');
+  const messages = sessao?.messages || [];
+  const docHtml = sessao?.docHtml || '';
+  const attrs = sessao?.attrs;
+  const sending = sessao?.sending;
+  const generating = sessao?.generating;
+  const reviewConfirmed = sessao?.reviewConfirmed;
 
-  const atualizarLista = () => listarConversas().then(setConversas).catch(() => {});
+  const setInput = (valor) => setInputs((prev) => ({ ...prev, [chaveAtiva]: valor }));
+  const setFiles = (fn) => setArquivos((prev) => ({ ...prev, [chaveAtiva]: fn(prev[chaveAtiva] || []) }));
 
-  useEffect(() => {
-    atualizarLista();
-  }, []);
-
-  // Carrega a conversa selecionada (ou limpa a tela para uma nova)
-  useEffect(() => {
-    conversaIdRef.current = conversaId;
-    carregandoRef.current = true;
-    if (!conversaId) {
-      setMessages([]);
-      setDocHtml('');
-      setAttrs(null);
-      setAllUrls([]);
-      setDocumentSources([]);
-      setReviewConfirmed(false);
-      carregandoRef.current = false;
-      return;
-    }
-    carregarConversa(conversaId)
-      .then((c) => {
-        setMessages(c.messages || []);
-        setDocHtml(c.doc_html || '');
-        setAttrs(c.estado?.attrs || null);
-        setAllUrls(c.estado?.allUrls || []);
-        setDocumentSources(c.estado?.documentSources || []);
-        setReviewConfirmed(false);
-      })
-      .catch(() => {})
-      .finally(() => {
-        carregandoRef.current = false;
-      });
-  }, [conversaId]);
-
-  // Salva automaticamente a conversa (mensagens + minuta) no banco
-  useEffect(() => {
-    if (carregandoRef.current || !messages.length) return;
-    setSaveStatus('saving');
-    clearTimeout(saveTimerRef.current);
-    saveTimerRef.current = setTimeout(async () => {
-      try {
-        const payload = {
-          titulo: tituloDaConversa(messages),
-          messages,
-          doc_html: docHtml,
-          estado: { attrs, allUrls, documentSources },
-        };
-        const salva = await salvarConversa(conversaIdRef.current, payload);
-        if (!conversaIdRef.current) {
-          conversaIdRef.current = salva.id;
-          setSearchParams({ id: salva.id }, { replace: true });
-        }
-        setSaveStatus('saved');
-        atualizarLista();
-      } catch (error) {
-        console.error(error);
-        setSaveStatus('local');
-      }
-    }, 800);
-    return () => clearTimeout(saveTimerRef.current);
-  }, [messages, docHtml, attrs, allUrls, documentSources]);
-
-  const novaConversa = () => {
-    conversaIdRef.current = null;
-    setSearchParams({});
-  };
-
-  const removerConversa = async (id) => {
-    await excluirConversa(id).catch(() => {});
-    atualizarLista();
-    if (id === conversaIdRef.current) novaConversa();
-  };
-
-  const gerarMinuta = async (opts = {}) => {
-    if (!modeloPadrao || generating) return;
-    setGenerating(true);
-    setMessages((m) => [...m, { role: 'tool', text: `Usando template principal: ${modeloPadrao.titulo}` }]);
-    try {
-      const geracaoTexto = opts.texto ?? userText;
-      const { html, dadosReceita, dadosCep, dadosDatajud, dadosCct, calculos, caso, modeloSemelhante } = await gerarPecaPadrao({
-        texto: geracaoTexto,
-        fileUrls: opts.urls ?? allUrls,
-        attrs: opts.attrs ?? attrs,
-        modeloPadrao,
-        onTool: (msg) => setMessages((m) => [...m, { role: 'tool', text: msg }]),
-      });
-      setDocHtml(html);
-      setReviewConfirmed(false);
-      const retornos = [
-        dadosReceita?.length && { role: 'tool_result', title: 'Retorno da Receita Federal (BrasilAPI)', text: JSON.stringify(dadosReceita, null, 2) },
-        dadosCep?.length && { role: 'tool_result', title: 'Retorno da consulta de CEP', text: JSON.stringify(dadosCep, null, 2) },
-        dadosDatajud?.length && { role: 'tool_result', title: 'Retorno do DataJud/CNJ', text: JSON.stringify(dadosDatajud, null, 2) },
-        dadosCct?.clausulas?.length && { role: 'tool_result', title: 'Cláusulas de CCT consultadas', text: JSON.stringify(dadosCct, null, 2) },
-        caso && Object.keys(caso).length && { role: 'tool_result', title: 'Dados analisados e extraídos pela IA', text: JSON.stringify(caso, null, 2) },
-        calculos?.length && { role: 'tool_result', title: 'Retorno dos cálculos determinísticos', text: JSON.stringify(calculos, null, 2) },
-        modeloSemelhante && { role: 'tool_result', title: 'Modelo de referência selecionado', text: JSON.stringify(modeloSemelhante, null, 2) },
-        {
-          role: 'tool_result',
-          title: 'Fontes consultadas nesta geração',
-          text: JSON.stringify(fontesGeracao({
-            texto: geracaoTexto,
-            documentos: opts.sources ?? documentSources,
-            template: modeloPadrao,
-            referencia: modeloSemelhante,
-            dadosReceita,
-            dadosCep,
-            dadosDatajud,
-            dadosCct,
-          }), null, 2),
-        },
-      ].filter(Boolean);
-      if (retornos.length) setMessages((m) => [...m, ...retornos]);
-
-      const verificados = (dadosReceita || []).filter((d) => !d.erro);
-      let nota = docHtml
-        ? 'Documento atualizado com base no modelo padrão. Veja as mudanças ao lado.'
-        : 'Minuta gerada com base no modelo padrão. Veja o documento ao lado.';
-      if (verificados.length) {
-        nota += ` CNPJ(s) confirmado(s) na Receita: ${verificados.map((d) => `${d.razao_social} (${d.cnpj})`).join('; ')}.`;
-      }
-      const comValor = (calculos || []).filter((c) => c.valor != null);
-      if (comValor.length) {
-        nota += `\n\nCálculos determinísticos (por código, sem IA):\n${comValor.map((c) => `• ${c.item}: ${formatBRL(c.valor)}`).join('\n')}`;
-      }
-      setMessages((m) => [...m, { role: 'assistant', text: nota }]);
-
-      // Verificação de coerência jurídica da minuta (LLM audita, não reescreve)
-      setMessages((m) => [...m, { role: 'tool', text: 'Verificando coerência jurídica da minuta...' }]);
-      try {
-        const verif = await verificarCoerencia({ texto: geracaoTexto, caso, html });
-        const alertas = verif?.alertas || [];
-        const icone = { BLOQUEANTE: '⛔', ATENCAO: '⚠️', INFO: 'ℹ️' };
-        const cabecalho = `Verificação de coerência — status: ${verif?.status || 'concluída'}.`;
-        const corpo = alertas.length
-          ? '\n' + alertas.map((a) => `${icone[a.severidade] || '•'} ${a.descricao}${a.sugestao ? ` — ${a.sugestao}` : ''}`).join('\n')
-          : ' Nenhum problema aparente. A revisão humana do advogado continua obrigatória.';
-        setMessages((m) => [
-          ...m,
-          { role: 'tool_result', title: 'Retorno da auditoria de coerência (IA)', text: JSON.stringify(verif, null, 2) },
-          {
-            role: 'tool_result',
-            title: 'Fontes consultadas nesta auditoria',
-            text: JSON.stringify(fontesAuditoria({
-              texto: geracaoTexto,
-              template: modeloPadrao,
-              referencia: modeloSemelhante,
-            }), null, 2),
-          },
-          { role: 'assistant', text: cabecalho + corpo },
-        ]);
-      } catch (e) {
-        console.error(e);
-      }
-    } catch (err) {
-      console.error(err);
-      setMessages((m) => [...m, { role: 'assistant', text: 'Erro ao gerar a minuta. Tente novamente.' }]);
-    }
-    setGenerating(false);
-  };
-
-  const handleSend = async () => {
+  const handleSend = () => {
     if (sending || generating || (!input.trim() && files.length === 0)) return;
-    const text = input.trim();
-    const attached = files;
-    const novasMsgs = [...messages, { role: 'user', text, files: attached.map((f) => f.name) }];
-    setMessages(novasMsgs);
+    const texto = input.trim();
+    const anexos = files;
     setInput('');
-    setFiles([]);
-    setSending(true);
-    try {
-      let urls = allUrls;
-      let fontesAtuais = documentSources;
-      if (attached.length) {
-        const novos = [];
-        const novasFontes = [];
-        for (const file of attached) {
-          const { file_url } = await base44.integrations.Core.UploadFile({ file });
-          novos.push(file_url);
-          novasFontes.push({ nome: file.name, url: file_url });
-        }
-        urls = [...allUrls, ...novos];
-        fontesAtuais = [...documentSources, ...novasFontes];
-        setAllUrls(urls);
-        setDocumentSources(fontesAtuais);
-      }
-
-      const transcript = novasMsgs
-        .filter((m) => m.role === 'user' || m.role === 'assistant')
-        .map((m) => ({ role: m.role, text: m.text || '' }));
-      const modelosCtx = modeloPadrao ? [{ titulo: modeloPadrao.titulo, teses: [] }] : [];
-      const res = await conversarEntrevista({
-        transcript,
-        fileUrls: urls,
-        modelos: modelosCtx,
-        attrsAtuais: attrs || {},
-      });
-
-      const novoAttrs = { ...(attrs || {}), ...(res?.atributos || {}) };
-      setAttrs(novoAttrs);
-      setMessages((m) => [
-        ...m,
-        ...(res?.dadosReceita?.length
-          ? [
-              { role: 'tool', text: `Consultando ${res.dadosReceita.length} CNPJ(s) na Receita Federal (BrasilAPI)...` },
-              { role: 'tool_result', title: 'Retorno da Receita Federal (BrasilAPI)', text: JSON.stringify(res.dadosReceita, null, 2) },
-            ]
-          : []),
-        { role: 'assistant', text: res?.reply || 'Certo.' },
-        {
-          role: 'tool_result',
-          title: 'Análise da IA sobre a entrevista',
-          text: JSON.stringify({
-            atributos: res?.atributos || {},
-            pronto_para_gerar: res?.pronto_para_gerar ?? false,
-          }, null, 2),
-        },
-        {
-          role: 'tool_result',
-          title: 'Fontes consultadas nesta análise',
-          text: JSON.stringify(fontesEntrevista({
-            texto: transcript.filter((message) => message.role === 'user').map((message) => message.text).join('\n\n'),
-            documentos: fontesAtuais,
-          }), null, 2),
-        },
-      ]);
-
-      // Inicia a geração/atualização da minuta automaticamente após cada envio
-      const textoCompleto = novasMsgs
-        .filter((m) => m.role === 'user')
-        .map((m) => m.text)
-        .filter(Boolean)
-        .join('\n\n');
-      const faltando = res?.faltando || [];
-      if (res?.pronto_para_gerar) {
-        await gerarMinuta({ texto: textoCompleto, urls, attrs: novoAttrs, sources: fontesAtuais });
-      } else if (faltando.length) {
-        // Avisa o que falta e pede aprovação antes de gerar com marcadores
-        setPendingGeneration({ texto: textoCompleto, urls, attrs: novoAttrs, sources: fontesAtuais });
-        setMessages((m) => [...m, { role: 'approval', faltando }]);
-      } else if (docHtml) {
-        await gerarMinuta({ texto: textoCompleto, urls, attrs: novoAttrs, sources: fontesAtuais });
-      }
-    } catch (err) {
-      console.error(err);
-      setMessages((m) => [...m, { role: 'assistant', text: 'Erro ao processar. Tente novamente.' }]);
-    }
-    setSending(false);
-  };
-
-  const decidirGeracao = async (idx, aprovado) => {
-    setMessages((m) => m.map((msg, i) => (i === idx ? { ...msg, decided: aprovado ? 'sim' : 'nao' } : msg)));
-    const pend = pendingGeneration;
-    setPendingGeneration(null);
-    if (aprovado && pend) {
-      await gerarMinuta(pend);
-    } else if (!aprovado) {
-      setMessages((m) => [...m, { role: 'assistant', text: 'Certo, aguardo as informações que faltam antes de gerar a minuta.' }]);
-    }
+    setFiles(() => []);
+    // Não aguardamos: a conversa continua processando em segundo plano.
+    enviarMensagem(chaveAtiva, { text: texto, files: anexos });
   };
 
   const handleKeyDown = (e) => {
@@ -334,31 +94,27 @@ export default function GerarPorEntrevista() {
     }
   };
 
+  const removerConversa = async (id) => {
+    await excluirConversa(id).catch(() => {});
+    esquecerSessao(id);
+    listarConversas().then(setConversas).catch(() => {});
+    if (id === chaveAtiva || getSession(chaveAtiva) === null) setSearchParams({ id: novaSessao() });
+  };
+
   const exportar = async () => {
     if (!docHtml || !reviewConfirmed || exporting) return;
     setExporting(true);
     try {
-      const { blob, ...validacao } = await exportToDocx(docHtml, null, 'Minuta - petição inicial');
-      setMessages((m) => [...m, {
-        role: 'tool_result',
-        title: 'Validação da exportação DOCX',
-        text: JSON.stringify(validacao, null, 2),
-      }]);
-      // Salva uma cópia no Histórico para download posterior
-      try {
-        const file = new File([blob], 'Minuta - petição inicial.docx', {
-          type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        });
-        const { file_url } = await base44.integrations.Core.UploadFile({ file });
-        await base44.entities.DocumentoExportado.create({
-          titulo: 'Minuta - petição inicial',
-          file_url,
-          tamanho_bytes: blob.size,
-        });
-        setMessages((m) => [...m, { role: 'tool', text: 'Cópia do DOCX salva no Histórico.' }]);
-      } catch (e) {
-        console.error(e);
-      }
+      const { blob } = await exportToDocx(docHtml, null, 'Minuta - petição inicial');
+      const file = new File([blob], 'Minuta - petição inicial.docx', {
+        type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      });
+      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      await base44.entities.DocumentoExportado.create({
+        titulo: 'Minuta - petição inicial',
+        file_url,
+        tamanho_bytes: blob.size,
+      });
     } catch (err) {
       console.error(err);
       window.alert(`Não foi possível exportar o documento: ${err?.message || 'erro desconhecido'}`);
@@ -377,7 +133,7 @@ export default function GerarPorEntrevista() {
         <div className="flex-1 min-w-0">
           <h1 className="text-base font-semibold text-[#202124]">Gerar por Entrevista</h1>
           <p className="text-xs text-[#5f6368] truncate">
-            Converse à esquerda; a minuta aparece e se atualiza à direita.
+            Cada entrevista é um chat independente — todos continuam rodando em paralelo.
           </p>
         </div>
         <button
@@ -413,15 +169,17 @@ export default function GerarPorEntrevista() {
         )}
       </div>
 
-      {/* Corpo: chat (esq) + documento (dir) */}
+      {/* Corpo: conversas + chat (esq) + documento (dir) */}
       <div className="flex-1 flex flex-col lg:flex-row min-h-0 overflow-hidden">
         <ConversasSidebar
           conversas={conversas}
-          ativaId={conversaId}
-          onNova={novaConversa}
+          ativaId={sessao?.id || chaveAtiva}
+          ocupadas={ocupadas}
+          onNova={() => setSearchParams({ id: novaSessao() })}
           onSelecionar={(id) => setSearchParams({ id })}
           onExcluir={removerConversa}
         />
+
         {/* Chat */}
         <div
           className="flex flex-col min-h-0 lg:w-[400px] lg:flex-shrink-0 lg:border-r border-[#dadce0]"
@@ -449,7 +207,7 @@ export default function GerarPorEntrevista() {
                     key={i}
                     faltando={m.faltando}
                     decided={m.decided}
-                    onDecide={(aprovado) => decidirGeracao(i, aprovado)}
+                    onDecide={(aprovado) => decidirGeracao(chaveAtiva, i, aprovado)}
                   />
                 ) : m.role === 'tool' || m.role === 'tool_result' ? (
                   <ToolTraceMessage key={i} message={m} />
@@ -513,7 +271,8 @@ export default function GerarPorEntrevista() {
                   accept=".pdf,.doc,.docx,.txt,.rtf,.odt,.csv,.xls,.xlsx,.jpg,.jpeg,.png,.webp,.heic,.tif,.tiff,application/pdf,image/*"
                   className="hidden"
                   onChange={(e) => {
-                    setFiles((prev) => [...prev, ...Array.from(e.target.files)]);
+                    const novos = Array.from(e.target.files);
+                    setFiles((prev) => [...prev, ...novos]);
                     e.target.value = '';
                   }}
                 />
@@ -527,7 +286,7 @@ export default function GerarPorEntrevista() {
                 className="flex-1 px-1 py-2 text-sm bg-transparent resize-none focus:outline-none max-h-40"
               />
               <span className="pb-2 text-[10px] text-[#9aa0a6] whitespace-nowrap">
-                {saveStatus === 'saving' ? 'Salvando...' : saveStatus === 'local' ? 'Salvo neste dispositivo' : 'Salvo'}
+                {sessao?.saveStatus === 'saving' ? 'Salvando...' : sessao?.saveStatus === 'local' ? 'Não salvo' : 'Salvo'}
               </span>
               <button
                 onClick={handleSend}
@@ -552,13 +311,11 @@ export default function GerarPorEntrevista() {
               </span>
             )}
             {docHtml && !reviewConfirmed && (
-              <span className="hidden md:inline text-[11px] text-[#8a5d00]">
-                Confira os campos destacados
-              </span>
+              <span className="hidden md:inline text-[11px] text-[#8a5d00]">Confira os campos destacados</span>
             )}
             {docHtml && !reviewConfirmed && (
               <button
-                onClick={() => setReviewConfirmed(true)}
+                onClick={() => confirmarRevisao(chaveAtiva)}
                 className="flex items-center gap-1.5 px-3 py-1.5 border border-[#1a73e8] text-[#1a73e8] rounded-lg text-xs font-medium hover:bg-[#e8f0fe] transition-colors"
               >
                 <CheckCircle2 className="w-3.5 h-3.5" /> Confirmar revisão

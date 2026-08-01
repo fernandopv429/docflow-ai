@@ -1,7 +1,7 @@
 import React from 'react';
-import { Plus, MessageSquare, Trash2 } from 'lucide-react';
+import { Plus, MessageSquare, Trash2, Loader2 } from 'lucide-react';
 
-export default function ConversasSidebar({ conversas, ativaId, onNova, onSelecionar, onExcluir }) {
+export default function ConversasSidebar({ conversas, ativaId, ocupadas = {}, onNova, onSelecionar, onExcluir }) {
   return (
     <div className="hidden lg:flex flex-col w-56 flex-shrink-0 border-r border-[#dadce0] bg-white">
       <div className="p-3">
@@ -24,7 +24,11 @@ export default function ConversasSidebar({ conversas, ativaId, onNova, onSelecio
             }`}
             onClick={() => onSelecionar(c.id)}
           >
-            <MessageSquare className="w-3.5 h-3.5 flex-shrink-0" />
+            {ocupadas[c.id] ? (
+              <Loader2 className="w-3.5 h-3.5 flex-shrink-0 animate-spin text-[#1a73e8]" />
+            ) : (
+              <MessageSquare className="w-3.5 h-3.5 flex-shrink-0" />
+            )}
             <span className="flex-1 min-w-0 truncate text-xs">{c.titulo || 'Sem título'}</span>
             <button
               onClick={(e) => {
