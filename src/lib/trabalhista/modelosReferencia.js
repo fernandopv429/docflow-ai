@@ -10,6 +10,7 @@ import { blocoRegrasCriticas, regiaoTrtPorMunicipio } from './regrasCriticas';
 import { BLOCO_ENGENHARIA_JURIDICA } from './engenhariaJuridica';
 import { BLOCO_REGRAS_QUALIDADE_FAV } from './regrasQualidadeFav';
 import { invokeLLMComRetry } from './llmRetry';
+import { aplicarFormatacaoPadrao, esqueletoDoModelo } from './formatacaoPeca';
 import { traceAiCall } from '@/lib/sessionTrace';
 
 // ============================================================
@@ -851,14 +852,14 @@ export function buildGeracaoPadraoPrompt({ texto, attrs, modeloHtml, calculos, d
   const dataHoje = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
   return `${PROMPT_SISTEMA_PETICAO}${BLOCO_ENGENHARIA_JURIDICA}${BLOCO_REGRAS_QUALIDADE_FAV}${blocoRegrasCriticas({ municipios, dataHoje })}
 
-REGRA PRINCIPAL — ADAPTE O MODELO PADRÃO MANTENDO O ESTILO: abaixo está o MODELO PADRÃO do escritório em HTML (com a formatação, o layout e o texto-padrão corretos, podendo conter marcadores como {{VARIAVEL}}). Sua tarefa é ADAPTAR este HTML ao caso atual:
-- Substitua os marcadores {{...}} e quaisquer dados de exemplo pelos dados REAIS do caso (entrevista/documentos). Onde faltar um dado, deixe um marcador claro entre colchetes, ex.: [SALÁRIO].
+REGRA PRINCIPAL — ESCREVA APENAS O CONTEÚDO: a formatação (fonte, alinhamento, títulos, timbrado) é aplicada depois por código. Você NÃO deve reproduzir estilos, CSS, tabelas de layout ou atributos style.
+- Use HTML simples e semântico: <p> para parágrafos, <h2> para os títulos dos tópicos (em CAIXA ALTA), <ul>/<li> para listas de pedidos, <strong> para ênfase.
+- Siga a ESTRUTURA e o TEXTO-PADRÃO do modelo do escritório reproduzido em texto abaixo (mesma ordem e mesmos tópicos fixos), preenchendo com os dados REAIS do caso. Onde faltar um dado, deixe um marcador claro entre colchetes, ex.: [SALÁRIO].
 - Ajuste ou REMOVA os tópicos que não se aplicam ao caso; mantenha os tópicos fixos.
-- Todo valor que você preencher ou substituir com dados do caso atual deve ficar envolvido por <mark class="ai-filled-field" data-ai-field="nome_do_campo">valor preenchido</mark>. Marque somente os dados variáveis inseridos por você, nunca o texto jurídico padrão.
-- MANTENHA EXATAMENTE a formatação e a estrutura HTML do modelo (mesmas tags e estilos). NÃO reescreva o texto-padrão nem crie estrutura nova.
+- Todo dado variável que você preencher com informações do caso atual deve ficar envolvido por <mark class="ai-filled-field" data-ai-field="nome_do_campo">valor</mark>. Nunca marque o texto jurídico padrão.
 
-=== MODELO PADRÃO (HTML — preserve a formatação) ===
-${compactarHtmlModelo(modeloHtml)}
+=== MODELO PADRÃO DO ESCRITÓRIO (texto — siga a estrutura e o texto-padrão) ===
+${esqueletoDoModelo(modeloHtml)}
 === FIM DO MODELO PADRÃO ===
 ${diferencial ? `\n=== CASO SEMELHANTE NA BASE${modeloSemelhanteTitulo ? ` (${modeloSemelhanteTitulo})` : ''} — DIFERENCIAL ===\nO sistema selecionou, na base de referências, o caso mais semelhante a esta entrevista. Use os pontos PARTICULARES abaixo como orientação para as teses/capítulos específicos deste tipo de caso (o restante segue o Modelo Padrão). Inclua apenas o que tiver suporte no relato:\n${(diferencial || '').slice(0, 4000)}\n=== FIM DO DIFERENCIAL ===\n` : ''}
 === ENTREVISTA / CASO ATUAL ===
@@ -873,7 +874,7 @@ Atributos detectados: função=${attrs?.funcao || '-'}, modalidade=${attrs?.tipo
   }
 === FIM DA ENTREVISTA ===${blocoReceita(dadosReceita)}${blocoCeps(dadosCep)}${blocoDatajud(dadosDatajud)}${blocoCct(dadosCct)}${blocoCalculos(calculos)}
 
-FORMATO DE SAÍDA: retorne APENAS o HTML adaptado do corpo da petição (sem <html>, <head> ou <body>), PRESERVANDO a formatação/estilo do modelo. NÃO acrescente avisos, notas ou observações ao final.`;
+FORMATO DE SAÍDA: retorne APENAS o HTML simples do corpo da petição (sem <html>, <head>, <body>, sem <style> e sem atributos style). NÃO acrescente avisos, notas ou observações ao final.`;
 }
 
 // Limpa a saída da IA: remove cercas de código markdown (```html) e tags de
@@ -983,7 +984,7 @@ export async function gerarPecaPadrao({ texto, fileUrls, attrs, modeloPadrao, on
     { onHit: () => notify('Reutilizando geração idêntica em cache...') }
   );
   return {
-    html: limparHtmlIA(resultado),
+    html: aplicarFormatacaoPadrao(limparHtmlIA(resultado)),
     dadosReceita,
     dadosCep,
     dadosDatajud,
