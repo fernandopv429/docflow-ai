@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
-  ArrowLeft, Loader2, Paperclip, Send, X, FileText, Bot, FileDown, Library, RefreshCw, CheckCircle2, ScrollText,
+  ArrowLeft, Loader2, Paperclip, Send, X, FileText, Bot, FileDown, Library, RefreshCw, CheckCircle2, ScrollText, PanelLeft,
 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import ToolTraceMessage from '@/components/ToolTraceMessage';
@@ -34,6 +34,7 @@ export default function GerarPorEntrevista() {
   const [conversas, setConversas] = useState([]);
   const [modeloPadrao, setModeloPadrao] = useState(null);
   const [logsOpen, setLogsOpen] = useState(false);
+  const [sidebarAberta, setSidebarAberta] = useState(true);
   const consoleLogs = useConsoleLogs();
   const [inputs, setInputs] = useState({});
   const [arquivos, setArquivos] = useState({});
@@ -137,6 +138,13 @@ export default function GerarPorEntrevista() {
           </p>
         </div>
         <button
+          onClick={() => setSidebarAberta((v) => !v)}
+          className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-[#5f6368] hover:bg-[#f1f3f4] rounded-lg whitespace-nowrap"
+          title="Mostrar/ocultar entrevistas"
+        >
+          <PanelLeft className="w-4 h-4" /> Entrevistas
+        </button>
+        <button
           onClick={() => setLogsOpen(true)}
           className="p-2 text-[#5f6368] hover:text-[#202124] hover:bg-[#f1f3f4] rounded-full"
           title="Ver logs da sessão"
@@ -175,6 +183,7 @@ export default function GerarPorEntrevista() {
           conversas={conversas}
           ativaId={sessao?.id || chaveAtiva}
           ocupadas={ocupadas}
+          aberta={sidebarAberta}
           onNova={() => setSearchParams({ id: novaSessao() })}
           onSelecionar={(id) => setSearchParams({ id })}
           onExcluir={removerConversa}

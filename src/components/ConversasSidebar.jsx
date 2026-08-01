@@ -1,9 +1,10 @@
 import React from 'react';
 import { Plus, MessageSquare, Trash2, Loader2 } from 'lucide-react';
 
-export default function ConversasSidebar({ conversas, ativaId, ocupadas = {}, onNova, onSelecionar, onExcluir }) {
+export default function ConversasSidebar({ conversas, ativaId, ocupadas = {}, aberta = true, onNova, onSelecionar, onExcluir }) {
+  if (!aberta) return null;
   return (
-    <div className="hidden lg:flex flex-col w-56 flex-shrink-0 border-r border-[#dadce0] bg-white">
+    <div className="flex flex-col w-full lg:w-56 max-h-52 lg:max-h-none flex-shrink-0 border-b lg:border-b-0 lg:border-r border-[#dadce0] bg-white">
       <div className="p-3">
         <button
           onClick={onNova}
