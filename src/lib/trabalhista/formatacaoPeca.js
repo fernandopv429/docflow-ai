@@ -13,43 +13,39 @@ const ESTILO_PARAGRAFO = 'font-family:Arial,sans-serif;font-size:12pt;line-heigh
 const ESTILO_TITULO = 'font-family:Arial,sans-serif;font-size:12pt;line-height:1.5;text-align:left;font-weight:bold;margin:18pt 0 10pt;';
 const ESTILO_ENDERECAMENTO = 'font-family:Arial,sans-serif;font-size:12pt;line-height:1.5;text-align:left;font-weight:bold;margin:0 0 18pt;';
 
-// Substitui, POR CÓDIGO, dois fatos que a IA repetidamente errava ao
-// escrever de cabeça: (1) a data do fecho — já vimos minutas datadas ANTES
-// da própria rescisão que elas narram; (2) a frase "Dá-se à causa..." — já
-// vimos o valor não bater com a soma real dos pedidos, e o "por extenso"
-// divergir do número. Ambos passam a ser gerados 100% deterministicamente
-// (data real do sistema; valorPorExtenso.js para o extenso), eliminando a
-// dependência de a IA acertar esses dois fatos por conta própria.
+// Substitui, POR CÓDIGO, TODO o bloco de fecho da petição — a IA não escreve
+// mais nenhuma parte dele (ver CONTRATO DE SAÍDA no prompt principal). Isso
+// elimina de vez os erros que já vimos ao deixar a IA escrever isso de
+// cabeça: data do fecho anterior à própria rescisão, valor da causa que não
+// batia com a soma dos pedidos, e "por extenso" divergente do número.
+// Estratégia: remove qualquer resquício dessas linhas que a IA tenha escrito
+// por engano (defesa extra, caso ela não obedeça a instrução) e reconstrói o
+// bloco inteiro do zero, no formato e ordem do modelo padrão do escritório:
+// "Dá-se à causa..." → "Pede deferimento." → "São Paulo, [data]." → assinatura.
+const ESTILO_FECHO = 'font-family:Arial,sans-serif;font-size:12pt;line-height:1.5;text-align:center;margin:0 0 12pt;';
+
 export function aplicarFechoDeterministico(html, { valorCausa } = {}) {
   let out = String(html || '');
   const dataHoje = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
 
-  // Data do fecho: substitui o parágrafo "São Paulo, ..." (a vírgula logo
-  // após "Paulo" só ocorre nesse parágrafo — endereços têm "São Paulo/SP"
-  // ou "São Paulo (Zona Norte)", nunca "São Paulo," direto).
-  const reDataP = /<p[^>]*>\s*(?:<[^>]+>\s*)*S[ãa]o Paulo,[\s\S]*?<\/p>/i;
-  const novaData = `<p>São Paulo, ${dataHoje}.</p>`;
-  if (reDataP.test(out)) {
-    out = out.replace(reDataP, novaData);
-  } else {
-    const reDataTxt = /S[ãa]o Paulo,\s*[^.<\n]*\.?/i;
-    out = reDataTxt.test(out) ? out.replace(reDataTxt, `São Paulo, ${dataHoje}.`) : `${out}\n${novaData}`;
-  }
+  // Remove qualquer parágrafo de fecho que a IA tenha escrito por engano,
+  // apesar da instrução (defesa extra — evita duplicar linhas).
+  out = out.replace(/<p[^>]*>\s*(?:<[^>]+>\s*)*S[ãa]o Paulo,[\s\S]*?<\/p>/gi, '');
+  out = out.replace(/<p[^>]*>\s*(?:<[^>]+>\s*)*D[áa]-se[\s\S]*?<\/p>/gi, '');
+  out = out.replace(/<p[^>]*>\s*(?:<[^>]+>\s*)*Pede\s+deferimento[\s\S]*?<\/p>/gi, '');
+  out = out.replace(/<p[^>]*>\s*(?:<[^>]+>\s*)*FERNANDO\s+ANDRADE\s+VIEIRA[\s\S]*?<\/p>\s*(?:<p[^>]*>\s*(?:<[^>]+>\s*)*OAB\/SP[\s\S]*?<\/p>)?/gi, '');
 
-  // Valor da causa: substitui o parágrafo "Dá-se..." inteiro pela soma real
-  // dos itens do rol de pedidos (array `pedidos` retornado pela IA junto do
-  // HTML), com o "por extenso" calculado por código — nunca pela IA.
+  const linhas = [];
   if (valorCausa != null && Number.isFinite(valorCausa)) {
     const frase = `Dá-se à causa o valor estimativo de R$ ${formatarReais(valorCausa)} (${valorPorExtenso(valorCausa)}), para todos os fins legais, sem prejuízo da apuração definitiva em sede de liquidação de sentença.`;
-    const reValorP = /<p[^>]*>\s*(?:<[^>]+>\s*)*D[áa]-se[\s\S]*?<\/p>/i;
-    if (reValorP.test(out)) {
-      out = out.replace(reValorP, `<p><strong>${frase}</strong></p>`);
-    } else {
-      out += `\n<p><strong>${frase}</strong></p>`;
-    }
+    linhas.push(`<p style="${ESTILO_FECHO}"><strong>${frase}</strong></p>`);
   }
+  linhas.push(`<p style="${ESTILO_FECHO}">Pede deferimento.</p>`);
+  linhas.push(`<p style="${ESTILO_FECHO}">São Paulo, ${dataHoje}.</p>`);
+  linhas.push(`<p style="${ESTILO_FECHO}"><strong>FERNANDO ANDRADE VIEIRA</strong></p>`);
+  linhas.push(`<p style="${ESTILO_FECHO}">OAB/SP 320.825</p>`);
 
-  return out;
+  return `${out.trim()}\n${linhas.join('\n')}`;
 }
 
 // Extrai um ESQUELETO em texto do modelo padrão (títulos e início dos
