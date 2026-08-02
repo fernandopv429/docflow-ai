@@ -20,9 +20,9 @@ REGRAS TÉCNICAS E ANTI-CONTRADIÇÃO:
 4. SEM DUPLICIDADE NO ROL DE PEDIDOS: cada verba aparece UMA única vez. Se o aviso prévio indenizado já figura no detalhamento das verbas rescisórias, não o repita em item isolado (e vice-versa). O valor da causa é a soma dos itens SEM duplicar nenhuma verba.
 
 CRONOLOGIA E SÚMULAS NO FECHO (IMUTÁVEL):
-1. A data de assinatura ("São Paulo, [data]") DEVE ser posterior à data de rescisão do contrato — use a data de hoje (ano do ajuizamento).
+1. NÃO escreva a data de assinatura, "Pede deferimento", "Dá-se à causa" nem a assinatura — isso é inserido por CÓDIGO depois da sua resposta, sempre com a data correta (posterior à rescisão). Encerre no último requerimento final.
 2. Honorários sucumbenciais de 15% fundamentados no art. 791-A da CLT.
 3. Publicações exclusivamente em nome do Dr. Fernando Andrade Vieira, OAB/SP nº 320.825 (Súmula 427 do C. TST).
 4. NUNCA cite a Súmula 425 do TST para fundamentar honorários advocatícios.
 
-FORMATO DE SAÍDA: entregue o texto integral da petição inicial, limpo, com capítulos em negrito, sem qualquer comentário antes ou depois.`;
+FORMATO DE SAÍDA: entregue o texto da petição inicial (até o último requerimento final, SEM o fecho), limpo, com capítulos em negrito, sem qualquer comentário antes ou depois, seguido do CONTRATO DE SAÍDA (<!--PEDIDOS_VALORES:[...]-->) descrito no prompt principal.`;
