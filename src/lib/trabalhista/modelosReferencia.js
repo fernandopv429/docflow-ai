@@ -3,7 +3,7 @@ import mammoth from 'mammoth';
 import { TIPO_DISPENSA_LABELS } from './tokens';
 import { loadTemplateContent } from '@/lib/templateContent';
 import { extrairCasoDeTexto } from './parserEntrevista';
-import { calcularVerbasCaso } from './mathUtils';
+import { calcularVerbasCaso, round2 } from './mathUtils';
 import { runtimeCacheKey, withRuntimeCache } from './runtimeCache';
 import { removeTextLetterhead } from '@/lib/removeTextLetterhead';
 import { blocoRegrasCriticas, regiaoTrtPorMunicipio } from './regrasCriticas';
@@ -1001,6 +1001,7 @@ export async function gerarPecaPadrao({ texto, fileUrls, attrs, modeloPadrao, on
       dadosCct,
     }),
     model: 'claude_sonnet_4_6',
+    response_json_schema: RESPOSTA_GERACAO_SCHEMA,
   };
   const urls = [...(fileUrls || [])];
   if (urls.length) req.file_urls = urls;
@@ -1017,8 +1018,21 @@ export async function gerarPecaPadrao({ texto, fileUrls, attrs, modeloPadrao, on
       ),
     { onHit: () => notify('Reutilizando geração idêntica em cache...') }
   );
+
+  // Valor da causa: NUNCA confiamos no texto livre da IA para essa soma nem
+  // para o "por extenso" — somamos por código o array `pedidos` estruturado
+  // e reescrevemos a frase final e a data do fecho deterministicamente.
+  const pedidos = Array.isArray(resultado?.pedidos) ? resultado.pedidos : [];
+  const valorCausa = round2(pedidos.reduce((soma, p) => soma + (Number(p?.valor) || 0), 0));
+  if (pedidos.length) {
+    notify(`Valor da causa calculado por código (soma de ${pedidos.length} itens do rol de pedidos): R$ ${valorCausa.toFixed(2).replace('.', ',')}`);
+  }
+  const htmlBruto = aplicarFechoDeterministico(limparHtmlIA(resultado?.html || ''), { valorCausa: pedidos.length ? valorCausa : null });
+
   return {
-    html: aplicarFormatacaoPadrao(limparHtmlIA(resultado)),
+    html: aplicarFormatacaoPadrao(htmlBruto),
+    valorCausa: pedidos.length ? valorCausa : null,
+    pedidos,
     dadosReceita,
     dadosCep,
     dadosDatajud,
