@@ -817,7 +817,7 @@ ESTRUTURA E ESTILO DE REDAÇÃO (SEGUIR EXATAMENTE O MODELO)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 TRAVAS CRÍTICAS ANTI-ERRO (NÃO DESCUMPRIR)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-1. DATA DO FECHO: A data de assinatura ("São Paulo, [data]") DEVE ser obrigatoriamente posterior à data de desligamento do empregado. NUNCA coloque datas passadas ou anacrônicas em relação ao contrato.
+1. DATA DO FECHO: NÃO escreva a data do fecho — o sistema a insere automaticamente por código, sempre correta e posterior à rescisão. Sua resposta termina no último requerimento final, sem "Pede deferimento", sem "São Paulo, ..." e sem assinatura.
 2. HONORÁRIOS NO ENCERRAMENTO: Nos honorários sucumbenciais use a fundamentação do art. 791-A da CLT. NUNCA cite a Súmula 425 do TST para pedir honorários no encerramento (a Súmula 425 trata de jus postulandi).
 3. DESVIO DE FUNÇÃO × ACÚMULO: Se o vigilante atuou em Prevenção de Perdas, peça apenas DESVIO DE FUNÇÃO (multa convencional de 50%). Não misture com acúmulo de função para os mesmos fatos.
 4. DESVIO DE FUNÇÃO — DESCRIÇÃO CONCRETA: ao redigir o tópico do desvio de função, transcreva as ATIVIDADES efetivamente relatadas na entrevista (ex.: prevenção de perdas — conferência de cargas, controle/verificação de validade de produtos, contagem de paletes, registros operacionais). É PROIBIDO deixar a frase incompleta (ex.: "além das funções de VIGILANTE, ,") ou sem a lista de tarefas desviadas.
@@ -825,7 +825,10 @@ TRAVAS CRÍTICAS ANTI-ERRO (NÃO DESCUMPRIR)
 6. VALOR DA CAUSA NO CORPO: qualquer menção ao valor da causa DENTRO do texto (inclusive a base de cálculo dos honorários no rol de pedidos) deve ser o VALOR TOTAL REAL da causa (soma dos itens). NUNCA reproduza um valor da causa antigo herdado do modelo (ex.: "R$ 10.012,79").
 7. JUÍZO 100% DIGITAL × E-MAIL DO CLIENTE: se o reclamante possui e-mail (informado na entrevista), NÃO afirme que "o autor não possui correio eletrônico". Ajuste o parágrafo para indicar o e-mail do cliente na qualificação e apenas o encaminhamento/ciência pelo patrono, sem afirmação falsa.
 8. CONCORDÂNCIA DE GÊNERO: revise CADA ocorrência (contratado/a, ligado/a, prejudicado/a, deferido(s) ao/à reclamante) para o gênero do reclamante informado. Não deixe flexões do modelo no gênero oposto nem formas como "brasileiro(a)".
-9. SAÍDA DIRETA: Entregue diretamente o texto da petição pronta para uso, sem comentários iniciais ou explicações ao final.`;
+9. SAÍDA DIRETA: Entregue diretamente o texto da petição pronta para uso, sem comentários iniciais ou explicações ao final.
+10. CONTRATO DE SAÍDA — VALORES DOS PEDIDOS (OBRIGATÓRIO E LITERAL): imediatamente após o último requerimento final, sem NENHUM texto entre eles (nem "Pede deferimento", nem data, nem assinatura), inclua uma única linha no formato EXATO abaixo:
+<!--PEDIDOS_VALORES:[valor1,valor2,valor3]-->
+Regras desse array: um número por PEDIDO PRINCIPAL do rol (na mesma ordem em que você os listou), já somando os reflexos daquele mesmo item; SEM separador de milhar; ponto como separador decimal; SEM o símbolo R$; SEM aspas; NÃO inclua o percentual/valor de honorários advocatícios neste array (são calculados à parte, sobre o valor da causa). NÃO escreva nada depois dessa linha — ela deve ser o último caractere da sua resposta.`;
 
 // Bloco de cálculos determinísticos para o prompt (mesma lógica da auditoria).
 function blocoCalculos(calculos) {
