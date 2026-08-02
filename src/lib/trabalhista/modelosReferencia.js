@@ -805,14 +805,14 @@ ESTRUTURA E ESTILO DE REDAÇÃO (SEGUIR EXATAMENTE O MODELO)
 
 5. ROL DE PEDIDOS (DOS PEDIDOS):
    - Estruturar em tópicos com marcadores de hifen '-', indicando cada pedido principal e seus respectivos reflexos individualizados (DSRs, Aviso Prévio, Férias + 1/3, 13º Salário, FGTS + Multa de 40%).
-   - Indicar claramente o valor estimado por item.
+   - Indicar claramente o valor estimado por item (um único valor final por item, já somando os reflexos DESSE item — nunca deixe o valor do item "solto" em vários pedaços).
+   - NÃO escreva a frase final "Dá-se à causa o valor de..." nem calcule/some o total — isso é feito por código depois da sua resposta (ver CONTRATO DE SAÍDA no final deste prompt).
 
-6. REQUERIMENTOS FINAIS E FECHO:
+6. REQUERIMENTOS FINAIS (SEM FECHO — O FECHO É GERADO POR CÓDIGO):
    - Notificação das Reclamadas sob pena de confissão (Súmula 74 TST).
    - Indicação do endereço eletrônico do patrono: trabalhista@favadvogados.com.br.
    - Requerimento de intimações exclusivamente em nome do Dr. Fernando Andrade Vieira, OAB/SP nº 320.825 (Súmula 427 do TST).
-   - Valor Total da Causa ESTIMATIVO em R$ [Valor Extenso].
-   - Fecho: "Pede deferimento. / São Paulo, [Data do Ajuizamento no Ano Atual - ex.: 2026] / FERNANDO ANDRADE VIEIRA / OAB/SP 320.825".
+   - NÃO escreva "Pede deferimento", a data do fecho ("São Paulo, ...") nem a assinatura — o sistema insere essas três linhas automaticamente, sempre com a data correta. Encerre seu texto no último requerimento final.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 TRAVAS CRÍTICAS ANTI-ERRO (NÃO DESCUMPRIR)
