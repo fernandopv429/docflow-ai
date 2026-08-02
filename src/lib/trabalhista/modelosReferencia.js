@@ -882,9 +882,7 @@ Atributos detectados: função=${attrs?.funcao || '-'}, modalidade=${attrs?.tipo
   }
 === FIM DA ENTREVISTA ===${blocoReceita(dadosReceita)}${blocoCeps(dadosCep)}${blocoDatajud(dadosDatajud)}${blocoCct(dadosCct)}${blocoCalculos(calculos)}
 
-FORMATO DE SAÍDA: retorne um objeto JSON com dois campos:
-- "html": o HTML simples do corpo da petição (sem <html>, <head>, <body>, sem <style> e sem atributos style). Escreva os parágrafos de fecho normalmente ("São Paulo, [data]." e "Dá-se à causa o valor de R$ [valor]...") — NÃO se preocupe em acertar a data exata nem o "por extenso": o CÓDIGO substitui essas duas informações automaticamente depois, usando a soma do campo "pedidos" abaixo.
-- "pedidos": um array com TODOS os itens monetários do rol de pedidos, cada um como {"descricao": string, "valor": number}, já somando principal + reflexos em um único número por item (o mesmo total que aparece no HTML para aquele item). NÃO inclua honorários advocatícios nesse array (são percentuais sobre a condenação, não um valor fixo somado à causa).`;
+FORMATO DE SAÍDA: retorne APENAS o HTML simples do corpo da petição (sem <html>, <head>, <body>, sem <style> e sem atributos style). NÃO acrescente avisos, notas ou observações ao final. Escreva os parágrafos de fecho normalmente ("São Paulo, [data]." e "Dá-se à causa o valor de R$ [valor]...") — não precisa se preocupar em acertar a data exata nem o "por extenso": o CÓDIGO corrige essas duas informações automaticamente depois.`;
 }
 
 // Limpa a saída da IA: remove cercas de código markdown (```html) e tags de
@@ -897,18 +895,19 @@ export function limparHtmlIA(html) {
   return removeTextLetterhead(t.trim());
 }
 
-// Saída estruturada da geração: HTML + rol de pedidos com valores numéricos.
-// O array `pedidos` é usado por CÓDIGO para somar o valor real da causa e
-// escrever a frase final (com "por extenso" determinístico) — a IA para de
-// ser responsável por acertar essa soma sozinha na hora de escrever a peça.
-const RESPOSTA_GERACAO_SCHEMA = {
+// Extração do rol de pedidos JÁ GERADO, em chamada SEPARADA e pequena — isso
+// evita colocar um schema JSON na chamada PRINCIPAL de geração (que produz um
+// HTML enorme): pedir para o modelo devolver ao mesmo tempo um HTML longo E
+// respeitar um JSON schema é frágil e já causou uma geração praticamente vazia
+// em produção. Isolando a extração numa chamada à parte, se ela falhar o pior
+// caso é não corrigir o valor da causa — nunca perder a peça inteira.
+const PEDIDOS_EXTRACAO_SCHEMA = {
   type: 'object',
-  required: ['html', 'pedidos'],
+  required: ['pedidos'],
   properties: {
-    html: { type: 'string', description: 'HTML simples do corpo da petição.' },
     pedidos: {
       type: 'array',
-      description: 'Todos os itens monetários do rol de pedidos (principal + reflexos somados em um único número por item). Não inclua honorários advocatícios.',
+      description: 'Todos os itens monetários do rol de pedidos (principal + reflexos somados em um único número por item). Não inclua honorários advocatícios (percentual, não valor fixo).',
       items: {
         type: 'object',
         required: ['descricao', 'valor'],
@@ -920,6 +919,16 @@ const RESPOSTA_GERACAO_SCHEMA = {
     },
   },
 };
+
+export async function extrairPedidosDoHtml(html) {
+  const texto = esqueletoDoModelo(html, 20000);
+  const prompt = `A partir do texto abaixo, que é o corpo de uma petição trabalhista já redigida, localize a seção "DOS PEDIDOS" e extraia CADA item monetário do rol como {"descricao": string, "valor": number}, já somando principal + reflexos em um único número por item (o mesmo total que já aparece no texto para aquele item — NÃO recalcule nada, apenas extraia). NÃO inclua honorários advocatícios (são um percentual sobre a condenação, não um valor fixo). Se não encontrar a seção ou nenhum valor, retorne um array vazio.\n\n=== TEXTO DA PETIÇÃO ===\n${texto}`;
+  const resultado = await invokeLLMComRetry(
+    { prompt, model: 'claude_sonnet_4_6', response_json_schema: PEDIDOS_EXTRACAO_SCHEMA },
+    { tentativas: 2, timeoutMs: 120000 }
+  );
+  return Array.isArray(resultado?.pedidos) ? resultado.pedidos : [];
+}
 
 export async function gerarPecaPadrao({ texto, fileUrls, attrs, modeloPadrao, onTool }) {
   const notify = (msg) => {
@@ -1001,7 +1010,6 @@ export async function gerarPecaPadrao({ texto, fileUrls, attrs, modeloPadrao, on
       dadosCct,
     }),
     model: 'claude_sonnet_4_6',
-    response_json_schema: RESPOSTA_GERACAO_SCHEMA,
   };
   const urls = [...(fileUrls || [])];
   if (urls.length) req.file_urls = urls;
@@ -1019,19 +1027,36 @@ export async function gerarPecaPadrao({ texto, fileUrls, attrs, modeloPadrao, on
     { onHit: () => notify('Reutilizando geração idêntica em cache...') }
   );
 
-  // Valor da causa: NUNCA confiamos no texto livre da IA para essa soma nem
-  // para o "por extenso" — somamos por código o array `pedidos` estruturado
-  // e reescrevemos a frase final e a data do fecho deterministicamente.
-  const pedidos = Array.isArray(resultado?.pedidos) ? resultado.pedidos : [];
-  const valorCausa = round2(pedidos.reduce((soma, p) => soma + (Number(p?.valor) || 0), 0));
-  if (pedidos.length) {
-    notify(`Valor da causa calculado por código (soma de ${pedidos.length} itens do rol de pedidos): R$ ${valorCausa.toFixed(2).replace('.', ',')}`);
+  // Sanidade mínima: se a IA devolveu um documento anormalmente curto ou sem
+  // o rol de pedidos, é sinal de falha na geração — melhor falhar alto do
+  // que aceitar silenciosamente uma peça incompleta (já aconteceu em produção).
+  const htmlLimpo = limparHtmlIA(typeof resultado === 'string' ? resultado : resultado?.html || '');
+  if (htmlLimpo.length < 3000 || !/DOS PEDIDOS/i.test(htmlLimpo)) {
+    throw new Error('A minuta gerada pela IA veio incompleta (texto muito curto ou sem o rol de pedidos). Gere novamente.');
   }
-  const htmlBruto = aplicarFechoDeterministico(limparHtmlIA(resultado?.html || ''), { valorCausa: pedidos.length ? valorCausa : null });
+
+  // Valor da causa: NUNCA confiamos no texto livre da IA para essa soma nem
+  // para o "por extenso" — extraímos o rol de pedidos em chamada separada,
+  // somamos por código e reescrevemos a frase final e a data do fecho
+  // deterministicamente. Se a extração falhar, mantemos a peça e só corrigimos
+  // a data (que não depende de nenhuma chamada de IA) — nunca arriscamos a peça inteira.
+  let pedidos = [];
+  let valorCausa = null;
+  try {
+    notify('Extraindo o rol de pedidos para calcular o valor da causa por código...');
+    pedidos = await extrairPedidosDoHtml(htmlLimpo);
+    if (pedidos.length) {
+      valorCausa = round2(pedidos.reduce((soma, p) => soma + (Number(p?.valor) || 0), 0));
+      notify(`Valor da causa calculado por código (soma de ${pedidos.length} itens do rol de pedidos): R$ ${valorCausa.toFixed(2).replace('.', ',')}`);
+    }
+  } catch (e) {
+    notify('Não foi possível extrair o rol de pedidos automaticamente — confira o valor da causa manualmente.');
+  }
+  const htmlBruto = aplicarFechoDeterministico(htmlLimpo, { valorCausa });
 
   return {
     html: aplicarFormatacaoPadrao(htmlBruto),
-    valorCausa: pedidos.length ? valorCausa : null,
+    valorCausa,
     pedidos,
     dadosReceita,
     dadosCep,
