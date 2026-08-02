@@ -654,6 +654,7 @@ const CCT_PERGUNTAS_CONDICIONAIS = [
   [/dano moral|ass[eé]dio/i, 'garantias e direitos do trabalhador previstos na convenção'],
   [/gratifica[çc][aã]o|condutor|motorista/i, 'gratificação de função do condutor de veículo'],
   [/sal[aá]rio normativo|piso/i, 'piso salarial / salário normativo da categoria'],
+  [/assiduidade/i, 'prêmio de assiduidade e seu valor previsto em convenção'],& 
 ];
 
 export function perguntasCct(caso = {}, attrs = {}) {
