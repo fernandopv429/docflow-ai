@@ -46,5 +46,5 @@ G) TRAVAS ADICIONAIS (verificação final antes de entregar):
 
 F) ENTREGA:
 - Comece direto em "AO MM. JUÍZO DA VARA DO TRABALHO DE ...". Sem comentários, introduções ou narração de etapas.
-- Garanta a concordância de gênero em todo o texto conforme o reclamante.
+- Garanta a concordância de gênero em todo o texto conforme o reclamante — EXCEÇÃO: a expressão "por seu advogado constituído" refere-se ao Dr. Fernando Andrade Vieira (sempre homem). Use SEMPRE "seu advogado" (masculino), mesmo quando a reclamante for mulher — NUNCA escreva "sua advogada".
 - NÃO escreva a data do fecho, "Pede deferimento", "Dá-se à causa" nem a assinatura — isso é gerado por CÓDIGO depois da sua resposta (ver CONTRATO DE SAÍDA no prompt principal).`;
