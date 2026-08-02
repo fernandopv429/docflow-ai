@@ -28,11 +28,14 @@ export function anosCompletos(admissao, rescisao) {
   return m == null ? null : Math.floor(m / 12);
 }
 
-// Aviso prévio indenizado (Lei 12.506/2011): 30 dias + 3 dias por ano completo, máx. 90 dias
-export function avisoPrevio(salario, anos) {
+// Aviso prévio indenizado (Lei 12.506/2011): 30 dias + 3 dias por ano completo, máx. 90 dias.
+// Na rescisão por acordo (art. 484-A, I, CLT), o aviso prévio indenizado é pago
+// pela METADE — passe `acordo: true` para aplicar essa redução.
+export function avisoPrevio(salario, anos, { acordo = false } = {}) {
   if (!salario || anos == null) return null;
-  const dias = Math.min(30 + anos * 3, 90);
-  return { dias, valor: round2((salario / 30) * dias) };
+  const diasIntegral = Math.min(30 + anos * 3, 90);
+  const dias = acordo ? Math.round(diasIntegral / 2) : diasIntegral;
+  return { dias, diasIntegral, valor: round2((salario / 30) * dias) };
 }
 
 // Projeta a data de rescisão pelos dias do aviso prévio INDENIZADO. O aviso
@@ -65,11 +68,13 @@ export function feriasProporcionais(salario, meses) {
   return { avos, valor: round2(base * (4 / 3)) };
 }
 
-// FGTS do período (8% ao mês) e multa de 40%
-export function fgtsPeriodo(salario, meses) {
+// FGTS do período (8% ao mês) e multa rescisória. Multa padrão de 40% (dispensa
+// sem justa causa/equiparadas); na rescisão por acordo (art. 484-A, II, CLT) a
+// multa é de 20% — passe `multaPct: 0.2` nesse caso.
+export function fgtsPeriodo(salario, meses, { multaPct = 0.4 } = {}) {
   if (!salario || meses == null) return null;
   const deposito = round2(salario * 0.08 * meses);
-  return { deposito, multa40: round2(deposito * 0.4) };
+  return { deposito, multa: round2(deposito * multaPct), multaPct };
 }
 
 // Reflexo de DSR sobre verba variável habitual (1/6 — Súm. 172 TST)
@@ -91,16 +96,26 @@ export function calcularVerbasCaso(caso = {}) {
   const salario = Number(caso.salario) || null;
   const meses = mesesContrato(caso.data_admissao, caso.data_rescisao);
   const anos = meses == null ? null : Math.floor(meses / 12);
+  // Rescisão por acordo (art. 484-A, CLT): aviso prévio pela metade e multa do
+  // FGTS de 20% (em vez de 40%). 13º e férias proporcionais permanecem INTEGRAIS.
+  const isAcordo = caso.tipo_dispensa === 'acordo';
 
   if (meses != null) {
     itens.push({ item: 'Duração do contrato', memoria: `${meses} mês(es) / ${anos} ano(s) completo(s)`, valor: null });
   }
-  const ap = avisoPrevio(salario, anos);
-  if (ap) itens.push({ item: 'Aviso prévio indenizado', memoria: `${ap.dias} dias (Lei 12.506/2011)`, valor: ap.valor });
+  const ap = avisoPrevio(salario, anos, { acordo: isAcordo });
+  if (ap) {
+    const memoriaAp = isAcordo
+      ? `${ap.dias} dias — metade de ${ap.diasIntegral} (art. 484-A, I, CLT — rescisão por acordo)`
+      : `${ap.dias} dias (Lei 12.506/2011)`;
+    itens.push({ item: 'Aviso prévio indenizado', memoria: memoriaAp, valor: ap.valor });
+  }
 
   // 13º, férias e FGTS usam o tempo de serviço COM a projeção do aviso prévio
   // indenizado (art. 487, §1º, CLT; Súmula 371 TST) — por isso os avos podem
-  // diferir de uma contagem "seca" entre admissão e rescisão.
+  // diferir de uma contagem "seca" entre admissão e rescisão. No acordo, a
+  // projeção usa os dias efetivamente indenizados (a metade), mas os avos de
+  // 13º/férias em si NÃO são reduzidos pela metade — só o aviso e a multa do FGTS.
   const dataProjetada = ap ? projetarDataComAvisoPrevio(caso.data_rescisao, ap.dias) : caso.data_rescisao;
   const mesesProjetados = mesesContrato(caso.data_admissao, dataProjetada) ?? meses;
   const sufixoProjecao = ap ? ` (com projeção do aviso prévio indenizado — art. 487 §1º CLT/Súm. 371 TST)` : '';
@@ -109,10 +124,14 @@ export function calcularVerbasCaso(caso = {}) {
   if (dt) itens.push({ item: '13º proporcional', memoria: `${dt.avos}/12 avos${sufixoProjecao}`, valor: dt.valor });
   const fe = feriasProporcionais(salario, mesesProjetados);
   if (fe) itens.push({ item: 'Férias proporcionais + 1/3', memoria: `${fe.avos}/12 avos + 1/3${sufixoProjecao}`, valor: fe.valor });
-  const fg = fgtsPeriodo(salario, mesesProjetados);
+  const fg = fgtsPeriodo(salario, mesesProjetados, { multaPct: isAcordo ? 0.2 : 0.4 });
   if (fg) {
     itens.push({ item: 'FGTS do período (8%)', memoria: `8% × ${mesesProjetados} meses${sufixoProjecao}`, valor: fg.deposito });
-    itens.push({ item: 'Multa de 40% do FGTS', memoria: '40% sobre os depósitos', valor: fg.multa40 });
+    itens.push({
+      item: isAcordo ? 'Multa de 20% do FGTS (acordo)' : 'Multa de 40% do FGTS',
+      memoria: isAcordo ? '20% sobre os depósitos (art. 484-A, II, CLT — rescisão por acordo)' : '40% sobre os depósitos',
+      valor: fg.multa,
+    });
   }
   if (caso.val_ft) {
     const dsr = dsrSobreValor(Number(caso.val_ft));
