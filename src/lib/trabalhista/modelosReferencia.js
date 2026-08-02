@@ -976,16 +976,26 @@ export async function gerarPecaPadrao({ texto, fileUrls, attrs, modeloPadrao, on
   // Cálculo 100% determinístico (a IA não faz aritmética).
   const calculos = calcularVerbasCaso(caso || {});
 
-  // Seleciona o modelo de referência mais semelhante (matching determinístico) → usa seu diferencial.
+  // Seleciona os modelos de referência mais semelhantes (matching determinístico,
+  // por atributos estruturados) — até 3, desde que tenham pontuação > 0. Usar mais
+  // de um evita descartar o 2º/3º colocado quando a pontuação está próxima do 1º;
+  // o orçamento de caracteres do diferencial é dividido entre os selecionados para
+  // não inflar demais o prompt.
   let modeloSemelhante = null;
-  let diferencial = '';
+  let modelosSemelhantes = [];
+  let referencias = [];
   try {
     const modelos = await listarModelosAtivos();
-    const ranking = rankearModelos(modelos, attrs || {});
-    if (ranking[0] && ranking[0].score > 0) {
-      modeloSemelhante = ranking[0].modelo;
-      diferencial = modeloSemelhante.diferencial || modeloSemelhante.conteudo || modeloSemelhante.resumo || '';
-      if (modeloSemelhante.titulo) notify(`Referência mais semelhante: ${modeloSemelhante.titulo}`);
+    const ranking = rankearModelos(modelos, attrs || {}).filter((r) => r.score > 0).slice(0, 3);
+    modelosSemelhantes = ranking.map((r) => r.modelo);
+    modeloSemelhante = modelosSemelhantes[0] || null;
+    if (modelosSemelhantes.length) {
+      const orcamentoPorModelo = Math.floor(4500 / modelosSemelhantes.length);
+      referencias = modelosSemelhantes.map((m) => ({
+        titulo: m.titulo || '',
+        diferencial: (m.diferencial || m.conteudo || m.resumo || '').slice(0, orcamentoPorModelo),
+      }));
+      notify(`Referências mais semelhantes: ${modelosSemelhantes.map((m) => m.titulo).filter(Boolean).join(' • ')}`);
     }
   } catch (e) {
     /* segue sem referência */
