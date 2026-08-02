@@ -882,7 +882,7 @@ Atributos detectados: função=${attrs?.funcao || '-'}, modalidade=${attrs?.tipo
   }
 === FIM DA ENTREVISTA ===${blocoReceita(dadosReceita)}${blocoCeps(dadosCep)}${blocoDatajud(dadosDatajud)}${blocoCct(dadosCct)}${blocoCalculos(calculos)}
 
-FORMATO DE SAÍDA: retorne APENAS o HTML simples do corpo da petição (sem <html>, <head>, <body>, sem <style> e sem atributos style). NÃO acrescente avisos, notas ou observações ao final. Escreva os parágrafos de fecho normalmente ("São Paulo, [data]." e "Dá-se à causa o valor de R$ [valor]...") — não precisa se preocupar em acertar a data exata nem o "por extenso": o CÓDIGO corrige essas duas informações automaticamente depois.`;
+FORMATO DE SAÍDA: retorne APENAS o HTML simples do corpo da petição (sem <html>, <head>, <body>, sem <style> e sem atributos style). NÃO acrescente avisos, notas ou observações ao final. NÃO escreva a data do fecho, "Pede deferimento", "Dá-se à causa" nem a assinatura — encerre no último requerimento final e, na sequência, na mesma resposta, inclua a linha única do CONTRATO DE SAÍDA (<!--PEDIDOS_VALORES:[...]-->) exatamente como especificado no início deste prompt.`;
 }
 
 // Limpa a saída da IA: remove cercas de código markdown (```html) e tags de
