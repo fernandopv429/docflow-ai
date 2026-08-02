@@ -1052,6 +1052,23 @@ export async function gerarPecaPadrao({ texto, fileUrls, attrs, modeloPadrao, on
   } catch (e) {
     notify('Não foi possível extrair o rol de pedidos automaticamente — confira o valor da causa manualmente.');
   }
+
+  // Piso de segurança: NUNCA deixe a petição sair sem nenhum valor da causa.
+  // Se a extração do rol de pedidos falhou (valorCausa ainda null), usamos a
+  // soma das verbas 100% determinísticas (mathUtils.js) como piso mínimo —
+  // sempre disponível, sem chamada extra de IA. É parcial (não inclui horas
+  // extras, intervalo, desvio de função etc., que são estimados pela IA), por
+  // isso avisamos explicitamente para conferência manual — mas a frase "Dá-se
+  // à causa" nunca mais fica ausente da peça.
+  if (valorCausa == null) {
+    const somaDeterministica = round2((calculos || []).reduce((soma, c) => soma + (Number(c?.valor) || 0), 0));
+    if (somaDeterministica > 0) {
+      valorCausa = somaDeterministica;
+      notify(
+        `Usando apenas a soma das verbas determinísticas como valor da causa (R$ ${valorCausa.toFixed(2).replace('.', ',')}) — NÃO inclui horas extras, intervalo, desvio de função e demais itens estimados pela IA. Confira e ajuste manualmente antes de protocolar.`
+      );
+    }
+  }
   const htmlBruto = aplicarFechoDeterministico(htmlLimpo, { valorCausa });
 
   return {
