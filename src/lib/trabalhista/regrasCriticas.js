@@ -24,7 +24,7 @@ export function regiaoTrtPorMunicipio(municipio) {
   return achou ? '2ª Região (TRT-2)' : null;
 }
 
-export function blocoRegrasCriticas({ municipios = [], dataHoje } = {}) {
+export function blocoRegrasCriticas({ municipios = [] } = {}) {
   const trt2 = municipios.filter((m) => regiaoTrtPorMunicipio(m));
   const orientacaoTrt = trt2.length
     ? `O local de prestação (${trt2.join(', ')}) pertence ao TRT da 2ª Região. Enderece a peça a "AO JUÍZO DA VARA DO TRABALHO DE ${trt2[0].toUpperCase()} – SEGUNDA REGIÃO" (ou à Vara de São Paulo, se for o caso). NUNCA use TRT da 15ª Região para esses municípios.`
@@ -36,7 +36,7 @@ REGRAS CRÍTICAS (erros já cometidos em minutas anteriores — NÃO repita):
 1. COMPETÊNCIA / TRT: ${orientacaoTrt}
 2. ESCALA: use EXCLUSIVAMENTE a escala efetivamente relatada na entrevista. Se o relato é 12x36, trate apenas de 12x36 (prorrogação, folgas laboradas). É PROIBIDO criar tópicos, quadros sinóticos ou jurisprudência sobre escalas que o relato não menciona (ex.: 4x2, 5x2, 6x1 quando o caso é 12x36).
 3. DESVIO × ACÚMULO DE FUNÇÃO: são pedidos ALTERNATIVOS e mutuamente excludentes para o MESMO conjunto de tarefas. Escolha UM só (desvio, quando executa tarefas de outro cargo; acúmulo, quando soma as atribuições de dois cargos) e peça apenas a multa convencional correspondente. NUNCA cumule os dois com base nos mesmos fatos.
-4. HONORÁRIOS: use 15% de forma UNIFORME — no tópico próprio, no rol de pedidos e no parágrafo de fecho. Não misture 15% e 20% na mesma peça.
-5. VALORES ESTIMADOS: calcule cada pedido a partir dos dados reais do caso (salário base × meses trabalhados × percentual aplicável). É PROIBIDO lançar valores redondos genéricos e altos (ex.: R$ 15.000,00 "a apurar") e igualmente PROIBIDO entregar a peça com "[VALOR A APURAR]", "R$ 0,00" ou colchetes de rascunho no rol de pedidos — sempre apresente um valor numérico proporcional. Não infle a causa: o total deve corresponder à soma dos pedidos.
-6. DATA DO FECHO: use a data de hoje — "São Paulo, ${dataHoje}." Nunca deixe "[data]" em aberto.`;
+4. HONORÁRIOS: use 15% de forma UNIFORME — no tópico próprio e no rol de pedidos. Não misture 15% e 20% na mesma peça. Não inclua o valor dos honorários no array do CONTRATO DE SAÍDA (são calculados à parte pelo sistema, sobre o valor da causa).
+5. VALORES ESTIMADOS: calcule cada pedido a partir dos dados reais do caso (salário base × meses trabalhados × percentual aplicável). É PROIBIDO lançar valores redondos genéricos e altos (ex.: R$ 15.000,00 "a apurar") e igualmente PROIBIDO entregar a peça com "[VALOR A APURAR]", "R$ 0,00" ou colchetes de rascunho no rol de pedidos — sempre apresente um valor numérico proporcional por item (um único valor final por item, já somando os reflexos DESSE item).
+6. VALOR DA CAUSA E FECHO SÃO CALCULADOS POR CÓDIGO, NÃO POR VOCÊ: não escreva a frase "Dá-se à causa o valor de...", não some os itens, não escreva "Pede deferimento", a data do fecho ("São Paulo, ...") nem a assinatura. Termine sua resposta no último requerimento final e, na sequência, no formato exigido no CONTRATO DE SAÍDA descrito no prompt principal. Isso existe porque, em testes reais, a IA já errou tanto a soma final quanto a data do fecho ao escrevê-las livremente — agora o código faz isso de forma determinística.`;
 }
