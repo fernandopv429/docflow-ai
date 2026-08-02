@@ -1016,28 +1016,27 @@ export async function gerarPecaPadrao({ texto, fileUrls, attrs, modeloPadrao, on
   // Sanidade mínima: se a IA devolveu um documento anormalmente curto ou sem
   // o rol de pedidos, é sinal de falha na geração — melhor falhar alto do
   // que aceitar silenciosamente uma peça incompleta (já aconteceu em produção).
-  const htmlLimpo = limparHtmlIA(typeof resultado === 'string' ? resultado : resultado?.html || '');
-  if (htmlLimpo.length < 3000 || !/DOS PEDIDOS/i.test(htmlLimpo)) {
+  const htmlBrutoIA = typeof resultado === 'string' ? resultado : resultado?.html || '';
+  const htmlSemPedidos = limparHtmlIA(htmlBrutoIA);
+  if (htmlSemPedidos.length < 3000 || !/DOS PEDIDOS/i.test(htmlSemPedidos)) {
     throw new Error('A minuta gerada pela IA veio incompleta (texto muito curto ou sem o rol de pedidos). Gere novamente.');
   }
 
   // Valor da causa: NUNCA confiamos no texto livre da IA para essa soma nem
-  // para o "por extenso" — extraímos o rol de pedidos em chamada separada,
-  // somamos por código e reescrevemos a frase final e a data do fecho
-  // deterministicamente. Se a extração falhar, mantemos a peça e só corrigimos
-  // a data (que não depende de nenhuma chamada de IA) — nunca arriscamos a peça inteira.
-  let pedidos = [];
+  // para o "por extenso" — a própria IA já embute o array de valores na MESMA
+  // resposta (CONTRATO DE SAÍDA: <!--PEDIDOS_VALORES:[...]-->), sem precisar de
+  // uma segunda chamada de IA para reler o que ela mesma acabou de escrever.
+  // Só fazemos um parse determinístico e removemos o comentário do HTML final.
+  const { valores, htmlSemComentario } = extrairValoresPedidos(htmlSemPedidos);
+  const htmlLimpo = htmlSemComentario;
   let valorCausa = null;
-  try {
-    notify('Extraindo o rol de pedidos para calcular o valor da causa por código...');
-    pedidos = await extrairPedidosDoHtml(htmlLimpo);
-    if (pedidos.length) {
-      valorCausa = round2(pedidos.reduce((soma, p) => soma + (Number(p?.valor) || 0), 0));
-      notify(`Valor da causa calculado por código (soma de ${pedidos.length} itens do rol de pedidos): R$ ${valorCausa.toFixed(2).replace('.', ',')}`);
-    }
-  } catch (e) {
-    notify('Não foi possível extrair o rol de pedidos automaticamente — confira o valor da causa manualmente.');
+  if (valores.length) {
+    valorCausa = round2(valores.reduce((soma, v) => soma + v, 0));
+    notify(`Valor da causa calculado por código (soma de ${valores.length} itens do rol de pedidos): R$ ${valorCausa.toFixed(2).replace('.', ',')}`);
+  } else {
+    notify('Não foi possível ler o rol de valores dos pedidos na resposta da IA — confira o valor da causa manualmente.');
   }
+  const pedidos = valores;
 
   // Piso de segurança: NUNCA deixe a petição sair sem nenhum valor da causa.
   // Se a extração do rol de pedidos falhou (valorCausa ainda null), usamos a
