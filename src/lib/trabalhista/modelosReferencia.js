@@ -897,6 +897,30 @@ export function limparHtmlIA(html) {
   return removeTextLetterhead(t.trim());
 }
 
+// Saída estruturada da geração: HTML + rol de pedidos com valores numéricos.
+// O array `pedidos` é usado por CÓDIGO para somar o valor real da causa e
+// escrever a frase final (com "por extenso" determinístico) — a IA para de
+// ser responsável por acertar essa soma sozinha na hora de escrever a peça.
+const RESPOSTA_GERACAO_SCHEMA = {
+  type: 'object',
+  required: ['html', 'pedidos'],
+  properties: {
+    html: { type: 'string', description: 'HTML simples do corpo da petição.' },
+    pedidos: {
+      type: 'array',
+      description: 'Todos os itens monetários do rol de pedidos (principal + reflexos somados em um único número por item). Não inclua honorários advocatícios.',
+      items: {
+        type: 'object',
+        required: ['descricao', 'valor'],
+        properties: {
+          descricao: { type: 'string' },
+          valor: { type: 'number' },
+        },
+      },
+    },
+  },
+};
+
 export async function gerarPecaPadrao({ texto, fileUrls, attrs, modeloPadrao, onTool }) {
   const notify = (msg) => {
     try {
