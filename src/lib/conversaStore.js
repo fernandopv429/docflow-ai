@@ -100,30 +100,43 @@ function agendarSave(key) {
   clearTimeout(saveTimers.get(k));
   saveTimers.set(
     k,
-    setTimeout(async () => {
-      const s = sessions.get(k);
-      if (!s || !s.messages.length) return;
-      patch(k, { saveStatus: 'saving' });
-      try {
-        const salva = await salvarConversa(s.id, {
-          titulo: tituloDaConversa(s.messages),
-          messages: s.messages,
-          doc_html: s.docHtml,
-          estado: { attrs: s.attrs, allUrls: s.allUrls, documentSources: s.documentSources },
-        });
-        if (!s.id) {
-          aliases.set(salva.id, k);
-          patch(k, { id: salva.id });
-        }
-        patch(k, { saveStatus: 'saved' });
-      } catch (e) {
-        console.error(e);
-        patch(k, { saveStatus: 'local' });
-      }
-      listVersion += 1;
-      emit();
+    setTimeout(() => {
+      // Encadeia com qualquer salvamento AINDA EM ANDAMENTO para essa mesma
+      // conversa — sem isso, dois salvamentos podiam rodar em paralelo (ex.:
+      // um disparado antes da minuta ficar pronta, outro logo depois) e o que
+      // terminasse por último (não necessariamente o mais recente a começar)
+      // vencia, sobrescrevendo o banco com um estado mais antigo/vazio.
+      // Encadear garante execução sequencial, sempre lendo o estado mais
+      // atual no momento em que CADA salvamento realmente roda.
+      const anterior = saveChains.get(k) || Promise.resolve();
+      const atual = anterior.then(() => executarSave(k)).catch((e) => console.error(e));
+      saveChains.set(k, atual);
     }, 800)
   );
+}
+
+async function executarSave(k) {
+  const s = sessions.get(k);
+  if (!s || !s.messages.length) return;
+  patch(k, { saveStatus: 'saving' });
+  try {
+    const salva = await salvarConversa(s.id, {
+      titulo: tituloDaConversa(s.messages),
+      messages: s.messages,
+      doc_html: s.docHtml,
+      estado: { attrs: s.attrs, allUrls: s.allUrls, documentSources: s.documentSources },
+    });
+    if (!s.id) {
+      aliases.set(salva.id, k);
+      patch(k, { id: salva.id });
+    }
+    patch(k, { saveStatus: 'saved' });
+  } catch (e) {
+    console.error(e);
+    patch(k, { saveStatus: 'local' });
+  }
+  listVersion += 1;
+  emit();
 }
 
 // Conversas que estão processando agora (para sinalizar na lista lateral)
