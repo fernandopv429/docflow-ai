@@ -859,9 +859,14 @@ export function compactarHtmlModelo(html) {
 }
 
 // Geração adaptando o MODELO PADRÃO (HTML formatado), preservando o estilo.
-export function buildGeracaoPadraoPrompt({ texto, attrs, modeloHtml, calculos, diferencial, modeloSemelhanteTitulo, dadosReceita, dadosCep, dadosDatajud, dadosCct }) {
+export function buildGeracaoPadraoPrompt({ texto, attrs, modeloHtml, calculos, referencias, dadosReceita, dadosCep, dadosDatajud, dadosCct }) {
   const municipios = [...new Set((dadosCep || []).map((d) => d.municipio).filter(Boolean))];
   const dataHoje = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
+  const blocoReferencias = (referencias || []).length
+    ? `\n=== CASOS SEMELHANTES NA BASE (${referencias.length}) — DIFERENCIAL ===\nO sistema selecionou, na base de referências, os casos mais semelhantes a esta entrevista (do mais para o menos parecido). Use os pontos PARTICULARES abaixo como orientação para as teses/capítulos específicos deste tipo de caso (o restante segue o Modelo Padrão). Se dois casos indicarem abordagens diferentes para o mesmo tema, priorize o PRIMEIRO (mais semelhante). Inclua apenas o que tiver suporte no relato desta entrevista:\n${referencias
+        .map((r, i) => `--- Referência ${i + 1}${r.titulo ? ` (${r.titulo})` : ''} ---\n${r.diferencial}`)
+        .join('\n\n')}\n=== FIM DOS DIFERENCIAIS ===\n`
+    : '';
   return `${PROMPT_SISTEMA_PETICAO}${BLOCO_ENGENHARIA_JURIDICA}${BLOCO_REGRAS_QUALIDADE_FAV}${blocoRegrasCriticas({ municipios, dataHoje })}
 
 REGRA PRINCIPAL — ESCREVA APENAS O CONTEÚDO: a formatação (fonte, alinhamento, títulos, timbrado) é aplicada depois por código. Você NÃO deve reproduzir estilos, CSS, tabelas de layout ou atributos style.
@@ -873,7 +878,7 @@ REGRA PRINCIPAL — ESCREVA APENAS O CONTEÚDO: a formatação (fonte, alinhamen
 === MODELO PADRÃO DO ESCRITÓRIO (texto — siga a estrutura e o texto-padrão) ===
 ${esqueletoDoModelo(modeloHtml)}
 === FIM DO MODELO PADRÃO ===
-${diferencial ? `\n=== CASO SEMELHANTE NA BASE${modeloSemelhanteTitulo ? ` (${modeloSemelhanteTitulo})` : ''} — DIFERENCIAL ===\nO sistema selecionou, na base de referências, o caso mais semelhante a esta entrevista. Use os pontos PARTICULARES abaixo como orientação para as teses/capítulos específicos deste tipo de caso (o restante segue o Modelo Padrão). Inclua apenas o que tiver suporte no relato:\n${(diferencial || '').slice(0, 4000)}\n=== FIM DO DIFERENCIAL ===\n` : ''}
+${blocoReferencias}
 === ENTREVISTA / CASO ATUAL ===
 ${texto || '(ver documentos anexados)'}
 
