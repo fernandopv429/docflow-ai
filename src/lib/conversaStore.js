@@ -19,6 +19,7 @@ const sessions = new Map(); // chave -> estado
 const aliases = new Map(); // id salvo no banco -> chave local
 const listeners = new Set();
 const saveTimers = new Map();
+const saveChains = new Map(); // chave -> promise do último salvamento encadeado (evita corrida entre saves)
 
 let listVersion = 0;
 export const getListVersion = () => listVersion;
