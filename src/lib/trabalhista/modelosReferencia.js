@@ -882,7 +882,9 @@ Atributos detectados: função=${attrs?.funcao || '-'}, modalidade=${attrs?.tipo
   }
 === FIM DA ENTREVISTA ===${blocoReceita(dadosReceita)}${blocoCeps(dadosCep)}${blocoDatajud(dadosDatajud)}${blocoCct(dadosCct)}${blocoCalculos(calculos)}
 
-FORMATO DE SAÍDA: retorne APENAS o HTML simples do corpo da petição (sem <html>, <head>, <body>, sem <style> e sem atributos style). NÃO acrescente avisos, notas ou observações ao final.`;
+FORMATO DE SAÍDA: retorne um objeto JSON com dois campos:
+- "html": o HTML simples do corpo da petição (sem <html>, <head>, <body>, sem <style> e sem atributos style). Escreva os parágrafos de fecho normalmente ("São Paulo, [data]." e "Dá-se à causa o valor de R$ [valor]...") — NÃO se preocupe em acertar a data exata nem o "por extenso": o CÓDIGO substitui essas duas informações automaticamente depois, usando a soma do campo "pedidos" abaixo.
+- "pedidos": um array com TODOS os itens monetários do rol de pedidos, cada um como {"descricao": string, "valor": number}, já somando principal + reflexos em um único número por item (o mesmo total que aparece no HTML para aquele item). NÃO inclua honorários advocatícios nesse array (são percentuais sobre a condenação, não um valor fixo somado à causa).`;
 }
 
 // Limpa a saída da IA: remove cercas de código markdown (```html) e tags de
