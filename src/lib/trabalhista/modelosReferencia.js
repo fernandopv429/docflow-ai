@@ -670,6 +670,7 @@ export function perguntasCct(caso = {}, attrs = {}) {
     caso.tem_adic_noturno && 'adicional noturno',
     caso.tem_ft && 'folgas trabalhadas',
     caso.tem_dano_moral && 'dano moral',
+    caso.tem_assiduidade && 'assiduidade',
   ]
     .filter(Boolean)
     .join(' ');
