@@ -1147,9 +1147,12 @@ Responda APENAS com o objeto JSON.`;
     model: 'claude_sonnet_4_6',
     response_json_schema: COERENCIA_SCHEMA,
   };
-  return withRuntimeCache('auditoria-coerencia', runtimeCacheKey(prompt), () =>
+  const resultado = await withRuntimeCache('auditoria-coerencia', runtimeCacheKey(prompt), () =>
     traceAiCall('Auditoria de coerência', request, () => invokeLLMComRetry(request))
   );
+  // O retorno pode vir embrulhado em { response: {...} } — desembrulha antes
+  // de o chamador ler "status" e "alertas" (senão a auditoria fica sempre vazia).
+  return resultado?.response ?? resultado;
 }
 
 // ============================================================
