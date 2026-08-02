@@ -52,10 +52,10 @@ export function valorPorExtenso(valor) {
   const centavosTotais = Math.round((Number(valor) || 0) * 100);
   const reais = Math.floor(centavosTotais / 100);
   const centavos = centavosTotais % 100;
+  const centavosTxt = centavos ? `${inteiroPorExtenso(centavos)} ${centavos === 1 ? 'centavo' : 'centavos'}` : '';
+  if (!reais) return centavosTxt || 'zero reais';
   const reaisTxt = `${inteiroPorExtenso(reais)} ${reais === 1 ? 'real' : 'reais'}`;
-  if (!centavos) return reaisTxt;
-  const centavosTxt = `${inteiroPorExtenso(centavos)} ${centavos === 1 ? 'centavo' : 'centavos'}`;
-  return `${reaisTxt} e ${centavosTxt}`;
+  return centavos ? `${reaisTxt} e ${centavosTxt}` : reaisTxt;
 }
 
 // Formata em "R$ X.XXX,XX" (padrão brasileiro).
