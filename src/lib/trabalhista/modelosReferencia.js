@@ -1085,6 +1085,7 @@ export async function gerarPecaPadrao({ texto, fileUrls, attrs, modeloPadrao, on
     calculos,
     caso,
     modeloSemelhante: modeloSemelhante ? { titulo: modeloSemelhante.titulo } : null,
+    modelosSemelhantes: modelosSemelhantes.map((m) => ({ titulo: m.titulo })),
   };
 }
 
