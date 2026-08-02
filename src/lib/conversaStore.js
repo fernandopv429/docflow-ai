@@ -44,6 +44,7 @@ const novoEstado = (extra = {}) => ({
   allUrls: [],
   documentSources: [],
   pending: null,
+  geracao: null, // contexto da geração em andamento (persistido para sobreviver a refresh)
   sending: false,
   generating: false,
   reviewConfirmed: false,
@@ -74,9 +75,17 @@ export async function abrirSessao(key) {
       attrs: c.estado?.attrs || null,
       allUrls: c.estado?.allUrls || [],
       documentSources: c.estado?.documentSources || [],
+      geracao: c.estado?.geracao || null,
     })
   );
   emit();
+  // Geração interrompida por refresh/fechamento da aba: retoma automaticamente
+  // a partir do contexto que ficou salvo no banco.
+  const interrompida = c.estado?.geracao;
+  if (interrompida) {
+    addMessages(k, { role: 'tool', text: 'Geração interrompida detectada — retomando automaticamente...' });
+    gerarMinuta(k, interrompida);
+  }
   return k;
 }
 
@@ -116,6 +125,18 @@ function agendarSave(key) {
   );
 }
 
+// Salva IMEDIATAMENTE (sem o debounce de 800ms). Usado ao iniciar/encerrar a
+// geração, para que o marcador de "geração em andamento" chegue ao banco mesmo
+// se a página for recarregada logo em seguida.
+function flushSave(key) {
+  const k = resolveKey(key);
+  clearTimeout(saveTimers.get(k));
+  const anterior = saveChains.get(k) || Promise.resolve();
+  const atual = anterior.then(() => executarSave(k)).catch((e) => console.error(e));
+  saveChains.set(k, atual);
+  return atual;
+}
+
 async function executarSave(k) {
   const s = sessions.get(k);
   if (!s || !s.messages.length) return;
@@ -125,7 +146,7 @@ async function executarSave(k) {
       titulo: tituloDaConversa(s.messages),
       messages: s.messages,
       doc_html: s.docHtml,
-      estado: { attrs: s.attrs, allUrls: s.allUrls, documentSources: s.documentSources },
+      estado: { attrs: s.attrs, allUrls: s.allUrls, documentSources: s.documentSources, geracao: s.geracao },
     });
     if (!s.id) {
       aliases.set(salva.id, k);
@@ -166,17 +187,25 @@ export async function gerarMinuta(key, opts = {}) {
   const sessao = getSession(key);
   const modeloPadrao = await obterModeloPadrao();
   if (!modeloPadrao || !sessao || sessao.generating) return;
-  patch(key, { generating: true });
+  const geracaoTexto =
+    opts.texto ?? sessao.messages.filter((m) => m.role === 'user').map((m) => m.text).filter(Boolean).join('\n\n');
+  const contexto = {
+    texto: geracaoTexto,
+    urls: opts.urls ?? sessao.allUrls,
+    attrs: opts.attrs ?? sessao.attrs,
+    sources: opts.sources ?? sessao.documentSources,
+  };
+  patch(key, { generating: true, geracao: contexto });
   addMessages(key, { role: 'tool', text: `Usando template principal: ${modeloPadrao.titulo}` });
+  // Persiste o marcador antes de começar: se a aba for recarregada durante a
+  // geração, a sessão retoma sozinha ao ser reaberta.
+  flushSave(key);
   try {
-    const atual = getSession(key);
-    const geracaoTexto =
-      opts.texto ?? atual.messages.filter((m) => m.role === 'user').map((m) => m.text).filter(Boolean).join('\n\n');
     const { html, dadosReceita, dadosCep, dadosDatajud, dadosCct, calculos, caso, modeloSemelhante } =
       await gerarPecaPadrao({
         texto: geracaoTexto,
-        fileUrls: opts.urls ?? atual.allUrls,
-        attrs: opts.attrs ?? atual.attrs,
+        fileUrls: contexto.urls,
+        attrs: contexto.attrs,
         modeloPadrao,
         onTool: (msg) => addMessages(key, { role: 'tool', text: msg }),
       });
@@ -197,7 +226,7 @@ export async function gerarMinuta(key, opts = {}) {
         text: JSON.stringify(
           fontesGeracao({
             texto: geracaoTexto,
-            documentos: opts.sources ?? atual.documentSources,
+            documentos: contexto.sources,
             template: modeloPadrao,
             referencia: modeloSemelhante,
             dadosReceita,
@@ -261,7 +290,8 @@ export async function gerarMinuta(key, opts = {}) {
       text: `Erro ao gerar a minuta: ${err?.message || 'falha desconhecida'}. Envie a última mensagem novamente para repetir a geração.`,
     });
   }
-  patch(key, { generating: false });
+  patch(key, { generating: false, geracao: null });
+  flushSave(key);
 }
 
 // ============================================================
