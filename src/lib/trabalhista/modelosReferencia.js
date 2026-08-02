@@ -895,39 +895,25 @@ export function limparHtmlIA(html) {
   return removeTextLetterhead(t.trim());
 }
 
-// Extração do rol de pedidos JÁ GERADO, em chamada SEPARADA e pequena — isso
-// evita colocar um schema JSON na chamada PRINCIPAL de geração (que produz um
-// HTML enorme): pedir para o modelo devolver ao mesmo tempo um HTML longo E
-// respeitar um JSON schema é frágil e já causou uma geração praticamente vazia
-// em produção. Isolando a extração numa chamada à parte, se ela falhar o pior
-// caso é não corrigir o valor da causa — nunca perder a peça inteira.
-const PEDIDOS_EXTRACAO_SCHEMA = {
-  type: 'object',
-  required: ['pedidos'],
-  properties: {
-    pedidos: {
-      type: 'array',
-      description: 'Todos os itens monetários do rol de pedidos (principal + reflexos somados em um único número por item). Não inclua honorários advocatícios (percentual, não valor fixo).',
-      items: {
-        type: 'object',
-        required: ['descricao', 'valor'],
-        properties: {
-          descricao: { type: 'string' },
-          valor: { type: 'number' },
-        },
-      },
-    },
-  },
-};
+// Extração DETERMINÍSTICA (sem chamada de IA) do rol de valores que a própria
+// IA já embute na MESMA resposta, como última linha, no formato combinado no
+// CONTRATO DE SAÍDA do prompt principal: <!--PEDIDOS_VALORES:[v1,v2,...]-->.
+// Isso evita por completo uma segunda chamada de IA para "reler" o que a
+// primeira acabou de escrever (mais lento e mais frágil) — só fazemos um
+// parse de array numérico, e removemos o comentário do HTML final.
+const PEDIDOS_VALORES_RE = /<!--\s*PEDIDOS_VALORES\s*:\s*(\[[^\]]*\])\s*-->/i;
 
-export async function extrairPedidosDoHtml(html) {
-  const texto = esqueletoDoModelo(html, 20000);
-  const prompt = `A partir do texto abaixo, que é o corpo de uma petição trabalhista já redigida, localize a seção "DOS PEDIDOS" e extraia CADA item monetário do rol como {"descricao": string, "valor": number}, já somando principal + reflexos em um único número por item (o mesmo total que já aparece no texto para aquele item — NÃO recalcule nada, apenas extraia). NÃO inclua honorários advocatícios (são um percentual sobre a condenação, não um valor fixo). Se não encontrar a seção ou nenhum valor, retorne um array vazio.\n\n=== TEXTO DA PETIÇÃO ===\n${texto}`;
-  const resultado = await invokeLLMComRetry(
-    { prompt, model: 'claude_sonnet_4_6', response_json_schema: PEDIDOS_EXTRACAO_SCHEMA },
-    { tentativas: 2, timeoutMs: 120000 }
-  );
-  return Array.isArray(resultado?.pedidos) ? resultado.pedidos : [];
+export function extrairValoresPedidos(html) {
+  const m = PEDIDOS_VALORES_RE.exec(html || '');
+  if (!m) return { valores: [], htmlSemComentario: html || '' };
+  let valores = [];
+  try {
+    const arr = JSON.parse(m[1]);
+    if (Array.isArray(arr)) valores = arr.map(Number).filter((n) => Number.isFinite(n));
+  } catch (e) {
+    /* array malformado — valores fica vazio, o piso de segurança assume depois */
+  }
+  return { valores, htmlSemComentario: html.replace(PEDIDOS_VALORES_RE, '').trim() };
 }
 
 export async function gerarPecaPadrao({ texto, fileUrls, attrs, modeloPadrao, onTool }) {
