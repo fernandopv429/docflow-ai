@@ -90,16 +90,25 @@ export function limparDivisores(raiz) {
   raiz.querySelectorAll('hr').forEach((el) => el.remove());
   raiz.querySelectorAll('p,div,td,li').forEach((el) => {
     const texto = (el.textContent || '').replace(/\s|&nbsp;/g, '');
-    if (texto && /^[-_—–=*·]{3,}$/.test(texto)) {
+    if (texto && /^[-_—–=*·━─═▬•~.]{3,}$/.test(texto)) {
       el.remove();
       return;
     }
     const style = el.getAttribute('style');
-    if (style && /border/i.test(style)) {
+    if (style && /border/i.test(style) && el.tagName.toLowerCase() !== 'td') {
       el.setAttribute('style', style.replace(/border[a-z-]*\s*:[^;]*;?/gi, ''));
     }
   });
+  // Traços de separação soltos no meio de um parágrafo (ex.: "texto<br>━━━━").
+  raiz.innerHTML = raiz.innerHTML.replace(/[━─═▬]{2,}/g, '').replace(/(?:^|>|\s)[-_]{4,}(?=\s|<|$)/g, '');
   return raiz;
+}
+
+// Mesma limpeza a partir de uma string HTML (usada na revisão de minutas
+// geradas antes desta regra).
+export function limparDivisoresHtml(html) {
+  const doc = new DOMParser().parseFromString(`<div id="raiz">${html || ''}</div>`, 'text/html');
+  return limparDivisores(doc.getElementById('raiz')).innerHTML;
 }
 
 // Aplica o padrão visual ao HTML de conteúdo devolvido pela IA.

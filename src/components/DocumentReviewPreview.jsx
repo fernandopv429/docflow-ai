@@ -1,6 +1,7 @@
 import React from 'react';
 import { Image } from '@/components/ui/image';
 import { TIMBRADO } from '@/lib/timbrado';
+import { limparDivisoresHtml } from '@/lib/trabalhista/formatacaoPeca';
 
 const LOGO_URL = 'https://media.base44.com/images/public/6a5a44d24aa52c9fbdd61b1a/4f1847ac3_image.png';
 
@@ -20,7 +21,10 @@ function Footer() {
   );
 }
 
-export default function DocumentReviewPreview({ html, dimmed }) {
+export default function DocumentReviewPreview({ html: htmlOriginal, dimmed }) {
+  // Minutas geradas antes da regra "sem divisores" ainda podem trazer traços/
+  // linhas — limpamos também na exibição.
+  const html = React.useMemo(() => limparDivisoresHtml(htmlOriginal), [htmlOriginal]);
   const hasImportedPages = /class=["'][^"']*\bdocx\b/.test(html || '');
   if (hasImportedPages) {
     return <div className={`legal-document-review transition-opacity ${dimmed ? 'opacity-40' : 'opacity-100'}`} dangerouslySetInnerHTML={{ __html: html }} />;
