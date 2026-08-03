@@ -150,6 +150,15 @@ export function calcularVerbasCaso(caso = {}) {
   if (caso.tem_acumulo && salario && meses) {
     itens.push({ item: 'Acúmulo de função (20%/mês)', memoria: '20% × salário × meses (multa normativa)', valor: round2(salario * 0.2 * meses) });
   }
+  // Desvio de função: multa convencional de 50%/mês (cláusula 64ª da CCT de
+  // vigilância). Calculado por código sobre os MESES REAIS do contrato (não
+  // projetados) — já vimos a IA errar essa conta sozinha (usou 10 meses num
+  // contrato de 8). Se `tem_desvio` não vier marcado pelo parser mas a
+  // entrevista relatar desvio, a IA ainda pode estimar por conta própria no
+  // texto — este cálculo é um reforço, não um bloqueio ao tópico.
+  if (caso.tem_desvio && salario && meses) {
+    itens.push({ item: 'Desvio de função (50%/mês)', memoria: '50% × salário × meses reais do contrato (Cláusula 64ª CCT)', valor: round2(salario * 0.5 * meses) });
+  }
   const assidMensal = Number(caso.assiduidade_prometido || caso.assiduidade_diferenca) || null;
   if (assidMensal && meses) {
     itens.push({ item: 'Prêmio assiduidade (suprimido)', memoria: 'valor mensal × meses (estimativa)', valor: round2(assidMensal * meses) });
