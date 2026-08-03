@@ -1108,11 +1108,19 @@ const COERENCIA_SCHEMA = {
   },
 };
 
-export async function verificarCoerencia({ texto, caso, html }) {
+export async function verificarCoerencia({ texto, caso, html, dadosReceita, dadosCep }) {
   const prompt = `Você é um auditor jurídico trabalhista. Verifique a MINUTA gerada quanto à COERÊNCIA factual e jurídica com o caso. NÃO reescreva a peça — apenas aponte problemas.
 
+NÃO SÃO PROBLEMAS (padrão de prática do escritório — NÃO flagre como "sem suporte fático", mesmo sem menção explícita na entrevista):
+- Para VIGILANTE ARMADO: adicional de periculosidade nas horas extras (Súmula 132 TST — presunção legal do art. 193 CLT, não depende de confirmação do cliente); minutos que antecedem e sucedem a jornada (preleção/rendição); 10 minutos de descanso por hora (cláusula da CCT de vigilância).
+- Sempre que houver FOLGAS TRABALHADAS (FTs) relatadas: vale-transporte e auxílio-alimentação não concedidos nessas folgas, com valores-padrão (R$ 10,00/dia; valor da CCT) mesmo sem confirmação explícita do uso de transporte/alimentação.
+- Razão social/CEP/endereço das reclamadas que divergem do texto da entrevista MAS coincidem com os dados oficiais da Receita Federal/ViaCEP fornecidos abaixo — isso é CORRETO (o sistema sempre prioriza o dado oficial verificado sobre o relato informal do cliente). Só marque como problema se a peça divergir TAMBÉM do dado oficial (nem do relato, nem do oficial).
+- A seção "DAS VERBAS RESCISÓRIAS" é NARRATIVA (recapitula em prosa o que já será formalmente pedido) — NÃO conte os valores citados ali como uma segunda soma. Só aponte duplicidade se o MESMO item aparecer DUAS VEZES no rol formal "DOS PEDIDOS".
+
+Continue flagrando normalmente: adicional noturno SEM jornada que realmente cruze 22h-5h (isso depende do horário relatado, não é presunção da categoria); assiduidade sem prova de prêmio prometido/suprimido.
+
 Checagens obrigatórias:
-- Tese/pedido SEM suporte no relato (ex.: adicional noturno sem jornada noturna; periculosidade/insalubridade sem exposição relatada; horas extras sem alegação de sobrejornada).
+- Tese/pedido SEM suporte no relato, RESSALVADAS as exceções de padrão de categoria listadas acima (ex.: adicional noturno sem jornada noturna real; horas extras sem alegação de sobrejornada).
 - COMPETÊNCIA/TRT errado para o município de prestação (Grande São Paulo/Baixada/Litoral = TRT 2ª Região; interior/Campinas = TRT 15ª Região). Divergência é BLOQUEANTE.
 - Tópico ou quadro sobre ESCALA DIFERENTE da relatada (ex.: 4x2 quando o caso é 12x36) — BLOQUEANTE.
 - DESVIO e ACÚMULO de função pedidos cumulativamente sobre os mesmos fatos — BLOQUEANTE.
