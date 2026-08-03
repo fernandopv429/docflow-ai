@@ -256,33 +256,6 @@ export async function gerarMinuta(key, opts = {}) {
     }
     addMessages(key, { role: 'assistant', text: nota });
 
-    // Verificação de coerência jurídica da minuta (LLM audita, não reescreve)
-    addMessages(key, { role: 'tool', text: 'Verificando coerência jurídica da minuta...' });
-    try {
-      const verif = await verificarCoerencia({ texto: geracaoTexto, caso, html, dadosReceita, dadosCep });
-      const alertas = verif?.alertas || [];
-      const icone = { BLOQUEANTE: '⛔', ATENCAO: '⚠️', INFO: 'ℹ️' };
-      const cabecalho = `Verificação de coerência — status: ${verif?.status || 'concluída'}.`;
-      const corpo = alertas.length
-        ? '\n' + alertas.map((a) => `${icone[a.severidade] || '•'} ${a.descricao}${a.sugestao ? ` — ${a.sugestao}` : ''}`).join('\n')
-        : ' Nenhum problema aparente. A revisão humana do advogado continua obrigatória.';
-      addMessages(
-        key,
-        { role: 'tool_result', title: 'Retorno da auditoria de coerência (IA)', text: JSON.stringify(verif, null, 2) },
-        {
-          role: 'tool_result',
-          title: 'Fontes consultadas nesta auditoria',
-          text: JSON.stringify(
-            fontesAuditoria({ texto: geracaoTexto, template: modeloPadrao, referencia: modeloSemelhante }),
-            null,
-            2
-          ),
-        },
-        { role: 'assistant', text: cabecalho + corpo }
-      );
-    } catch (e) {
-      console.error(e);
-    }
   } catch (err) {
     console.error(err);
     addMessages(key, {
