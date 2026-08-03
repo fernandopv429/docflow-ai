@@ -89,6 +89,16 @@ export function danoMoral10x(maiorRemuneracao) {
   return round2(maiorRemuneracao * 10);
 }
 
+// Saldo de salário do mês da rescisão (dias trabalhados no mês ÷ 30 × salário
+// — convenção do "mês comercial" de 30 dias, padrão na prática trabalhista).
+export function saldoSalario(salario, dataRescisao) {
+  if (!salario || !dataRescisao) return null;
+  const r = new Date(dataRescisao);
+  if (isNaN(r)) return null;
+  const dias = r.getDate();
+  return { dias, valor: round2((salario / 30) * dias) };
+}
+
 // Consolida os cálculos possíveis a partir dos dados do caso.
 // Retorna apenas itens calculáveis (inputs presentes) com rótulo + memória.
 export function calcularVerbasCaso(caso = {}) {
@@ -111,6 +121,11 @@ export function calcularVerbasCaso(caso = {}) {
     itens.push({ item: 'Aviso prévio indenizado', memoria: memoriaAp, valor: ap.valor });
   }
 
+  const saldo = saldoSalario(salario, caso.data_rescisao);
+  if (saldo) {
+    itens.push({ item: 'Saldo de salário', memoria: `${saldo.dias} dia(s) do mês da rescisão (base 30)`, valor: saldo.valor });
+  }
+
   // 13º, férias e FGTS usam o tempo de serviço COM a projeção do aviso prévio
   // indenizado (art. 487, §1º, CLT; Súmula 371 TST) — por isso os avos podem
   // diferir de uma contagem "seca" entre admissão e rescisão. No acordo, a
@@ -124,6 +139,22 @@ export function calcularVerbasCaso(caso = {}) {
   if (dt) itens.push({ item: '13º proporcional', memoria: `${dt.avos}/12 avos${sufixoProjecao}`, valor: dt.valor });
   const fe = feriasProporcionais(salario, mesesProjetados);
   if (fe) itens.push({ item: 'Férias proporcionais + 1/3', memoria: `${fe.avos}/12 avos + 1/3${sufixoProjecao}`, valor: fe.valor });
+
+  // Multa do art. 467 da CLT: 50% sobre as VERBAS RESCISÓRIAS INCONTROVERSAS
+  // (saldo de salário + aviso prévio + 13º + férias +1/3) — NÃO apenas "1
+  // salário", que é uma simplificação que subestima o pedido em geral. Essa
+  // base mais completa foi confirmada comparando com uma peça real da
+  // especialista para o mesmo caso (a conta dela batia com esta fórmula, não
+  // com 50% de 1 salário só).
+  if (ap && dt && fe) {
+    const baseIncontroversa = round2((saldo?.valor || 0) + ap.valor + dt.valor + fe.valor);
+    itens.push({
+      item: 'Multa do art. 467 da CLT',
+      memoria: '50% sobre saldo de salário + aviso prévio + 13º + férias +1/3 (verbas incontroversas)',
+      valor: round2(baseIncontroversa * 0.5),
+    });
+  }
+
   const fg = fgtsPeriodo(salario, mesesProjetados, { multaPct: isAcordo ? 0.2 : 0.4 });
   if (fg) {
     itens.push({ item: 'FGTS do período (8%)', memoria: `8% × ${mesesProjetados} meses${sufixoProjecao}`, valor: fg.deposito });
