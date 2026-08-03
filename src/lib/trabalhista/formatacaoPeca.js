@@ -48,6 +48,15 @@ export function aplicarFechoDeterministico(html, { valorCausa } = {}) {
   return `${out.trim()}\n${linhas.join('\n')}`;
 }
 
+// Remove qualquer item do rol de pedidos que tenha ficado com valor R$ 0,00
+// — já vimos a IA tentar "mesclar sem duplicar" dois itens (seguindo a regra
+// de bis in idem) mas deixar uma linha zerada em vez de omitir a linha por
+// completo. Uma petição não deve "pedir" uma verba de valor zero — a linha
+// inteira é removida por código, sem depender da IA acertar isso sozinha.
+export function removerPedidosZerados(html) {
+  return String(html || '').replace(/<li[^>]*>(?:(?!<\/li>)[\s\S])*?R\$\s?0[,.]00(?:(?!<\/li>)[\s\S])*?<\/li>\s*/gi, '');
+}
+
 // Extrai um ESQUELETO em texto do modelo padrão (títulos e início dos
 // parágrafos), usado como referência de estrutura no prompt — em vez de
 // mandar todo o HTML pesado para a IA.
