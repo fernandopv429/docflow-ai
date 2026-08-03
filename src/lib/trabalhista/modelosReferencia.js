@@ -10,7 +10,7 @@ import { blocoRegrasCriticas, regiaoTrtPorMunicipio } from './regrasCriticas';
 import { BLOCO_ENGENHARIA_JURIDICA } from './engenhariaJuridica';
 import { BLOCO_REGRAS_QUALIDADE_FAV } from './regrasQualidadeFav';
 import { invokeLLMComRetry } from './llmRetry';
-import { aplicarFormatacaoPadrao, aplicarFechoDeterministico, esqueletoDoModelo } from './formatacaoPeca';
+import { aplicarFormatacaoPadrao, aplicarFechoDeterministico, removerPedidosZerados, esqueletoDoModelo } from './formatacaoPeca';
 import { traceAiCall } from '@/lib/sessionTrace';
 
 // ============================================================
