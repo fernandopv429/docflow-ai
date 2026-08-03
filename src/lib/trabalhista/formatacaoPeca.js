@@ -11,8 +11,8 @@ import { valorPorExtenso, formatarReais } from './valorPorExtenso';
 
 // Espaçamento: 1 linha em branco entre parágrafos (18pt ≈ 1 linha de 12pt),
 // 2 linhas em branco antes de cada título e 1 linha depois dele.
-const ESTILO_PARAGRAFO = 'font-family:Arial,sans-serif;font-size:12pt;line-height:1.5;text-align:justify;margin:0 0 18pt;';
-const ESTILO_TITULO = 'font-family:Arial,sans-serif;font-size:12pt;line-height:1.5;text-align:left;font-weight:bold;margin:36pt 0 18pt;';
+const ESTILO_PARAGRAFO = 'font-family:Arial,sans-serif;font-size:12pt;line-height:1.5;text-align:justify;margin:0 0 12pt;';
+const ESTILO_TITULO = 'font-family:Arial,sans-serif;font-size:12pt;line-height:1.5;text-align:left;font-weight:bold;margin:24pt 0 12pt;';
 const ESTILO_ITEM = 'font-family:Arial,sans-serif;font-size:12pt;line-height:1.5;text-align:justify;margin:0 0 12pt;';
 const ESTILO_SUBITEM = 'font-family:Arial,sans-serif;font-size:12pt;line-height:1.5;text-align:left;margin:0 0 6pt 18pt;';
 const ESTILO_CITACAO = 'font-family:Arial,sans-serif;font-size:12pt;font-style:italic;line-height:1.5;text-align:justify;margin:18pt 0 18pt 36pt;';
@@ -83,13 +83,32 @@ export function esqueletoDoModelo(html, limite = 18000) {
   return linhas.join('\n').slice(0, limite);
 }
 
+// Remove QUALQUER divisor visual: <hr>, parágrafos feitos só de traços/underscores
+// e bordas aplicadas a parágrafos/divs. O modelo do escritório não usa divisores.
+export function limparDivisores(raiz) {
+  if (!raiz) return raiz;
+  raiz.querySelectorAll('hr').forEach((el) => el.remove());
+  raiz.querySelectorAll('p,div,td,li').forEach((el) => {
+    const texto = (el.textContent || '').replace(/\s|&nbsp;/g, '');
+    if (texto && /^[-_—–=*·]{3,}$/.test(texto)) {
+      el.remove();
+      return;
+    }
+    const style = el.getAttribute('style');
+    if (style && /border/i.test(style)) {
+      el.setAttribute('style', style.replace(/border[a-z-]*\s*:[^;]*;?/gi, ''));
+    }
+  });
+  return raiz;
+}
+
 // Aplica o padrão visual ao HTML de conteúdo devolvido pela IA.
 export function aplicarFormatacaoPadrao(htmlConteudo) {
   const doc = new DOMParser().parseFromString(`<div id="raiz">${htmlConteudo || ''}</div>`, 'text/html');
   const raiz = doc.getElementById('raiz');
 
   // O modelo do escritório não usa linhas divisórias entre seções.
-  raiz.querySelectorAll('hr').forEach((el) => el.remove());
+  limparDivisores(raiz);
 
   raiz.querySelectorAll('h1,h2,h3,h4,h5,h6').forEach((el) => {
     const p = doc.createElement('p');

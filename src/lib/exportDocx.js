@@ -18,6 +18,7 @@ import {
 import { applyConditionals } from './variables';
 import { removeTextLetterhead } from './removeTextLetterhead';
 import { TIMBRADO } from './timbrado';
+import { limparDivisores } from './trabalhista/formatacaoPeca';
 import { sessionTrace } from './sessionTrace';
 
 // ---------- Utilitarios de parsing HTML -> docx ----------
@@ -216,7 +217,16 @@ function processBlock(block, out, state) {
     return;
   }
 
-  const heading = ['h1', 'h2', 'h3'].includes(tag);
+  // Títulos vêm como <p><strong>TEXTO</strong></p> depois da formatação por código:
+  // detectá-los evita que um título fique isolado no fim da página.
+  const textoBlock = (block.textContent || '').trim();
+  const tituloEmParagrafo =
+    tag === 'p' &&
+    block.children.length === 1 &&
+    ['strong', 'b'].includes(block.children[0].tagName?.toLowerCase()) &&
+    textoBlock === (block.children[0].textContent || '').trim() &&
+    textoBlock === textoBlock.toUpperCase();
+  const heading = ['h1', 'h2', 'h3'].includes(tag) || tituloEmParagrafo;
   const runs = processInlineNodes(block, inlineStyle(block, { bold: heading }));
   const firstLine = toTwips(css['text-indent']);
   const left = toTwips(css['margin-left']);
@@ -245,6 +255,8 @@ function processBlock(block, out, state) {
     children: runs,
     alignment: alignment === AlignmentType.LEFT ? AlignmentType.JUSTIFIED : alignment,
     keepNext: heading,
+    keepLines: heading,
+    widowControl: true,
     indent: {
       ...(firstLine ? { firstLine } : {}),
       ...(left ? { left } : {}),
@@ -346,6 +358,9 @@ export async function exportToDocx(html, variables, title) {
   renderedRoot.setAttribute('aria-hidden', 'true');
   renderedRoot.style.cssText = 'position:fixed;left:-100000px;top:0;width:794px;visibility:hidden;pointer-events:none;';
   renderedRoot.innerHTML = processed;
+  // Documentos gerados antes da regra de "sem divisores" podem trazer <hr> ou
+  // linhas de traços — removidos também na exportação.
+  limparDivisores(renderedRoot);
   document.body.appendChild(renderedRoot);
 
   const children = [];
