@@ -259,7 +259,7 @@ export async function gerarMinuta(key, opts = {}) {
     // Verificação de coerência jurídica da minuta (LLM audita, não reescreve)
     addMessages(key, { role: 'tool', text: 'Verificando coerência jurídica da minuta...' });
     try {
-      const verif = await verificarCoerencia({ texto: geracaoTexto, caso, html });
+      const verif = await verificarCoerencia({ texto: geracaoTexto, caso, html, dadosReceita, dadosCep });
       const alertas = verif?.alertas || [];
       const icone = { BLOQUEANTE: '⛔', ATENCAO: '⚠️', INFO: 'ℹ️' };
       const cabecalho = `Verificação de coerência — status: ${verif?.status || 'concluída'}.`;
