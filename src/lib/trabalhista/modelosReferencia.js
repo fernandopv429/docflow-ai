@@ -868,7 +868,10 @@ export function buildGeracaoPadraoPrompt({ texto, attrs, modeloHtml, calculos, r
   return `${PROMPT_SISTEMA_PETICAO}${BLOCO_ENGENHARIA_JURIDICA}${BLOCO_REGRAS_QUALIDADE_FAV}${blocoRegrasCriticas({ municipios, dataHoje })}
 
 REGRA PRINCIPAL — ESCREVA APENAS O CONTEÚDO: a formatação (fonte, alinhamento, títulos, timbrado) é aplicada depois por código. Você NÃO deve reproduzir estilos, CSS, tabelas de layout ou atributos style.
-- Use HTML simples e semântico: <p> para parágrafos, <h2> para os títulos dos tópicos (em CAIXA ALTA), <ul>/<li> para listas de pedidos, <strong> para ênfase.
+- Use HTML simples e semântico: <p> para parágrafos, <h2> para os títulos dos tópicos (em CAIXA ALTA), <ul>/<li> para listas de pedidos, <strong> para ênfase, <blockquote> para citações.
+- LEGIBILIDADE (OBRIGATÓRIO): cada parágrafo em seu próprio <p>, com no máximo 5 a 6 linhas — divida ideias complexas em vários <p> curtos. É PROIBIDO entregar blocos densos e contínuos de texto nas teses e na narrativa dos fatos.
+- Cada item do rol de pedidos em seu próprio <li> (nunca vários pedidos no mesmo item).
+- Toda citação de doutrina, transcrição de artigo de lei ou ementa/aresto de jurisprudência deve ficar em um <blockquote> próprio, isolada do texto principal (o código aplica o recuo e o espaçamento).
 - Siga a ESTRUTURA e o TEXTO-PADRÃO do modelo do escritório reproduzido em texto abaixo (mesma ordem e mesmos tópicos fixos), preenchendo com os dados REAIS do caso. Onde faltar um dado, deixe um marcador claro entre colchetes, ex.: [SALÁRIO].
 - Ajuste ou REMOVA os tópicos que não se aplicam ao caso; mantenha os tópicos fixos.
 - Todo dado variável que você preencher com informações do caso atual deve ficar envolvido por <mark class="ai-filled-field" data-ai-field="nome_do_campo">valor</mark>. Nunca marque o texto jurídico padrão.

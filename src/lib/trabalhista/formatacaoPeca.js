@@ -9,8 +9,12 @@
 
 import { valorPorExtenso, formatarReais } from './valorPorExtenso';
 
-const ESTILO_PARAGRAFO = 'font-family:Arial,sans-serif;font-size:12pt;line-height:1.5;text-align:justify;margin:0 0 12pt;';
-const ESTILO_TITULO = 'font-family:Arial,sans-serif;font-size:12pt;line-height:1.5;text-align:left;font-weight:bold;margin:18pt 0 10pt;';
+// Espaçamento: 1 linha em branco entre parágrafos (18pt ≈ 1 linha de 12pt),
+// 2 linhas em branco antes de cada título e 1 linha depois dele.
+const ESTILO_PARAGRAFO = 'font-family:Arial,sans-serif;font-size:12pt;line-height:1.5;text-align:justify;margin:0 0 18pt;';
+const ESTILO_TITULO = 'font-family:Arial,sans-serif;font-size:12pt;line-height:1.5;text-align:left;font-weight:bold;margin:36pt 0 18pt;';
+const ESTILO_ITEM = 'font-family:Arial,sans-serif;font-size:12pt;line-height:1.5;text-align:justify;margin:0 0 12pt;';
+const ESTILO_CITACAO = 'font-family:Arial,sans-serif;font-size:11pt;line-height:1.5;text-align:justify;margin:18pt 0 18pt;padding-left:36pt;';
 const ESTILO_ENDERECAMENTO = 'font-family:Arial,sans-serif;font-size:12pt;line-height:1.5;text-align:left;font-weight:bold;margin:0 0 18pt;';
 
 // Substitui, POR CÓDIGO, TODO o bloco de fecho da petição — a IA não escreve
@@ -95,7 +99,16 @@ export function aplicarFormatacaoPadrao(htmlConteudo) {
   });
 
   raiz.querySelectorAll('li').forEach((el) => {
-    el.setAttribute('style', ESTILO_PARAGRAFO.replace('margin:0 0 12pt;', 'margin:0 0 6pt;'));
+    el.setAttribute('style', ESTILO_ITEM);
+  });
+
+  // Citações (doutrina, lei, ementas) isoladas do texto principal, recuadas
+  // e com 1 linha em branco antes e depois.
+  raiz.querySelectorAll('blockquote').forEach((el) => {
+    const p = doc.createElement('p');
+    p.setAttribute('style', ESTILO_CITACAO);
+    p.innerHTML = el.innerHTML.replace(/<\/?(p|div)[^>]*>/gi, ' ').trim();
+    el.replaceWith(p);
   });
 
   // Endereçamento (primeiro parágrafo, "AO MM. JUÍZO...") em destaque.
