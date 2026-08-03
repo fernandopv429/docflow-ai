@@ -14,6 +14,7 @@ import { valorPorExtenso, formatarReais } from './valorPorExtenso';
 const ESTILO_PARAGRAFO = 'font-family:Arial,sans-serif;font-size:12pt;line-height:1.5;text-align:justify;margin:0 0 18pt;';
 const ESTILO_TITULO = 'font-family:Arial,sans-serif;font-size:12pt;line-height:1.5;text-align:left;font-weight:bold;margin:36pt 0 18pt;';
 const ESTILO_ITEM = 'font-family:Arial,sans-serif;font-size:12pt;line-height:1.5;text-align:justify;margin:0 0 12pt;';
+const ESTILO_SUBITEM = 'font-family:Arial,sans-serif;font-size:12pt;line-height:1.5;text-align:left;margin:0 0 6pt;padding-left:18pt;';
 const ESTILO_CITACAO = 'font-family:Arial,sans-serif;font-size:11pt;line-height:1.5;text-align:justify;margin:18pt 0 18pt;padding-left:36pt;';
 const ESTILO_ENDERECAMENTO = 'font-family:Arial,sans-serif;font-size:12pt;line-height:1.5;text-align:left;font-weight:bold;margin:0 0 18pt;';
 
@@ -99,7 +100,14 @@ export function aplicarFormatacaoPadrao(htmlConteudo) {
   });
 
   raiz.querySelectorAll('li').forEach((el) => {
-    el.setAttribute('style', ESTILO_ITEM);
+    // Sub-itens (reflexos de um pedido) ficam recuados e mais próximos entre si.
+    const aninhado = Boolean(el.parentElement?.closest('li'));
+    el.setAttribute('style', aninhado ? ESTILO_SUBITEM : ESTILO_ITEM);
+  });
+
+  // Quadros/tabelas isolados do texto (1 linha em branco acima e abaixo).
+  raiz.querySelectorAll('table').forEach((el) => {
+    el.setAttribute('style', `${el.getAttribute('style') || ''}margin:18pt 0 18pt;`);
   });
 
   // Citações (doutrina, lei, ementas) isoladas do texto principal, recuadas

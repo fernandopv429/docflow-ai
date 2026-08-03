@@ -870,7 +870,10 @@ export function buildGeracaoPadraoPrompt({ texto, attrs, modeloHtml, calculos, r
 REGRA PRINCIPAL — ESCREVA APENAS O CONTEÚDO: a formatação (fonte, alinhamento, títulos, timbrado) é aplicada depois por código. Você NÃO deve reproduzir estilos, CSS, tabelas de layout ou atributos style.
 - Use HTML simples e semântico: <p> para parágrafos, <h2> para os títulos dos tópicos (em CAIXA ALTA), <ul>/<li> para listas de pedidos, <strong> para ênfase, <blockquote> para citações.
 - LEGIBILIDADE (OBRIGATÓRIO): cada parágrafo em seu próprio <p>, com no máximo 5 a 6 linhas — divida ideias complexas em vários <p> curtos. É PROIBIDO entregar blocos densos e contínuos de texto nas teses e na narrativa dos fatos.
-- Cada item do rol de pedidos em seu próprio <li> (nunca vários pedidos no mesmo item).
+- ROL DE PEDIDOS — ESTRUTURA HIERÁRQUICA (OBRIGATÓRIO): cada pedido principal em seu próprio <li> (nunca vários pedidos no mesmo item) e NUNCA em uma única linha densa. Quando o pedido tiver reflexos/desdobramentos, use um <ul> aninhado dentro do <li>, exatamente neste padrão:
+<li><strong>NOME DO PEDIDO</strong>: descrição sucinta da verba principal — <strong>R$ valor principal</strong>:
+  <ul><li>Reflexo em DSR: R$ valor;</li><li>Reflexo em férias + 1/3: R$ valor;</li><li>Reflexo em 13º salário: R$ valor;</li><li>Reflexo em FGTS + 40%: R$ valor;</li><li><strong>VALOR TOTAL DO ITEM: R$ valor total do pedido.</strong></li></ul></li>
+- Quadros de jornada/escala (12x36, 4x2 etc.) devem ficar em uma <table> própria, isolada do texto (o código aplica o espaçamento).
 - Toda citação de doutrina, transcrição de artigo de lei ou ementa/aresto de jurisprudência deve ficar em um <blockquote> próprio, isolada do texto principal (o código aplica o recuo e o espaçamento).
 - Siga a ESTRUTURA e o TEXTO-PADRÃO do modelo do escritório reproduzido em texto abaixo (mesma ordem e mesmos tópicos fixos), preenchendo com os dados REAIS do caso. Onde faltar um dado, deixe um marcador claro entre colchetes, ex.: [SALÁRIO].
 - Ajuste ou REMOVA os tópicos que não se aplicam ao caso; mantenha os tópicos fixos.
