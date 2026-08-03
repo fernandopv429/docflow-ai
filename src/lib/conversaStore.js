@@ -3,9 +3,8 @@ import {
   carregarModeloPadrao,
   conversarEntrevista,
   gerarPecaPadrao,
-  verificarCoerencia,
 } from '@/lib/trabalhista/modelosReferencia';
-import { fontesAuditoria, fontesEntrevista, fontesGeracao } from '@/lib/trabalhista/fontesAnalise';
+import { fontesEntrevista, fontesGeracao } from '@/lib/trabalhista/fontesAnalise';
 import { formatBRL } from '@/lib/trabalhista/mathUtils';
 import { carregarConversa, salvarConversa, tituloDaConversa } from '@/lib/conversas';
 
