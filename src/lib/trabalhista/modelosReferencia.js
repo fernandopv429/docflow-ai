@@ -805,7 +805,7 @@ ESTRUTURA E ESTILO DE REDAÇÃO (SEGUIR EXATAMENTE O MODELO)
    - DO AVISO PRÉVIO INDENIZADO (Lei 12.506/11)
    - DAS VERBAS RESCISÓRIAS
    - DA MULTA DO ARTIGO 477 DA CLT
-   - DA MULTA DO ARTIGO 467 DA CLT
+   - DA MULTA DO ARTIGO 467 DA CLT (50% sobre as verbas rescisórias INCONTROVERSAS — saldo de salário + aviso prévio + 13º + férias +1/3, NÃO apenas 1 salário. Se o valor "Multa do art. 467 da CLT" já vier pronto em CÁLCULOS DETERMINÍSTICOS, USE EXATAMENTE ESSE VALOR.)
 
 5. ROL DE PEDIDOS (DOS PEDIDOS):
    - Estruturar em tópicos com marcadores de hifen '-', indicando cada pedido principal e seus respectivos reflexos individualizados (DSRs, Aviso Prévio, Férias + 1/3, 13º Salário, FGTS + Multa de 40%).
