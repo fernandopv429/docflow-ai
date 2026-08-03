@@ -784,7 +784,7 @@ ESTRUTURA E ESTILO DE REDAÇÃO (SEGUIR EXATAMENTE O MODELO)
    - DA ATRIBUIÇÃO ESTIMATIVA AOS PEDIDOS
 
    Conforme o Caso Concreto (Mérito do Vigilante/Trabalhador):
-   - DO DESVIO DE FUNÇÃO (Vigilante executando Prevenção de Perdas/Conferência — Multa da CCT de 50%/mês)
+   - DO DESVIO DE FUNÇÃO (Vigilante executando Prevenção de Perdas/Conferência — Multa da CCT de 50%/mês. Se o valor "Desvio de função (50%/mês)" já vier pronto em CÁLCULOS DETERMINÍSTICOS, USE EXATAMENTE ESSE VALOR — NÃO calcule por conta própria; se não vier, estime com base nos meses reais do contrato informados na entrevista.)
    - DA GRATIFICAÇÃO DE FUNÇÃO (Se houver condução de veículo — 10% da CCT)
    - DA JORNADA DE TRABALHO
    - DAS HORAS EXTRAS (Excedentes da 8ª diária e 44ª semanal, com o ADICIONAL CONVENCIONAL REAL da CCT vigente informado no bloco CONVENÇÃO COLETIVA; nunca presuma um percentual — na falta, use [adicional conforme CCT])
