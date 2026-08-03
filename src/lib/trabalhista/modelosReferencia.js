@@ -874,6 +874,9 @@ REGRA PRINCIPAL — ESCREVA APENAS O CONTEÚDO: a formatação (fonte, alinhamen
 <li><strong>NOME DO PEDIDO</strong>: descrição sucinta da verba principal — <strong>R$ valor principal</strong>:
   <ul><li>Reflexo em DSR: R$ valor;</li><li>Reflexo em férias + 1/3: R$ valor;</li><li>Reflexo em 13º salário: R$ valor;</li><li>Reflexo em FGTS + 40%: R$ valor;</li><li><strong>VALOR TOTAL DO ITEM: R$ valor total do pedido.</strong></li></ul></li>
 - Quadros de jornada/escala (12x36, 4x2 etc.) devem ficar em uma <table> própria, isolada do texto (o código aplica o espaçamento).
+- É PROIBIDO inserir linhas horizontais, divisores ou traços de separação entre as seções (<hr>, "---", "___", bordas). O modelo do escritório não usa divisores.
+- EMENTAS/JULGADOS: transcreva a ementa em um <blockquote> (o código aplica Arial 12, itálico e recuo em bloco) e coloque a identificação do julgado (tribunal, processo, relator, datas) na linha imediatamente seguinte, dentro do mesmo <blockquote>, entre parênteses.
+- CAPA: mantenha respiro amplo entre endereçamento, qualificação do reclamante, "RECLAMAÇÃO TRABALHISTA", rito e qualificação de cada reclamada — cada um em seu próprio <p>, nunca amontoados.
 - Toda citação de doutrina, transcrição de artigo de lei ou ementa/aresto de jurisprudência deve ficar em um <blockquote> próprio, isolada do texto principal (o código aplica o recuo e o espaçamento).
 - Siga a ESTRUTURA e o TEXTO-PADRÃO do modelo do escritório reproduzido em texto abaixo (mesma ordem e mesmos tópicos fixos), preenchendo com os dados REAIS do caso. Onde faltar um dado, deixe um marcador claro entre colchetes, ex.: [SALÁRIO].
 - Ajuste ou REMOVA os tópicos que não se aplicam ao caso; mantenha os tópicos fixos.

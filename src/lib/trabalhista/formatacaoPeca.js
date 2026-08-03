@@ -15,7 +15,7 @@ const ESTILO_PARAGRAFO = 'font-family:Arial,sans-serif;font-size:12pt;line-heigh
 const ESTILO_TITULO = 'font-family:Arial,sans-serif;font-size:12pt;line-height:1.5;text-align:left;font-weight:bold;margin:36pt 0 18pt;';
 const ESTILO_ITEM = 'font-family:Arial,sans-serif;font-size:12pt;line-height:1.5;text-align:justify;margin:0 0 12pt;';
 const ESTILO_SUBITEM = 'font-family:Arial,sans-serif;font-size:12pt;line-height:1.5;text-align:left;margin:0 0 6pt;padding-left:18pt;';
-const ESTILO_CITACAO = 'font-family:Arial,sans-serif;font-size:11pt;line-height:1.5;text-align:justify;margin:18pt 0 18pt;padding-left:36pt;';
+const ESTILO_CITACAO = 'font-family:Arial,sans-serif;font-size:12pt;font-style:italic;line-height:1.5;text-align:justify;margin:18pt 0 18pt;padding-left:36pt;';
 const ESTILO_ENDERECAMENTO = 'font-family:Arial,sans-serif;font-size:12pt;line-height:1.5;text-align:left;font-weight:bold;margin:0 0 18pt;';
 
 // Substitui, POR CÓDIGO, TODO o bloco de fecho da petição — a IA não escreve
@@ -87,6 +87,9 @@ export function esqueletoDoModelo(html, limite = 18000) {
 export function aplicarFormatacaoPadrao(htmlConteudo) {
   const doc = new DOMParser().parseFromString(`<div id="raiz">${htmlConteudo || ''}</div>`, 'text/html');
   const raiz = doc.getElementById('raiz');
+
+  // O modelo do escritório não usa linhas divisórias entre seções.
+  raiz.querySelectorAll('hr').forEach((el) => el.remove());
 
   raiz.querySelectorAll('h1,h2,h3,h4,h5,h6').forEach((el) => {
     const p = doc.createElement('p');
