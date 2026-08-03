@@ -803,7 +803,7 @@ ESTRUTURA E ESTILO DE REDAÇÃO (SEGUIR EXATAMENTE O MODELO)
    - DAS MULTAS CONVENCIONAIS (use o NÚMERO da cláusula e o PERCENTUAL REAIS da CCT vigente fornecida no bloco CONVENÇÃO COLETIVA; é PROIBIDO inventar percentual/cláusula — se a CCT não constar, use o marcador [cláusula/percentual conforme CCT])
    - DOS FGTS + MULTA DE 40% (Art. 18 da Lei 8.036/90)
    - DO AVISO PRÉVIO INDENIZADO (Lei 12.506/11)
-   - DAS VERBAS RESCISÓRIAS
+   - DAS VERBAS RESCISÓRIAS (Se os valores "Saldo de salário", "Aviso prévio indenizado", "13º proporcional", "Férias proporcionais + 1/3" já vierem prontos em CÁLCULOS DETERMINÍSTICOS, USE EXATAMENTE ESSES VALORES — NÃO calcule o saldo de salário por conta própria, nem arredonde os dias.)
    - DA MULTA DO ARTIGO 477 DA CLT
    - DA MULTA DO ARTIGO 467 DA CLT (50% sobre as verbas rescisórias INCONTROVERSAS — saldo de salário + aviso prévio + 13º + férias +1/3, NÃO apenas 1 salário. Se o valor "Multa do art. 467 da CLT" já vier pronto em CÁLCULOS DETERMINÍSTICOS, USE EXATAMENTE ESSE VALOR.)
 
