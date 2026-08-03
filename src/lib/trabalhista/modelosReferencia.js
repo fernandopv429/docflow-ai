@@ -1145,6 +1145,7 @@ Checagens obrigatórias:
 Classifique cada alerta: BLOQUEANTE (erro grave), ATENCAO (revisar) ou INFO. Defina "status": "bloqueado" se houver BLOQUEANTE; "revisar" se houver ATENCAO; senão "aprovado".
 
 DADOS DO CASO (estruturado): ${JSON.stringify(caso || {})}
+DADOS OFICIAIS JÁ VERIFICADOS (Receita Federal/ViaCEP — use para julgar se uma divergência do relato é uma correção legítima, não um erro): ${JSON.stringify(dadosReceita || [])} ${JSON.stringify(dadosCep || [])}
 RELATO/ENTREVISTA: """${texto || ''}"""
 MINUTA GERADA (HTML): """${html || ''}"""
 
