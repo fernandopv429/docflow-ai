@@ -1072,7 +1072,8 @@ export async function gerarPecaPadrao({ texto, fileUrls, attrs, modeloPadrao, on
       );
     }
   }
-  const htmlBruto = aplicarFechoDeterministico(htmlLimpo, { valorCausa });
+  const htmlSemZerados = removerPedidosZerados(htmlLimpo);
+  const htmlBruto = aplicarFechoDeterministico(htmlSemZerados, { valorCausa });
 
   return {
     html: aplicarFormatacaoPadrao(htmlBruto),
