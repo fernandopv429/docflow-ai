@@ -190,11 +190,24 @@ function processBlock(block, out, state) {
     return;
   }
   if (tag === 'ul' || tag === 'ol') {
+    const level = state.listLevel || 0;
     for (const li of block.children) {
+      // Sublistas (reflexos de um pedido) viram um nível recuado abaixo do item,
+      // em vez de serem achatadas na mesma linha do pedido principal.
+      const sublistas = [...li.children].filter((c) => ['ul', 'ol'].includes(c.tagName?.toLowerCase()));
+      const conteudo = li.cloneNode(true);
+      conteudo.querySelectorAll('ul,ol').forEach((n) => n.remove());
+      const cssLi = cssValues(li);
       out.push(new Paragraph({
-        children: processInlineNodes(li, inlineStyle(li)),
-        ...(tag === 'ul' ? { bullet: { level: 0 } } : { numbering: { reference: 'doc-numbering', level: 0 } }),
+        children: processInlineNodes(conteudo, inlineStyle(li)),
+        spacing: { after: toTwips(cssLi['margin-bottom']) || 120 },
+        ...(tag === 'ul'
+          ? { bullet: { level } }
+          : { numbering: { reference: 'doc-numbering', level } }),
       }));
+      for (const sub of sublistas) {
+        processBlock(sub, out, { ...state, listLevel: level + 1 });
+      }
     }
     return;
   }

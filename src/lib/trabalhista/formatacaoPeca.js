@@ -14,8 +14,8 @@ import { valorPorExtenso, formatarReais } from './valorPorExtenso';
 const ESTILO_PARAGRAFO = 'font-family:Arial,sans-serif;font-size:12pt;line-height:1.5;text-align:justify;margin:0 0 18pt;';
 const ESTILO_TITULO = 'font-family:Arial,sans-serif;font-size:12pt;line-height:1.5;text-align:left;font-weight:bold;margin:36pt 0 18pt;';
 const ESTILO_ITEM = 'font-family:Arial,sans-serif;font-size:12pt;line-height:1.5;text-align:justify;margin:0 0 12pt;';
-const ESTILO_SUBITEM = 'font-family:Arial,sans-serif;font-size:12pt;line-height:1.5;text-align:left;margin:0 0 6pt;padding-left:18pt;';
-const ESTILO_CITACAO = 'font-family:Arial,sans-serif;font-size:12pt;font-style:italic;line-height:1.5;text-align:justify;margin:18pt 0 18pt;padding-left:36pt;';
+const ESTILO_SUBITEM = 'font-family:Arial,sans-serif;font-size:12pt;line-height:1.5;text-align:left;margin:0 0 6pt 18pt;';
+const ESTILO_CITACAO = 'font-family:Arial,sans-serif;font-size:12pt;font-style:italic;line-height:1.5;text-align:justify;margin:18pt 0 18pt 36pt;';
 const ESTILO_ENDERECAMENTO = 'font-family:Arial,sans-serif;font-size:12pt;line-height:1.5;text-align:left;font-weight:bold;margin:0 0 18pt;';
 
 // Substitui, POR CÓDIGO, TODO o bloco de fecho da petição — a IA não escreve
